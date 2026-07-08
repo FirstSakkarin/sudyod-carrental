@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>สุดยอดรถเช่า เชียงใหม่</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body>
+
+  <!-- MAIN APP -->
+  <div id="mainApp" class="app-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo"><i class="fa-solid fa-car-side"></i></div>
+        <div>
+          <span class="sidebar-title">สุดยอดรถเช่า</span>
+          <span class="sidebar-sub">เชียงใหม่</span>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" onclick="navigate('dashboard')">
+          <i class="fa-solid fa-chart-pie"></i><span>ภาพรวม</span>
+        </a>
+        <a href="#" class="nav-item" onclick="navigate('cars')">
+          <i class="fa-solid fa-car"></i><span>รถทั้งหมด</span>
+        </a>
+        <a href="#" class="nav-item" onclick="navigate('bookings')">
+          <i class="fa-solid fa-calendar-check"></i><span>การจอง</span>
+        </a>
+        <a href="#" class="nav-item" onclick="navigate('maintenance')">
+          <i class="fa-solid fa-wrench"></i><span>ซ่อมบำรุง</span>
+        </a>
+        <a href="#" class="nav-item" onclick="navigate('suggest')">
+          <i class="fa-solid fa-lightbulb"></i><span>แนะนำรถ</span>
+        </a>
+        <a href="#" class="nav-item owner-only" onclick="navigate('finance')">
+          <i class="fa-solid fa-coins"></i><span>รายรับ-รายจ่าย</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-info">
+          <div class="user-avatar"><i class="fa-solid fa-store"></i></div>
+          <div>
+            <span class="user-name">สุดยอดรถเช่า</span>
+            <span class="role-badge">เชียงใหม่</span>
+          </div>
+        </div>
+        <div class="sidebar-actions">
+          <button class="icon-btn" onclick="openSettingsModal()" title="ตั้งค่า Google Sheets">
+            <i class="fa-solid fa-gear"></i>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MOBILE TOPBAR -->
+    <header class="topbar">
+      <button class="menu-btn" onclick="toggleSidebar()">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+      <span class="topbar-title" id="topbarTitle">ภาพรวม</span>
+      <div class="topbar-right">
+        <span id="syncStatus" class="sync-badge sync-off">
+          <i class="fa-solid fa-circle"></i> ออฟไลน์
+        </span>
+        <button class="menu-btn" onclick="openSettingsModal()">
+          <i class="fa-solid fa-gear"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- SIDEBAR OVERLAY -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+
+      <!-- DASHBOARD -->
+      <section id="page-dashboard" class="page active">
+        <div class="page-header">
+          <div>
+            <h2>ภาพรวมฝูงรถ</h2>
+            <p class="page-subtitle" id="todayDate"></p>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="syncNow()">
+            <i class="fa-solid fa-rotate"></i> รีเฟรช
+          </button>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card stat-total">
+            <div class="stat-icon"><i class="fa-solid fa-car"></i></div>
+            <div class="stat-info">
+              <div class="stat-num" id="statTotal">0</div>
+              <div class="stat-label">รถทั้งหมด</div>
+            </div>
+          </div>
+          <div class="stat-card stat-available">
+            <div class="stat-icon"><i class="fa-solid fa-circle-check"></i></div>
+            <div class="stat-info">
+              <div class="stat-num" id="statAvailable">0</div>
+              <div class="stat-label">รถว่าง</div>
+            </div>
+          </div>
+          <div class="stat-card stat-rented">
+            <div class="stat-icon"><i class="fa-solid fa-road"></i></div>
+            <div class="stat-info">
+              <div class="stat-num" id="statRented">0</div>
+              <div class="stat-label">กำลังเช่า</div>
+            </div>
+          </div>
+          <div class="stat-card stat-maintenance">
+            <div class="stat-icon"><i class="fa-solid fa-wrench"></i></div>
+            <div class="stat-info">
+              <div class="stat-num" id="statMaintenance">0</div>
+              <div class="stat-label">ซ่อมบำรุง</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-card">
+          <div class="section-card-header">
+            <h3><i class="fa-solid fa-rotate-left"></i> คืนรถวันนี้</h3>
+          </div>
+          <div id="todayReturns" class="return-list"></div>
+        </div>
+
+        <div class="section-card">
+          <div class="section-card-header">
+            <h3><i class="fa-solid fa-list"></i> สถานะรถทุกคัน</h3>
+          </div>
+          <div id="dashboardCarList" class="car-grid"></div>
+        </div>
+      </section>
+
+      <!-- CARS PAGE -->
+      <section id="page-cars" class="page">
+        <div class="page-header">
+          <div>
+            <h2>รถทั้งหมด</h2>
+            <p class="page-subtitle" id="carsCount"></p>
+          </div>
+          <button class="btn btn-primary" onclick="openAddCarModal()">
+            <i class="fa-solid fa-plus"></i> เพิ่มรถ
+          </button>
+        </div>
+        <div class="filter-bar">
+          <div class="search-box">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="carSearch" placeholder="ค้นหา ทะเบียน / ยี่ห้อ / รุ่น..." oninput="renderCarsPage()" />
+          </div>
+          <select id="carStatusFilter" onchange="renderCarsPage()">
+            <option value="">ทุกสถานะ</option>
+            <option value="available">ว่าง</option>
+            <option value="rented">เช่าอยู่</option>
+            <option value="maintenance">ซ่อมบำรุง</option>
+          </select>
+        </div>
+        <div id="carsTableContainer"></div>
+      </section>
+
+      <!-- BOOKINGS PAGE -->
+      <section id="page-bookings" class="page">
+        <div class="page-header">
+          <div>
+            <h2>การจอง</h2>
+          </div>
+          <button class="btn btn-primary" onclick="openAddBookingModal()">
+            <i class="fa-solid fa-plus"></i> เพิ่มการจอง
+          </button>
+        </div>
+        <div class="filter-bar">
+          <select id="bookingFilter" onchange="renderBookingsPage()">
+            <option value="active">กำลังเช่า</option>
+            <option value="upcoming">กำลังจะถึง</option>
+            <option value="completed">คืนแล้ว</option>
+            <option value="all">ทั้งหมด</option>
+          </select>
+        </div>
+        <div id="bookingsTableContainer"></div>
+      </section>
+
+      <!-- MAINTENANCE PAGE -->
+      <section id="page-maintenance" class="page">
+        <div class="page-header">
+          <div>
+            <h2>ซ่อมบำรุง</h2>
+          </div>
+          <button class="btn btn-primary" onclick="openAddMaintenanceModal()">
+            <i class="fa-solid fa-plus"></i> บันทึกการซ่อม
+          </button>
+        </div>
+        <div class="filter-bar">
+          <select id="maintenanceCarFilter" onchange="renderMaintenancePage()">
+            <option value="">รถทุกคัน</option>
+          </select>
+        </div>
+        <div id="maintenanceTableContainer"></div>
+      </section>
+
+      <!-- SUGGEST PAGE -->
+      <section id="page-suggest" class="page">
+        <div class="page-header">
+          <div>
+            <h2>แนะนำรถ</h2>
+            <p class="page-subtitle">ค้นหารถว่างตามวันที่ต้องการ</p>
+          </div>
+        </div>
+        <div class="section-card">
+          <div class="suggest-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label><i class="fa-solid fa-calendar"></i> วันรับรถ</label>
+                <input type="date" id="suggestDate" onchange="runSuggest()" />
+              </div>
+              <div class="form-group">
+                <label><i class="fa-solid fa-calendar-xmark"></i> วันคืนรถ</label>
+                <input type="date" id="suggestEndDate" onchange="runSuggest()" />
+              </div>
+              <div class="form-group">
+                <label><i class="fa-solid fa-car"></i> ประเภทรถ</label>
+                <select id="suggestType" onchange="runSuggest()">
+                  <option value="">ทุกประเภท</option>
+                  <option value="sedan">ซีดาน</option>
+                  <option value="suv">SUV</option>
+                  <option value="pickup">กระบะ</option>
+                  <option value="van">ตู้</option>
+                </select>
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="runSuggest()">
+              <i class="fa-solid fa-magnifying-glass"></i> ค้นหารถ
+            </button>
+          </div>
+        </div>
+        <div id="suggestResults"></div>
+      </section>
+
+      <!-- FINANCE PAGE (Owner only) -->
+      <section id="page-finance" class="page">
+        <div class="page-header">
+          <div>
+            <h2>รายรับ-รายจ่าย</h2>
+          </div>
+          <button class="btn btn-primary" onclick="openAddExpenseModal()">
+            <i class="fa-solid fa-plus"></i> บันทึกรายจ่าย
+          </button>
+        </div>
+        <div class="filter-bar">
+          <select id="financeCarFilter" onchange="renderFinancePage()">
+            <option value="">รถทุกคัน</option>
+          </select>
+          <select id="financeMonthFilter" onchange="renderFinancePage()">
+            <option value="">ทุกเดือน</option>
+          </select>
+        </div>
+        <div id="financeSummaryCards" class="stats-grid"></div>
+        <div id="financeTableContainer"></div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ======================== MODALS ======================== -->
+
+  <!-- Car Modal -->
+  <div id="carModal" class="modal-overlay" style="display:none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="carModalTitle">เพิ่มรถ</h3>
+        <button class="modal-close" onclick="closeModal('carModal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="carModalId" />
+        <div class="form-row">
+          <div class="form-group">
+            <label>ทะเบียนรถ *</label>
+            <input type="text" id="carPlate" placeholder="เช่น ขข 1234 เชียงใหม่" />
+          </div>
+          <div class="form-group">
+            <label>ประเภท</label>
+            <select id="carType">
+              <option value="sedan">ซีดาน</option>
+              <option value="suv">SUV</option>
+              <option value="pickup">กระบะ</option>
+              <option value="van">ตู้</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>ยี่ห้อ *</label>
+            <input type="text" id="carBrand" placeholder="เช่น Toyota" />
+          </div>
+          <div class="form-group">
+            <label>รุ่น *</label>
+            <input type="text" id="carModel" placeholder="เช่น Camry" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>ปี</label>
+            <input type="number" id="carYear" placeholder="เช่น 2022" min="2000" max="2035" />
+          </div>
+          <div class="form-group">
+            <label>สี</label>
+            <input type="text" id="carColor" placeholder="เช่น ขาว" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>เลขไมล์ปัจจุบัน (กม.)</label>
+            <input type="number" id="carMileage" placeholder="เช่น 45000" />
+          </div>
+          <div class="form-group">
+            <label>ซ่อมครั้งถัดไปที่ (กม.)</label>
+            <input type="number" id="carNextService" placeholder="เช่น 50000" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>ราคาเช่า/วัน (บาท)</label>
+            <input type="number" id="carDailyRate" placeholder="เช่น 800" />
+          </div>
+          <div class="form-group">
+            <label>สถานะ</label>
+            <select id="carStatus">
+              <option value="available">ว่าง</option>
+              <option value="rented">เช่าอยู่</option>
+              <option value="maintenance">ซ่อมบำรุง</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>หมายเหตุ</label>
+          <textarea id="carNote" rows="2" placeholder="หมายเหตุเพิ่มเติม..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('carModal')">ยกเลิก</button>
+        <button class="btn btn-primary" onclick="saveCar()"><i class="fa-solid fa-floppy-disk"></i> บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Car Detail Modal -->
+  <div id="carDetailModal" class="modal-overlay" style="display:none;">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h3 id="carDetailTitle">รายละเอียดรถ</h3>
+        <button class="modal-close" onclick="closeModal('carDetailModal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body" id="carDetailBody"></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('carDetailModal')">ปิด</button>
+        <button class="btn btn-warning" id="carDetailEditBtn">
+          <i class="fa-solid fa-pen"></i> แก้ไข
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Booking Modal -->
+  <div id="bookingModal" class="modal-overlay" style="display:none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="bookingModalTitle">เพิ่มการจอง</h3>
+        <button class="modal-close" onclick="closeModal('bookingModal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="bookingModalId" />
+        <div class="form-group">
+          <label>รถ *</label>
+          <select id="bookingCar" onchange="calcBookingTotal()"></select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>ชื่อลูกค้า *</label>
+            <input type="text" id="bookingCustomer" placeholder="ชื่อ-นามสกุล" />
+          </div>
+          <div class="form-group">
+            <label>เบอร์โทร</label>
+            <input type="text" id="bookingPhone" placeholder="08X-XXX-XXXX" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>วันรับรถ *</label>
+            <input type="date" id="bookingStart" onchange="calcBookingTotal()" />
+          </div>
+          <div class="form-group">
+            <label>วันคืนรถ *</label>
+            <input type="date" id="bookingEnd" onchange="calcBookingTotal()" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>เลขไมล์ออก (กม.)</label>
+            <input type="number" id="bookingMileageOut" placeholder="เลขไมล์ตอนออกรถ" />
+          </div>
+          <div class="form-group">
+            <label>ราคาพิเศษ/วัน <small>(ว่างไว้ = ราคาปกติ)</small></label>
+            <input type="number" id="bookingRate" placeholder="บาท/วัน" oninput="calcBookingTotal()" />
+          </div>
+        </div>
+        <div class="booking-total-box" id="bookingTotalBox" style="display:none;">
+          <i class="fa-solid fa-receipt"></i>
+          รวม <strong id="bookingDays">0</strong> วัน &nbsp;=&nbsp;
+          <strong class="total-amount" id="bookingTotal">฿0</strong>
+        </div>
+        <div class="form-group">
+          <label>หมายเหตุ</label>
+          <textarea id="bookingNote" rows="2" placeholder="หมายเหตุ..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('bookingModal')">ยกเลิก</button>
+        <button class="btn btn-primary" onclick="saveBooking()"><i class="fa-solid fa-floppy-disk"></i> บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Return Car Modal -->
+  <div id="returnModal" class="modal-overlay" style="display:none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-rotate-left"></i> คืนรถ</h3>
+        <button class="modal-close" onclick="closeModal('returnModal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="returnBookingId" />
+        <div id="returnSummary" class="return-summary"></div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>วันคืนจริง</label>
+            <input type="date" id="returnDate" />
+          </div>
+          <div class="form-group">
+            <label>เลขไมล์ตอนคืน (กม.)</label>
+            <input type="number" id="returnMileage" placeholder="เลขไมล์ตอนคืน" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>ค่าใช้จ่ายเพิ่มเติม (บาท)</label>
+          <input type="number" id="returnExtra" value="0" placeholder="ค่าทำความสะอาด, น้ำมัน ฯลฯ" />
+        </div>
+        <div class="form-group">
+          <label>หมายเหตุการคืน</label>
+          <textarea id="returnNote" rows="2" placeholder="สภาพรถ, หมายเหตุ..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('returnModal')">ยกเลิก</button>
+        <button class="btn btn-success" onclick="confirmReturn()">
+          <i class="fa-solid fa-check"></i> ยืนยันคืนรถ
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Maintenance Modal -->
+  <div id="maintenanceModal" class="modal-overlay" style="display:none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>บันทึกการซ่อมบำรุง</h3>
+        <button class="modal-close" onclick="closeModal('maintenanceModal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="maintenanceModalId" />
+        <div class="form-row">
+          <div class="form-group">
+            <label>รถ *</label>
+            <select id="maintenanceCar"></select>
+          </div>
+          <div class="form-group">
+            <label>วันที่ซ่อม *</label>
+            <input type="date" id="maintenanceDate" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>ประเภทการซ่อม</label>
+            <select id="maintenanceType">
+              <option value="oil">เปลี่ยนน้ำมันเครื่อง</option>
+              <option value="tire">ยาง</option>
+              <option value="brake">เบรก</option>
+              <option value="ac">แอร์</option>
+              <option value="body">ตัวถัง/สี</option>
+              <option value="general">ทั่วไป</option>
+              <option value="other">อื่นๆ</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>เลขไมล์ตอนซ่อม (กม.)</label>
+            <input type="number" id="maintenanceMileage" placeholder="เช่น 45000" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>ค่าซ่อม (บาท) *</label>
+            <input type="number" id="maintenanceCost" placeholder="0" />
+          </div>
+          <div class="form-group">
+            <label>ซ่อมครั้งถัดไปที่ (กม.)</label>
+            <input type="number" id="maintenanceNextService" placeholder="เช่น 50000" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>รายละเอียด</label>
+          <textarea id="maintenanceDetail" rows="3" placeholder="รายละเอียดการซ่อม..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('maintenanceModal')">ยกเลิก</button>
+        <button class="btn btn-primary" onclick="saveMaintenance()"><i class="fa-solid fa-floppy-disk"></i> บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Expense Modal -->
+  <div id="expenseModal" class="modal-overlay" style="display:none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>บันทึกรายจ่าย</h3>
+        <button class="modal-close" onclick="closeModal('expenseModal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="expenseModalId" />
+        <div class="form-row">
+          <div class="form-group">
+            <label>รถ *</label>
+            <select id="expenseCar"></select>
+          </div>
+          <div class="form-group">
+            <label>วันที่ *</label>
+            <input type="date" id="expenseDate" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>ประเภทรายจ่าย</label>
+            <select id="expenseType">
+              <option value="insurance">ประกันภัย</option>
+              <option value="tax">ภาษีรถ</option>
+              <option value="fuel">น้ำมัน</option>
+              <option value="maintenance">ซ่อมบำรุง</option>
+              <option value="cleaning">ทำความสะอาด</option>
+              <option value="other">อื่นๆ</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>จำนวนเงิน (บาท) *</label>
+            <input type="number" id="expenseAmount" placeholder="0" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>รายละเอียด</label>
+          <textarea id="expenseDetail" rows="2" placeholder="รายละเอียด..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('expenseModal')">ยกเลิก</button>
+        <button class="btn btn-primary" onclick="saveExpense()"><i class="fa-solid fa-floppy-disk"></i> บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settingsModal" class="modal-overlay" style="display:none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h3><i class="fa-brands fa-google" style="color:#4285f4;"></i> เชื่อมต่อ Google Sheets</h3>
+        <button class="modal-close" onclick="closeModal('settingsModal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="sheets-guide">
+          <div class="guide-step"><span class="step-num">1</span><div>เปิด Google Sheet → <strong>Extensions → Apps Script</strong></div></div>
+          <div class="guide-step"><span class="step-num">2</span><div>วางโค้ดจากไฟล์ <code>Code.gs</code> แล้วกด Save</div></div>
+          <div class="guide-step"><span class="step-num">3</span><div><strong>Deploy → New deployment</strong> · Type: Web app · Access: Anyone</div></div>
+          <div class="guide-step"><span class="step-num">4</span><div>คัดลอก <strong>Web App URL</strong> วางด้านล่าง</div></div>
+        </div>
+        <div class="form-group" style="margin-top:1rem;">
+          <label>Web App URL</label>
+          <input type="url" id="settingsUrl" placeholder="https://script.google.com/macros/s/..." />
+        </div>
+        <div class="form-group">
+          <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;">
+            <button class="btn btn-outline btn-sm" onclick="testSheetsConnection()">
+              <i class="fa-solid fa-plug"></i> ทดสอบการเชื่อมต่อ
+            </button>
+            <span id="testResult" style="font-size:.82rem;"></span>
+          </div>
+        </div>
+        <div class="info-box">
+          <i class="fa-solid fa-circle-info"></i>
+          ข้อมูลจะ sync อัตโนมัติทุกครั้งที่มีการเปลี่ยนแปลง ถ้าไม่กรอก URL ระบบทำงาน offline ด้วย localStorage
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('settingsModal')">ยกเลิก</button>
+        <button class="btn btn-primary" onclick="saveSettings()">
+          <i class="fa-solid fa-floppy-disk"></i> บันทึกและซิงค์
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast" style="display:none;"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
