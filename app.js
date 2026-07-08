@@ -27,7 +27,7 @@ function initApp() {
   document.getElementById('todayDate').textContent = formatDateThai(new Date());
   renderDashboard();
   navigate('dashboard');
-  if (state.sheetsUrl) syncNow();
+  if (state.sheetsUrl) loadFromSheets();
 }
 
 function loadFromStorage() {
@@ -875,15 +875,48 @@ async function testSheetsConnection() {
   }
 }
 
+// โหลดข้อมูลจาก Sheets ตอนเปิดแอป
+async function loadFromSheets() {
+  if (!state.sheetsUrl) return;
+  setSyncStatus('syncing');
+  try {
+    const res  = await fetch(state.sheetsUrl);
+    const json = await res.json();
+    if (json.status === 'ok' && json.data) {
+      const d = json.data;
+      if (d.cars?.length)        state.cars        = d.cars;
+      if (d.bookings?.length)    state.bookings    = d.bookings;
+      if (d.maintenance?.length) state.maintenance = d.maintenance;
+      if (d.expenses?.length)    state.expenses    = d.expenses;
+      saveToStorage();
+      renderDashboard();
+      setSyncStatus('on');
+      showToast('โหลดข้อมูลจาก Google Sheets เรียบร้อย ✅', 'success');
+    } else {
+      // Sheets ว่างอยู่ → push ข้อมูล local ขึ้นไป
+      syncNow();
+    }
+  } catch {
+    setSyncStatus('error');
+    showToast('โหลดข้อมูลจาก Sheets ไม่ได้ ใช้ข้อมูล local แทน', '');
+  }
+}
+
+// Push ข้อมูลไปยัง Sheets
 async function syncNow() {
   if (!state.sheetsUrl || state.syncing) return;
   state.syncing = true;
   setSyncStatus('syncing');
   try {
-    const payload = { cars: state.cars, bookings: state.bookings, maintenance: state.maintenance, expenses: state.expenses };
+    const payload = {
+      cars:        state.cars,
+      bookings:    state.bookings,
+      maintenance: state.maintenance,
+      expenses:    state.expenses,
+    };
     const res  = await fetch(state.sheetsUrl, {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body:   JSON.stringify(payload),
       headers: { 'Content-Type': 'application/json' },
     });
     const json = await res.json();
