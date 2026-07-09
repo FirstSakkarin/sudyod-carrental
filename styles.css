@@ -83,11 +83,42 @@ input, select, textarea {
   z-index: 200;
   transition: transform .25s ease;
 }
+/* Logo images */
+.sidebar-logo-img {
+  width: 100%;
+  max-height: 110px;
+  object-fit: contain;
+  display: block;
+  padding: .25rem .5rem;
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,.4));
+}
+.footer-logo-img {
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.3);
+  flex-shrink: 0;
+}
+.topbar-logo-img {
+  height: 32px;
+  width: 32px;
+  object-fit: contain;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+.topbar-logo-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+
 .sidebar-header {
   display: flex;
   align-items: center;
   gap: .75rem;
-  padding: 1.25rem 1rem;
+  padding: .5rem 0 0;
   border-bottom: 1px solid rgba(255,255,255,.08);
 }
 .sidebar-logo {

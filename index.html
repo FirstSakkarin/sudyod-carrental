@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>สุดยอดรถเช่า เชียงใหม่</title>
+  <title>สุดยอด รถเช่า เชียงใหม่</title>
+  <link rel="icon" type="image/jpeg" href="logo.jpg" />
+  <link rel="apple-touch-icon" href="logo.jpg" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 </head>
@@ -15,11 +17,7 @@
     <!-- SIDEBAR -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
-        <div class="sidebar-logo"><i class="fa-solid fa-car-side"></i></div>
-        <div>
-          <span class="sidebar-title">สุดยอดรถเช่า</span>
-          <span class="sidebar-sub">เชียงใหม่</span>
-        </div>
+        <img src="logo.jpg" alt="Sud-Yod Car Rental" class="sidebar-logo-img" />
       </div>
       <nav class="sidebar-nav">
         <a href="#" class="nav-item active" onclick="navigate('dashboard')">
@@ -43,7 +41,7 @@
       </nav>
       <div class="sidebar-footer">
         <div class="user-info">
-          <div class="user-avatar"><i class="fa-solid fa-store"></i></div>
+          <img src="logo.jpg" alt="logo" class="footer-logo-img" />
           <div>
             <span class="user-name">สุดยอดรถเช่า</span>
             <span class="role-badge">เชียงใหม่</span>
@@ -62,7 +60,10 @@
       <button class="menu-btn" onclick="toggleSidebar()">
         <i class="fa-solid fa-bars"></i>
       </button>
-      <span class="topbar-title" id="topbarTitle">ภาพรวม</span>
+      <div class="topbar-logo-wrap">
+        <img src="logo.jpg" alt="Sud-Yod" class="topbar-logo-img" />
+        <span class="topbar-title" id="topbarTitle">ภาพรวม</span>
+      </div>
       <div class="topbar-right">
         <span id="syncStatus" class="sync-badge sync-off">
           <i class="fa-solid fa-circle"></i> ออฟไลน์
