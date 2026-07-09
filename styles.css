@@ -4,39 +4,44 @@
 
 :root {
   /* Brand */
-  --primary:        #6d28d9;
+  --primary:        #7c3aed;
   --primary-dark:   #4c1d95;
-  --primary-light:  #ede9fe;
+  --primary-light:  #2e1065;
   --accent:         #f97316;
-  --accent-light:   #fff7ed;
+  --accent-light:   #431407;
 
   /* Status */
-  --available:      #10b981;
-  --available-bg:   #d1fae5;
-  --rented:         #3b82f6;
-  --rented-bg:      #dbeafe;
-  --maintenance:    #f59e0b;
-  --maintenance-bg: #fef3c7;
-  --danger:         #ef4444;
-  --danger-bg:      #fee2e2;
-  --success:        #10b981;
-  --success-bg:     #d1fae5;
+  --available:      #34d399;
+  --available-bg:   #064e3b;
+  --rented:         #60a5fa;
+  --rented-bg:      #1e3a5f;
+  --maintenance:    #fbbf24;
+  --maintenance-bg: #451a03;
+  --danger:         #f87171;
+  --danger-bg:      #450a0a;
+  --success:        #34d399;
+  --success-bg:     #064e3b;
 
-  /* Neutral */
-  --gray-50:  #f9fafb;
-  --gray-100: #f3f4f6;
-  --gray-200: #e5e7eb;
-  --gray-300: #d1d5db;
-  --gray-400: #9ca3af;
-  --gray-500: #6b7280;
-  --gray-600: #4b5563;
-  --gray-700: #374151;
-  --gray-800: #1f2937;
-  --gray-900: #111827;
+  /* Dark Neutral (inverted) */
+  --gray-50:  #0f172a;
+  --gray-100: #1e293b;
+  --gray-200: #334155;
+  --gray-300: #475569;
+  --gray-400: #64748b;
+  --gray-500: #94a3b8;
+  --gray-600: #cbd5e1;
+  --gray-700: #e2e8f0;
+  --gray-800: #f1f5f9;
+  --gray-900: #f8fafc;
 
   /* Info */
-  --info:       #0ea5e9;
-  --info-light: #e0f2fe;
+  --info:       #38bdf8;
+  --info-light: #0c4a6e;
+
+  /* Surface */
+  --surface:    #1e293b;
+  --surface-2:  #0f172a;
+  --border:     #334155;
 
   /* Layout */
   --sidebar-w: 240px;
@@ -44,9 +49,9 @@
   --radius:    12px;
   --radius-sm: 8px;
   --radius-lg: 16px;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,.08);
-  --shadow:    0 4px 16px rgba(0,0,0,.10);
-  --shadow-lg: 0 8px 32px rgba(0,0,0,.14);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.4);
+  --shadow:    0 4px 16px rgba(0,0,0,.5);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,.6);
 }
 
 /* ========== RESET ========== */
@@ -54,7 +59,7 @@
 html { font-size: 15px; }
 body {
   font-family: 'Sarabun', 'Segoe UI', sans-serif;
-  background: #f1f5f9;
+  background: #0a0f1e;
   color: var(--gray-800);
   min-height: 100vh;
   line-height: 1.6;
@@ -345,7 +350,8 @@ input, select, textarea {
 
 /* ========== SECTION CARD ========== */
 .section-card {
-  background: #fff;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
   margin-bottom: 1.25rem;
@@ -356,7 +362,7 @@ input, select, textarea {
   align-items: center;
   justify-content: space-between;
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--gray-100);
+  border-bottom: 1px solid var(--border);
 }
 .section-card-header h3 {
   font-size: .95rem;
@@ -377,13 +383,13 @@ input, select, textarea {
 .car-mini-card {
   border-radius: var(--radius-sm);
   padding: .75rem;
-  border: 2px solid transparent;
-  background: var(--gray-50);
+  border: 2px solid var(--border);
+  background: var(--surface-2);
   cursor: pointer;
   transition: all .15s;
 }
 .car-mini-card:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
-.car-mini-plate { font-weight: 700; font-size: .9rem; color: var(--gray-800); }
+.car-mini-plate { font-weight: 700; font-size: .9rem; color: var(--gray-900); }
 .car-mini-model { font-size: .78rem; color: var(--gray-500); margin-top: .1rem; }
 .car-mini-status {
   margin-top: .5rem;
@@ -452,9 +458,9 @@ input, select, textarea {
 .search-box input { padding-left: 2.25rem; }
 .filter-bar select {
   padding: .55rem .85rem;
-  border: 1.5px solid var(--gray-200);
+  border: 1.5px solid var(--border);
   border-radius: var(--radius-sm);
-  background: #fff;
+  background: var(--surface);
   color: var(--gray-700);
   font-size: .88rem;
   cursor: pointer;
@@ -462,10 +468,12 @@ input, select, textarea {
   transition: border-color .15s;
 }
 .filter-bar select:focus { border-color: var(--primary); }
+.filter-bar select option { background: var(--surface); }
 
 /* ========== TABLES ========== */
 .table-wrap {
-  background: #fff;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
   overflow: hidden;
@@ -475,24 +483,25 @@ input, select, textarea {
   border-collapse: collapse;
 }
 .data-table th {
-  background: var(--gray-50);
-  color: var(--gray-600);
+  background: var(--surface-2);
+  color: var(--gray-500);
   font-size: .78rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .03em;
   padding: .7rem 1rem;
   text-align: left;
-  border-bottom: 1.5px solid var(--gray-200);
+  border-bottom: 1.5px solid var(--border);
 }
 .data-table td {
   padding: .75rem 1rem;
   font-size: .88rem;
-  border-bottom: 1px solid var(--gray-100);
+  border-bottom: 1px solid var(--border);
   vertical-align: middle;
+  color: var(--gray-700);
 }
 .data-table tr:last-child td { border-bottom: none; }
-.data-table tr:hover td { background: var(--gray-50); }
+.data-table tr:hover td { background: rgba(255,255,255,.03); }
 .data-table .actions { display: flex; gap: .4rem; }
 
 /* ========== STATUS PILLS ========== */
@@ -530,8 +539,8 @@ input, select, textarea {
   box-shadow: 0 2px 6px rgba(109,40,217,.3);
 }
 .btn-primary:hover { opacity: .92; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(109,40,217,.35); }
-.btn-secondary { background: var(--gray-100); color: var(--gray-700); }
-.btn-secondary:hover { background: var(--gray-200); }
+.btn-secondary { background: var(--surface-2); color: var(--gray-600); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--border); color: var(--gray-800); }
 .btn-success {
   background: linear-gradient(135deg, #059669, var(--success));
   color: #fff;
@@ -574,9 +583,9 @@ input, select, textarea {
 .form-group select,
 .form-group textarea {
   padding: .55rem .85rem;
-  border: 1.5px solid var(--gray-200);
+  border: 1.5px solid var(--border);
   border-radius: var(--radius-sm);
-  background: #fff;
+  background: var(--surface-2);
   color: var(--gray-800);
   outline: none;
   transition: border-color .15s;
@@ -585,6 +594,7 @@ input, select, textarea {
 .form-group input:focus,
 .form-group select:focus,
 .form-group textarea:focus { border-color: var(--primary); }
+.form-group select option { background: var(--surface-2); color: var(--gray-800); }
 .form-group textarea { resize: vertical; }
 .input-icon { position: relative; }
 .input-icon i {
@@ -598,8 +608,8 @@ input, select, textarea {
 
 /* ========== BOOKING TOTAL BOX ========== */
 .booking-total-box {
-  background: linear-gradient(135deg, var(--primary-light), #fef3c7);
-  border: 1.5px solid var(--primary-light);
+  background: rgba(124,58,237,.15);
+  border: 1.5px solid rgba(124,58,237,.3);
   border-radius: var(--radius-sm);
   padding: .75rem 1rem;
   font-size: .88rem;
@@ -614,10 +624,12 @@ input, select, textarea {
 
 /* ========== RETURN SUMMARY ========== */
 .return-summary {
-  background: var(--rented-bg);
+  background: rgba(59,130,246,.1);
+  border: 1px solid rgba(59,130,246,.2);
   border-radius: var(--radius-sm);
   padding: .85rem 1rem;
   font-size: .88rem;
+  color: var(--gray-700);
   margin-bottom: .75rem;
 }
 
@@ -673,7 +685,8 @@ input, select, textarea {
   font-size: .8rem;
 }
 .info-box {
-  background: var(--info-light);
+  background: rgba(14,165,233,.1);
+  border: 1px solid rgba(14,165,233,.2);
   border-radius: var(--radius-sm);
   padding: .7rem .9rem;
   font-size: .82rem;
@@ -697,7 +710,8 @@ input, select, textarea {
   backdrop-filter: blur(2px);
 }
 .modal {
-  background: #fff;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   width: 100%;
   max-width: 480px;
@@ -713,8 +727,8 @@ input, select, textarea {
   align-items: center;
   justify-content: space-between;
   padding: 1.1rem 1.25rem;
-  border-bottom: 1.5px solid var(--gray-100);
-  background: var(--gray-50);
+  border-bottom: 1.5px solid var(--border);
+  background: var(--surface-2);
 }
 .modal-header h3 {
   font-size: 1rem;
@@ -727,7 +741,7 @@ input, select, textarea {
 .modal-close {
   width: 30px; height: 30px;
   border: none;
-  background: var(--gray-200);
+  background: var(--border);
   border-radius: var(--radius-sm);
   color: var(--gray-600);
   font-size: .85rem;
@@ -744,11 +758,11 @@ input, select, textarea {
 }
 .modal-footer {
   padding: 1rem 1.25rem;
-  border-top: 1.5px solid var(--gray-100);
+  border-top: 1.5px solid var(--border);
   display: flex;
   justify-content: flex-end;
   gap: .6rem;
-  background: var(--gray-50);
+  background: var(--surface-2);
 }
 
 /* ========== TOAST ========== */
