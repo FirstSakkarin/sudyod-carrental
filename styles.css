@@ -279,6 +279,7 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
   color: #fff;
 }
 .topbar-right { display: flex; align-items: center; gap: .5rem; }
+.topbar-date { font-size: .78rem; color: rgba(255,255,255,.6); white-space: nowrap; }
 .menu-btn {
   width: 36px; height: 36px;
   border: 1px solid var(--glass-border);

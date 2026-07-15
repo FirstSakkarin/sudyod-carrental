@@ -25,7 +25,9 @@ document.addEventListener('DOMContentLoaded', () => {
 function initApp() {
   loadFromStorage();
   state.sheetsUrl = localStorage.getItem('sheetsUrl') || '';
-  document.getElementById('todayDate').textContent = formatDateThai(new Date());
+  const todayLabel = formatDateThai(new Date());
+  document.getElementById('topbarDate').textContent   = todayLabel;
+  document.getElementById('todayDateDesk').textContent = todayLabel;
   renderDashboard();
   navigate('dashboard');
   if (state.sheetsUrl) loadFromSheets();

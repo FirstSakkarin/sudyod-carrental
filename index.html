@@ -69,11 +69,9 @@
         <span class="topbar-title" id="topbarTitle">ภาพรวม</span>
       </div>
       <div class="topbar-right">
+        <span class="topbar-date" id="topbarDate"></span>
         <button id="syncStatus" class="sync-badge sync-off" onclick="refreshApp()" style="border:none;background:none;font-family:inherit;cursor:pointer;">
           <i class="fa-solid fa-circle"></i> ออฟไลน์
-        </button>
-        <button class="menu-btn" onclick="openSettingsModal()">
-          <i class="fa-solid fa-gear"></i>
         </button>
       </div>
     </header>
@@ -87,13 +85,13 @@
       <!-- DASHBOARD -->
       <section id="page-dashboard" class="page active">
         <div class="page-header">
-          <div>
-            <h2>ภาพรวมฝูงรถ</h2>
-            <p class="page-subtitle" id="todayDate"></p>
+          <h2>ภาพรวมฝูงรถ</h2>
+          <div style="display:flex;align-items:center;gap:.75rem;">
+            <span class="page-subtitle" id="todayDateDesk"></span>
+            <button id="syncStatusDesk" class="sync-badge sync-off" onclick="refreshApp()" style="border:none;background:none;font-family:inherit;cursor:pointer;">
+              <i class="fa-solid fa-circle"></i> ออฟไลน์
+            </button>
           </div>
-          <button id="syncStatusDesk" class="sync-badge sync-off" onclick="refreshApp()" style="border:none;background:none;font-family:inherit;cursor:pointer;">
-            <i class="fa-solid fa-circle"></i> ออฟไลน์
-          </button>
         </div>
         <div class="stats-grid">
           <div class="stat-card stat-total stat-card-clickable" onclick="goToCarsFiltered('')">
