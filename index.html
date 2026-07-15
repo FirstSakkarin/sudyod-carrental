@@ -96,28 +96,28 @@
           </button>
         </div>
         <div class="stats-grid">
-          <div class="stat-card stat-total">
+          <div class="stat-card stat-total stat-card-clickable" onclick="goToCarsFiltered('')">
             <div class="stat-icon"><i class="fa-solid fa-car"></i></div>
             <div class="stat-info">
               <div class="stat-num" id="statTotal">0</div>
               <div class="stat-label">รถทั้งหมด</div>
             </div>
           </div>
-          <div class="stat-card stat-available">
+          <div class="stat-card stat-available stat-card-clickable" onclick="goToCarsFiltered('available')">
             <div class="stat-icon"><i class="fa-solid fa-circle-check"></i></div>
             <div class="stat-info">
               <div class="stat-num" id="statAvailable">0</div>
               <div class="stat-label">รถว่าง</div>
             </div>
           </div>
-          <div class="stat-card stat-rented">
+          <div class="stat-card stat-rented stat-card-clickable" onclick="goToCarsFiltered('rented')">
             <div class="stat-icon"><i class="fa-solid fa-road"></i></div>
             <div class="stat-info">
               <div class="stat-num" id="statRented">0</div>
               <div class="stat-label">กำลังเช่า</div>
             </div>
           </div>
-          <div class="stat-card stat-maintenance">
+          <div class="stat-card stat-maintenance stat-card-clickable" onclick="goToCarsFiltered('maintenance')">
             <div class="stat-icon"><i class="fa-solid fa-wrench"></i></div>
             <div class="stat-info">
               <div class="stat-num" id="statMaintenance">0</div>

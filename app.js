@@ -108,6 +108,13 @@ function navigate(page) {
   if (page === 'customers')   renderCustomersPage();
 }
 
+function goToCarsFiltered(status) {
+  navigate('cars');
+  document.getElementById('carSearch').value = '';
+  document.getElementById('carStatusFilter').value = status;
+  renderCarsPage();
+}
+
 // ── Sidebar ────────────────────────────────────────────────────────────
 function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
