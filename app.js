@@ -1176,7 +1176,7 @@ async function testSheetsConnection() {
   if (!url) { el.textContent = '⚠️ กรุณากรอก URL ก่อน'; el.style.color = 'var(--maintenance)'; return; }
   el.textContent = 'กำลังทดสอบ...'; el.style.color = 'var(--gray-500)';
   try {
-    const res = await fetch(url + '?action=ping');
+    const res = await fetch(url + '?action=ping', { redirect: 'follow' });
     const json = await res.json();
     if (json.status === 'ok') { el.textContent = '✅ เชื่อมต่อสำเร็จ'; el.style.color = 'var(--success)'; }
     else                      { el.textContent = '⚠️ ตอบกลับแต่ไม่ถูกต้อง'; el.style.color = 'var(--maintenance)'; }
@@ -1227,7 +1227,7 @@ async function syncNow() {
     const res  = await fetch(state.sheetsUrl, {
       method: 'POST',
       body:   JSON.stringify(payload),
-      headers: { 'Content-Type': 'application/json' },
+      // No Content-Type header = avoids CORS preflight with Google Apps Script
     });
     const json = await res.json();
     if (json.status === 'ok') setSyncStatus('on');
