@@ -1,29 +1,28 @@
 /**
- * สุดยอดรถเช่า เชียงใหม่ — Google Apps Script API
- * สำหรับโปรเจค: Sudyod CarRental DB
+ * Sudyod CarRental DB — Google Apps Script API
  *
- * วิธีติดตั้ง:
- * 1. เปิด Google Sheet "Sudyod CarRental DB"
- * 2. Extensions → Apps Script
- * 3. วางโค้ดนี้ทั้งหมดแทนที่โค้ดเดิม → Save
- * 4. Deploy → New deployment
+ * Setup:
+ * 1. Open Google Sheet "Sudyod CarRental DB"
+ * 2. Extensions > Apps Script
+ * 3. Paste this entire file, replacing existing code > Save
+ * 4. Deploy > New deployment
  *    - Type: Web app
  *    - Execute as: Me
  *    - Who has access: Anyone
- * 5. คัดลอก Web app URL ไปวางในแอป (ปุ่ม ⚙️)
+ * 5. Copy the Web App URL into the app settings (gear icon)
  */
 
-// ชื่อ Sheet แต่ละแท็บ
+// Sheet tab names (English — avoids encoding issues)
 const SHEET_NAMES = {
-  cars:        'รถ',
-  bookings:    'การจอง',
-  maintenance: 'ซ่อมบำรุง',
-  expenses:    'รายจ่าย'
+  cars:        'Cars',
+  bookings:    'Bookings',
+  maintenance: 'Maintenance',
+  expenses:    'Expenses'
 };
 
-// คอลัมน์แต่ละ Sheet (ต้องตรงกับ app.js)
+// Column headers — must match app.js data structure exactly
 const HEADERS = {
-  cars:        ['id','plate','brand','model','type','year','color','mileage','nextService','dailyRate','status','note'],
+  cars:        ['id','plate','brand','model','type','year','color','mileage','nextService','dailyRate','status','note','blockedUntil','blockedReason'],
   bookings:    ['id','carId','customer','phone','start','end','mileageOut','rate','total','status','note','returnDate','returnMileage','extra','finalTotal','returnNote'],
   maintenance: ['id','carId','date','type','mileage','cost','nextService','detail'],
   expenses:    ['id','carId','date','expenseType','amount','detail']
@@ -33,7 +32,7 @@ const HEADERS = {
    Entry Points
 ───────────────────────────────────────── */
 function doGet(e) {
-  const action = e && e.parameter && e.parameter.action;
+  var action = e && e.parameter && e.parameter.action;
   if (action === 'ping') return respond({ status: 'ok' });
   return respond(handleGet());
 }
@@ -49,11 +48,11 @@ function respond(data) {
 }
 
 /* ─────────────────────────────────────────
-   GET — โหลดข้อมูลทั้งหมด
+   GET — Load all data
 ───────────────────────────────────────── */
 function handleGet() {
   try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
     ensureSheets(ss);
     return {
       status: 'ok',
@@ -71,12 +70,12 @@ function handleGet() {
 }
 
 /* ─────────────────────────────────────────
-   POST — บันทึกข้อมูลทั้งหมด (full sync)
+   POST — Save all data (full sync)
 ───────────────────────────────────────── */
 function handlePost(e) {
   try {
-    const body = JSON.parse(e.postData.contents);
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    var body = JSON.parse(e.postData.contents);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
     ensureSheets(ss);
 
     if (body.cars        !== undefined) arrayToSheet(ss, SHEET_NAMES.cars,        body.cars,        HEADERS.cars);
@@ -94,32 +93,35 @@ function handlePost(e) {
    Helpers
 ───────────────────────────────────────── */
 
-/** สร้าง Sheet ที่ยังไม่มี */
 function ensureSheets(ss) {
-  Object.entries(SHEET_NAMES).forEach(([key, name]) => {
+  var keys = Object.keys(SHEET_NAMES);
+  for (var i = 0; i < keys.length; i++) {
+    var key = keys[i];
+    var name = SHEET_NAMES[key];
     if (!ss.getSheetByName(name)) {
-      const sheet = ss.insertSheet(name);
-      const r = sheet.getRange(1, 1, 1, HEADERS[key].length);
+      var sheet = ss.insertSheet(name);
+      var r = sheet.getRange(1, 1, 1, HEADERS[key].length);
       r.setValues([HEADERS[key]]);
       styleHeader(r);
       sheet.setFrozenRows(1);
     }
-  });
+  }
 }
 
-/** Sheet → Array of objects */
 function sheetToArray(ss, name, expectedHeaders) {
-  const sheet = ss.getSheetByName(name);
+  var sheet = ss.getSheetByName(name);
   if (!sheet) return [];
-  const all = sheet.getDataRange().getValues();
+  var all = sheet.getDataRange().getValues();
   if (all.length < 2) return [];
-  const headers = all[0].map(String);
+  var headers = all[0].map(function(h) { return String(h); });
   return all.slice(1)
-    .filter(row => row.some(cell => cell !== '' && cell !== null))
-    .map(row => {
-      const obj = {};
-      headers.forEach((h, i) => {
-        let val = row[i];
+    .filter(function(row) {
+      return row.some(function(cell) { return cell !== '' && cell !== null; });
+    })
+    .map(function(row) {
+      var obj = {};
+      headers.forEach(function(h, i) {
+        var val = row[i];
         if (val === '' || val === null || val === undefined) val = null;
         if (val instanceof Date) val = Utilities.formatDate(val, 'Asia/Bangkok', 'yyyy-MM-dd');
         obj[h] = val;
@@ -128,61 +130,49 @@ function sheetToArray(ss, name, expectedHeaders) {
     });
 }
 
-/** Array of objects → Sheet (replace all) */
 function arrayToSheet(ss, name, data, headers) {
-  let sheet = ss.getSheetByName(name);
+  var sheet = ss.getSheetByName(name);
   if (!sheet) sheet = ss.insertSheet(name);
   sheet.clearContents();
 
   if (!data || data.length === 0) {
-    const r = sheet.getRange(1, 1, 1, headers.length);
+    var r = sheet.getRange(1, 1, 1, headers.length);
     r.setValues([headers]);
     styleHeader(r);
     sheet.setFrozenRows(1);
     return;
   }
 
-  const rows = [
-    headers,
-    ...data.map(obj => headers.map(h => {
-      const v = obj[h];
+  var rows = [headers].concat(data.map(function(obj) {
+    return headers.map(function(h) {
+      var v = obj[h];
       return (v === null || v === undefined) ? '' : v;
-    }))
-  ];
+    });
+  }));
 
   sheet.getRange(1, 1, rows.length, headers.length).setValues(rows);
   styleHeader(sheet.getRange(1, 1, 1, headers.length));
   sheet.setFrozenRows(1);
-  headers.forEach((_, i) => { try { sheet.autoResizeColumn(i + 1); } catch(e) {} });
+  headers.forEach(function(_, i) {
+    try { sheet.autoResizeColumn(i + 1); } catch(e) {}
+  });
 }
 
-/** Style header row */
 function styleHeader(range) {
   range
-    .setBackground('#4c1d95')
-    .setFontColor('#ffffff')
+    .setBackground('#1a1a2e')
+    .setFontColor('#facc15')
     .setFontWeight('bold')
     .setHorizontalAlignment('center');
 }
 
 /* ─────────────────────────────────────────
-   ทดสอบใน Apps Script Editor
+   Test functions
 ───────────────────────────────────────── */
 function testRead() {
   Logger.log(JSON.stringify(handleGet(), null, 2));
 }
 
-function testWrite() {
-  const e = {
-    postData: {
-      contents: JSON.stringify({
-        cars: [{
-          id: 'c1', plate: 'ขข 1234 เชียงใหม่', brand: 'Toyota', model: 'Vios',
-          type: 'sedan', year: 2021, color: 'ขาว', mileage: 48000,
-          nextService: 50000, dailyRate: 800, status: 'available', note: ''
-        }]
-      })
-    }
-  };
-  Logger.log(JSON.stringify(handlePost(e), null, 2));
+function testPing() {
+  Logger.log('ping ok');
 }
