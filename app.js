@@ -199,7 +199,7 @@ function renderDashboard() {
     const statusLabel = { available: 'ว่าง', rented: 'เช่าอยู่', maintenance: 'ซ่อมบำรุง', blocked: 'ปิดตา' }[car.status] || car.status;
     return `
       <div class="car-mini-card status-${car.status}" onclick="openCarDetail('${car.id}')">
-        <div class="car-mini-plate">${car.plate}</div>
+        <div class="car-mini-plate">${vehicleTypeIcon(car.type)} ${car.plate}</div>
         <div class="car-mini-model">${car.brand} ${car.model} · ${car.color}</div>
         <span class="car-mini-status pill pill-${car.status}">${statusLabel}</span>
       </div>`;
@@ -237,7 +237,7 @@ function renderCarsPage() {
         <tbody>
           ${cars.map(car => `
             <tr class="row-clickable" onclick="openCarDetail('${car.id}')">
-              <td><strong>${car.plate}</strong></td>
+              <td>${vehicleTypeIcon(car.type)} <strong>${car.plate}</strong></td>
               <td>${car.brand} ${car.model} <span style="color:var(--gray-400);font-size:.78rem;">${car.year || ''} · ${car.color || ''}</span></td>
               <td>
                 <span class="pill pill-${car.status}">${STATUS_LABEL[car.status] || car.status}</span>
@@ -372,7 +372,7 @@ function openCarDetail(id) {
   const activeBooking = state.bookings.find(b => b.carId === id && b.status === 'active');
   const history = state.bookings.filter(b => b.carId === id && b.status === 'completed').slice(-5).reverse();
 
-  document.getElementById('carDetailTitle').textContent = `${car.plate}`;
+  document.getElementById('carDetailTitle').innerHTML = `${vehicleTypeIcon(car.type)} ${car.plate}`;
   document.getElementById('carDetailBody').innerHTML = `
     <div style="margin-bottom:.75rem;">
       <span class="pill pill-${car.status}">${STATUS_LABEL[car.status] || car.status}</span>
@@ -381,7 +381,7 @@ function openCarDetail(id) {
       <div><span style="color:var(--gray-500);">ยี่ห้อ/รุ่น</span><br><strong>${car.brand} ${car.model}</strong></div>
       <div><span style="color:var(--gray-500);">ปี</span><br><strong>${car.year || '-'}</strong></div>
       <div><span style="color:var(--gray-500);">สี</span><br><strong>${car.color || '-'}</strong></div>
-      <div><span style="color:var(--gray-500);">ประเภท</span><br><strong>${car.type || '-'}</strong></div>
+      <div><span style="color:var(--gray-500);">ประเภท</span><br><strong>${vehicleTypeIcon(car.type)} ${TYPE_LABEL[car.type] || car.type || '-'}</strong></div>
       <div><span style="color:var(--gray-500);">เลขไมล์</span><br><strong>${car.mileage.toLocaleString()} กม.</strong></div>
       <div><span style="color:var(--gray-500);">ซ่อมถัดไป</span><br><strong>${car.nextService ? car.nextService.toLocaleString() + ' กม.' : '-'}</strong></div>
       <div><span style="color:var(--gray-500);">ราคา/วัน</span><br><strong>${car.dailyRate.toLocaleString()} ฿</strong></div>
@@ -1320,6 +1320,13 @@ function setSyncStatus(s) {
 // ── Helpers ────────────────────────────────────────────────────────────
 function getCarById(id) { return state.cars.find(c => c.id === id); }
 
+const TYPE_LABEL = { sedan: 'ซีดาน', suv: 'SUV', pickup: 'กระบะ', van: 'ตู้', motorcycle: 'มอเตอร์ไซค์' };
+function vehicleTypeIcon(type) {
+  return type === 'motorcycle'
+    ? `<i class="fa-solid fa-motorcycle" style="color:var(--accent);" title="มอเตอร์ไซค์"></i>`
+    : `<i class="fa-solid fa-car" style="color:var(--gray-400);" title="รถยนต์"></i>`;
+}
+
 function updateCarStatus(carId, status) {
   const idx = state.cars.findIndex(c => c.id === carId);
   if (idx > -1) state.cars[idx].status = status;
@@ -1333,7 +1340,7 @@ function populateCarSelect(selectId, availableOnly) {
     .forEach(c => {
       const opt = document.createElement('option');
       opt.value = c.id;
-      opt.textContent = `${c.plate} · ${c.brand} ${c.model}`;
+      opt.textContent = `${c.type === 'motorcycle' ? '🏍️ ' : ''}${c.plate} · ${c.brand} ${c.model}`;
       el.appendChild(opt);
     });
 }
