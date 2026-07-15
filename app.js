@@ -212,7 +212,7 @@ function renderCarsPage() {
         </thead>
         <tbody>
           ${cars.map(car => `
-            <tr>
+            <tr class="row-clickable" onclick="openCarDetail('${car.id}')">
               <td><strong>${car.plate}</strong></td>
               <td>${car.brand} ${car.model} <span style="color:var(--gray-400);font-size:.78rem;">${car.year || ''} · ${car.color || ''}</span></td>
               <td>
@@ -224,16 +224,16 @@ function renderCarsPage() {
               <td>${car.dailyRate.toLocaleString()} ฿</td>
               <td>
                 <div class="actions">
-                  <button class="btn btn-sm btn-outline btn-icon" onclick="openCarDetail('${car.id}')" title="รายละเอียด"><i class="fa-solid fa-eye"></i></button>
+                  <button class="btn btn-sm btn-outline btn-icon" onclick="event.stopPropagation(); openCarDetail('${car.id}')" title="รายละเอียด"><i class="fa-solid fa-eye"></i></button>
                   ${car.status === 'blocked'
-                    ? `<button class="btn btn-sm btn-icon" onclick="unblockCar('${car.id}')" title="เปิดตา"
+                    ? `<button class="btn btn-sm btn-icon" onclick="event.stopPropagation(); unblockCar('${car.id}')" title="เปิดตา"
                         style="background:var(--blocked-bg);color:var(--blocked);border:1px solid rgba(167,139,250,0.25);">
                         <i class="fa-solid fa-lock-open"></i></button>`
-                    : `<button class="btn btn-sm btn-icon" onclick="openBlockCarModal('${car.id}')" title="ปิดตา"
+                    : `<button class="btn btn-sm btn-icon" onclick="event.stopPropagation(); openBlockCarModal('${car.id}')" title="ปิดตา"
                         style="background:var(--blocked-bg);color:var(--blocked);border:1px solid rgba(167,139,250,0.25);">
                         <i class="fa-solid fa-lock"></i></button>`}
-                  <button class="btn btn-sm btn-warning btn-icon" onclick="openEditCarModal('${car.id}')" title="แก้ไข"><i class="fa-solid fa-pen"></i></button>
-                  <button class="btn btn-sm btn-danger btn-icon" onclick="deleteCar('${car.id}')" title="ลบ"><i class="fa-solid fa-trash"></i></button>
+                  <button class="btn btn-sm btn-warning btn-icon" onclick="event.stopPropagation(); openEditCarModal('${car.id}')" title="แก้ไข"><i class="fa-solid fa-pen"></i></button>
+                  <button class="btn btn-sm btn-danger btn-icon" onclick="event.stopPropagation(); deleteCar('${car.id}')" title="ลบ"><i class="fa-solid fa-trash"></i></button>
                 </div>
               </td>
             </tr>`).join('')}
@@ -422,7 +422,7 @@ function renderBookingsPage() {
             const car = getCarById(b.carId);
             const isOverdue = b.status === 'active' && b.end < today;
             return `
-              <tr>
+              <tr class="row-clickable" onclick="openEditBookingModal('${b.id}')">
                 <td><strong>${car ? car.plate : '-'}</strong><br><span style="font-size:.78rem;color:var(--gray-400);">${car ? car.brand+' '+car.model : ''}</span></td>
                 <td>${b.customer}<br><span style="font-size:.78rem;color:var(--gray-400);">${b.phone || '-'}</span></td>
                 <td>${b.start}<br>– ${b.end}${isOverdue ? ' <span class="pill pill-overdue" style="font-size:.68rem;">เกินกำหนด</span>' : ''}</td>
@@ -430,9 +430,9 @@ function renderBookingsPage() {
                 <td><span class="pill pill-${STATUS_PILL[b.status]||'completed'}">${STATUS_LABEL[b.status]||b.status}</span></td>
                 <td>
                   <div class="actions">
-                    ${b.status !== 'completed' ? `<button class="btn btn-sm btn-success btn-icon" onclick="openReturnModal('${b.id}')" title="คืนรถ"><i class="fa-solid fa-rotate-left"></i></button>` : ''}
-                    <button class="btn btn-sm btn-warning btn-icon" onclick="openEditBookingModal('${b.id}')" title="แก้ไข"><i class="fa-solid fa-pen"></i></button>
-                    <button class="btn btn-sm btn-danger btn-icon" onclick="deleteBooking('${b.id}')" title="ลบ"><i class="fa-solid fa-trash"></i></button>
+                    ${b.status !== 'completed' ? `<button class="btn btn-sm btn-success btn-icon" onclick="event.stopPropagation(); openReturnModal('${b.id}')" title="คืนรถ"><i class="fa-solid fa-rotate-left"></i></button>` : ''}
+                    <button class="btn btn-sm btn-warning btn-icon" onclick="event.stopPropagation(); openEditBookingModal('${b.id}')" title="แก้ไข"><i class="fa-solid fa-pen"></i></button>
+                    <button class="btn btn-sm btn-danger btn-icon" onclick="event.stopPropagation(); deleteBooking('${b.id}')" title="ลบ"><i class="fa-solid fa-trash"></i></button>
                   </div>
                 </td>
               </tr>`;
@@ -1020,7 +1020,7 @@ function renderCustomersPage() {
               ? `<span class="pill" style="background:${tc.bg};color:${tc.color};box-shadow:0 0 8px ${tc.shadow};">${TAG_LABEL[tag]}</span>`
               : `<span style="color:var(--gray-400);font-size:.78rem;">-</span>`;
             return `
-              <tr>
+              <tr class="row-clickable" onclick="openCustomerDetail('${encodeKey(c.key)}')">
                 <td><strong>${c.name}</strong></td>
                 <td>${c.phone}</td>
                 <td><strong style="color:var(--primary);text-shadow:0 0 8px var(--glow-primary-sm);">${c.bookings.length}</strong> ครั้ง</td>
@@ -1029,10 +1029,10 @@ function renderCustomersPage() {
                 <td>${tagHtml}</td>
                 <td>
                   <div class="actions">
-                    <button class="btn btn-sm btn-outline btn-icon" onclick="openCustomerDetail('${encodeKey(c.key)}')" title="ดูประวัติ">
+                    <button class="btn btn-sm btn-outline btn-icon" onclick="event.stopPropagation(); openCustomerDetail('${encodeKey(c.key)}')" title="ดูประวัติ">
                       <i class="fa-solid fa-eye"></i>
                     </button>
-                    <button class="btn btn-sm btn-primary btn-icon" onclick="prefillBookingForCustomer('${encodeKey(c.key)}')" title="จองให้ลูกค้านี้">
+                    <button class="btn btn-sm btn-primary btn-icon" onclick="event.stopPropagation(); prefillBookingForCustomer('${encodeKey(c.key)}')" title="จองให้ลูกค้านี้">
                       <i class="fa-solid fa-plus"></i>
                     </button>
                   </div>

@@ -630,6 +630,7 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
   background: rgba(250,204,21,0.03);
   color: var(--gray-800);
 }
+.data-table tr.row-clickable { cursor: pointer; }
 .data-table .actions { display: flex; gap: .4rem; }
 
 /* ========== STATUS PILLS ========== */
