@@ -9,6 +9,7 @@ let state = {
   bookings: [],
   maintenance: [],
   expenses: [],
+  customerTags: {},     // { 'name||phone': 'vip' | 'regular' | 'new' | '' }
   sheetsUrl: '',
   syncing: false,
 };
@@ -31,18 +32,20 @@ function initApp() {
 }
 
 function loadFromStorage() {
-  state.cars        = JSON.parse(localStorage.getItem('cars')        || '[]');
-  state.bookings    = JSON.parse(localStorage.getItem('bookings')    || '[]');
-  state.maintenance = JSON.parse(localStorage.getItem('maintenance') || '[]');
-  state.expenses    = JSON.parse(localStorage.getItem('expenses')    || '[]');
+  state.cars          = JSON.parse(localStorage.getItem('cars')          || '[]');
+  state.bookings      = JSON.parse(localStorage.getItem('bookings')      || '[]');
+  state.maintenance   = JSON.parse(localStorage.getItem('maintenance')   || '[]');
+  state.expenses      = JSON.parse(localStorage.getItem('expenses')      || '[]');
+  state.customerTags  = JSON.parse(localStorage.getItem('customerTags')  || '{}');
   if (!state.cars.length) seedSampleData();
 }
 
 function saveToStorage() {
-  localStorage.setItem('cars',        JSON.stringify(state.cars));
-  localStorage.setItem('bookings',    JSON.stringify(state.bookings));
-  localStorage.setItem('maintenance', JSON.stringify(state.maintenance));
-  localStorage.setItem('expenses',    JSON.stringify(state.expenses));
+  localStorage.setItem('cars',         JSON.stringify(state.cars));
+  localStorage.setItem('bookings',     JSON.stringify(state.bookings));
+  localStorage.setItem('maintenance',  JSON.stringify(state.maintenance));
+  localStorage.setItem('expenses',     JSON.stringify(state.expenses));
+  localStorage.setItem('customerTags', JSON.stringify(state.customerTags));
 }
 
 // ── Sample Data ────────────────────────────────────────────────────────
@@ -76,6 +79,7 @@ const PAGE_LABELS = {
   maintenance: 'ซ่อมบำรุง',
   suggest:     'แนะนำรถ',
   finance:     'รายรับ-รายจ่าย',
+  customers:   'ลูกค้า',
 };
 
 function navigate(page) {
@@ -96,6 +100,7 @@ function navigate(page) {
   if (page === 'bookings')    renderBookingsPage();
   if (page === 'maintenance') renderMaintenancePage();
   if (page === 'finance')     renderFinancePage();
+  if (page === 'customers')   renderCustomersPage();
 }
 
 // ── Sidebar ────────────────────────────────────────────────────────────
@@ -116,11 +121,34 @@ function renderDashboard() {
   const available   = cars.filter(c => c.status === 'available').length;
   const rented      = cars.filter(c => c.status === 'rented').length;
   const maintenance = cars.filter(c => c.status === 'maintenance').length;
+  const blocked     = cars.filter(c => c.status === 'blocked').length;
 
   document.getElementById('statTotal').textContent       = cars.length;
   document.getElementById('statAvailable').textContent   = available;
   document.getElementById('statRented').textContent      = rented;
   document.getElementById('statMaintenance').textContent = maintenance;
+  document.getElementById('statBlocked').textContent     = blocked;
+
+  // รถที่ถึงกำหนดเปิดตาแล้ว
+  const blockedDue = cars.filter(c => c.status === 'blocked' && c.blockedUntil && c.blockedUntil <= today);
+  const blockedDueCard = document.getElementById('blockedDueCard');
+  const blockedDueList = document.getElementById('blockedDueList');
+  if (blockedDue.length) {
+    blockedDueCard.style.display = '';
+    blockedDueList.innerHTML = blockedDue.map(car => `
+      <div class="blocked-alert">
+        <div class="blocked-alert-info">
+          <div class="blocked-alert-plate"><i class="fa-solid fa-lock-open"></i> ${car.plate} — ${car.brand} ${car.model}</div>
+          <div class="blocked-alert-detail">กำหนดเปิดตา: ${car.blockedUntil}${car.blockedReason ? ' · ' + car.blockedReason : ''}</div>
+        </div>
+        <button class="btn btn-sm" onclick="unblockCar('${car.id}')"
+          style="background:var(--blocked-bg);color:var(--blocked);border:1px solid rgba(167,139,250,0.3);box-shadow:0 0 10px var(--blocked-glow);">
+          <i class="fa-solid fa-lock-open"></i> เปิดตา
+        </button>
+      </div>`).join('');
+  } else {
+    blockedDueCard.style.display = 'none';
+  }
 
   // Today's returns
   const returns = state.bookings.filter(b => b.end === today && b.status === 'active');
@@ -147,7 +175,7 @@ function renderDashboard() {
   // Car mini grid
   const gridEl = document.getElementById('dashboardCarList');
   gridEl.innerHTML = cars.map(car => {
-    const statusLabel = { available: 'ว่าง', rented: 'เช่าอยู่', maintenance: 'ซ่อมบำรุง' }[car.status] || car.status;
+    const statusLabel = { available: 'ว่าง', rented: 'เช่าอยู่', maintenance: 'ซ่อมบำรุง', blocked: 'ปิดตา' }[car.status] || car.status;
     return `
       <div class="car-mini-card status-${car.status}" onclick="openCarDetail('${car.id}')">
         <div class="car-mini-plate">${car.plate}</div>
@@ -170,7 +198,7 @@ function renderCarsPage() {
 
   document.getElementById('carsCount').textContent = `${cars.length} คัน`;
 
-  const STATUS_LABEL = { available: 'ว่าง', rented: 'เช่าอยู่', maintenance: 'ซ่อมบำรุง' };
+  const STATUS_LABEL = { available: 'ว่าง', rented: 'เช่าอยู่', maintenance: 'ซ่อมบำรุง', blocked: 'ปิดตา' };
 
   const html = cars.length ? `
     <div class="table-wrap">
@@ -190,12 +218,23 @@ function renderCarsPage() {
             <tr>
               <td><strong>${car.plate}</strong></td>
               <td>${car.brand} ${car.model} <span style="color:var(--gray-400);font-size:.78rem;">${car.year || ''} · ${car.color || ''}</span></td>
-              <td><span class="pill pill-${car.status}">${STATUS_LABEL[car.status] || car.status}</span></td>
+              <td>
+                <span class="pill pill-${car.status}">${STATUS_LABEL[car.status] || car.status}</span>
+                ${car.status === 'blocked' && car.blockedUntil ? `<br><span style="font-size:.72rem;color:var(--blocked);">ถึง ${car.blockedUntil}</span>` : ''}
+                ${car.status === 'blocked' && car.blockedReason ? `<br><span style="font-size:.72rem;color:var(--gray-500);">${car.blockedReason}</span>` : ''}
+              </td>
               <td>${car.mileage.toLocaleString()} กม.</td>
               <td>${car.dailyRate.toLocaleString()} ฿</td>
               <td>
                 <div class="actions">
                   <button class="btn btn-sm btn-outline btn-icon" onclick="openCarDetail('${car.id}')" title="รายละเอียด"><i class="fa-solid fa-eye"></i></button>
+                  ${car.status === 'blocked'
+                    ? `<button class="btn btn-sm btn-icon" onclick="unblockCar('${car.id}')" title="เปิดตา"
+                        style="background:var(--blocked-bg);color:var(--blocked);border:1px solid rgba(167,139,250,0.25);">
+                        <i class="fa-solid fa-lock-open"></i></button>`
+                    : `<button class="btn btn-sm btn-icon" onclick="openBlockCarModal('${car.id}')" title="ปิดตา"
+                        style="background:var(--blocked-bg);color:var(--blocked);border:1px solid rgba(167,139,250,0.25);">
+                        <i class="fa-solid fa-lock"></i></button>`}
                   <button class="btn btn-sm btn-warning btn-icon" onclick="openEditCarModal('${car.id}')" title="แก้ไข"><i class="fa-solid fa-pen"></i></button>
                   <button class="btn btn-sm btn-danger btn-icon" onclick="deleteCar('${car.id}')" title="ลบ"><i class="fa-solid fa-trash"></i></button>
                 </div>
@@ -294,7 +333,7 @@ function openCarDetail(id) {
   const car = getCarById(id);
   if (!car) return;
 
-  const STATUS_LABEL = { available: 'ว่าง', rented: 'เช่าอยู่', maintenance: 'ซ่อมบำรุง' };
+  const STATUS_LABEL = { available: 'ว่าง', rented: 'เช่าอยู่', maintenance: 'ซ่อมบำรุง', blocked: 'ปิดตา' };
   const activeBooking = state.bookings.find(b => b.carId === id && b.status === 'active');
   const history = state.bookings.filter(b => b.carId === id && b.status === 'completed').slice(-5).reverse();
 
@@ -312,6 +351,16 @@ function openCarDetail(id) {
       <div><span style="color:var(--gray-500);">ซ่อมถัดไป</span><br><strong>${car.nextService ? car.nextService.toLocaleString() + ' กม.' : '-'}</strong></div>
       <div><span style="color:var(--gray-500);">ราคา/วัน</span><br><strong>${car.dailyRate.toLocaleString()} ฿</strong></div>
     </div>
+    ${car.status === 'blocked' ? `
+      <div style="background:var(--blocked-bg);border:1px solid rgba(167,139,250,0.2);border-radius:var(--radius-sm);padding:.75rem;font-size:.85rem;margin-bottom:.75rem;color:var(--blocked);">
+        <i class="fa-solid fa-lock"></i> <strong>รถถูกปิดตาอยู่</strong>
+        ${car.blockedReason ? `<br>เหตุผล: ${car.blockedReason}` : ''}
+        ${car.blockedUntil  ? `<br>กำหนดเปิดตา: ${car.blockedUntil}` : ''}
+        <br><button class="btn btn-sm" style="margin-top:.5rem;background:var(--blocked-bg);color:var(--blocked);border:1px solid rgba(167,139,250,0.3);"
+          onclick="unblockCar('${car.id}');closeModal('carDetailModal')">
+          <i class="fa-solid fa-lock-open"></i> เปิดตา
+        </button>
+      </div>` : ''}
     ${activeBooking ? `
       <div style="background:var(--rented-bg);border-radius:var(--radius-sm);padding:.75rem;font-size:.85rem;margin-bottom:.75rem;">
         <strong>การเช่าปัจจุบัน</strong><br>
@@ -669,6 +718,7 @@ function runSuggest() {
   // Find available cars (no active booking in date range)
   const available = state.cars.filter(car => {
     if (car.status === 'maintenance') return false;
+    if (car.status === 'blocked')     return false;
     if (type && car.type !== type)    return false;
     // Check for booking conflicts
     const conflict = state.bookings.some(b =>
@@ -841,6 +891,280 @@ function saveExpense() {
   showToast('บันทึกรายจ่ายเรียบร้อย', 'success');
 }
 
+// ── Block / Unblock Car ────────────────────────────────────────────────
+
+function openBlockCarModal(id) {
+  const car = getCarById(id);
+  if (!car) return;
+  document.getElementById('blockCarId').value = id;
+  document.getElementById('blockUntil').value  = '';
+  document.getElementById('blockReason').value = '';
+  document.getElementById('blockCarInfo').innerHTML =
+    `<i class="fa-solid fa-lock"></i> <strong>${car.plate}</strong> — ${car.brand} ${car.model} (${car.color || ''})`;
+  showModal('blockCarModal');
+}
+
+function saveBlockCar() {
+  const id     = document.getElementById('blockCarId').value;
+  const until  = document.getElementById('blockUntil').value;
+  const reason = document.getElementById('blockReason').value.trim();
+  const idx    = state.cars.findIndex(c => c.id === id);
+  if (idx < 0) return;
+  state.cars[idx].status       = 'blocked';
+  state.cars[idx].blockedUntil = until || null;
+  state.cars[idx].blockedReason = reason || null;
+  saveToStorage();
+  closeModal('blockCarModal');
+  renderCarsPage();
+  renderDashboard();
+  pushToSheets();
+  const car = state.cars[idx];
+  showToast(`ปิดตา ${car.plate} เรียบร้อย${until ? ' ถึง ' + until : ''}`, 'success');
+}
+
+function unblockCar(id) {
+  const idx = state.cars.findIndex(c => c.id === id);
+  if (idx < 0) return;
+  state.cars[idx].status        = 'available';
+  state.cars[idx].blockedUntil  = null;
+  state.cars[idx].blockedReason = null;
+  saveToStorage();
+  renderCarsPage();
+  renderDashboard();
+  pushToSheets();
+  showToast(`เปิดตา ${state.cars[idx].plate} เรียบร้อย — สถานะ: ว่าง`, 'success');
+}
+
+// ── Customers Page ─────────────────────────────────────────────────────
+
+const TAG_LABEL = { vip: 'VIP', regular: 'ลูกค้าประจำ', new: 'ลูกค้าใหม่', '': '' };
+const TAG_COLOR = {
+  vip:     { bg: 'rgba(250,204,21,0.15)', color: '#facc15', shadow: 'rgba(250,204,21,0.4)' },
+  regular: { bg: 'rgba(96,165,250,0.15)', color: '#60a5fa', shadow: 'rgba(96,165,250,0.4)' },
+  new:     { bg: 'rgba(52,211,153,0.15)', color: '#34d399', shadow: 'rgba(52,211,153,0.4)' },
+};
+
+function buildCustomerList() {
+  const map = {};
+  state.bookings.forEach(b => {
+    const key = (b.customer || '').trim() + '||' + (b.phone || '').trim();
+    if (!map[key]) {
+      map[key] = {
+        key,
+        name:     (b.customer || '').trim(),
+        phone:    (b.phone || '').trim() || '-',
+        bookings: [],
+        totalSpent: 0,
+        lastDate: '',
+      };
+    }
+    map[key].bookings.push(b);
+    if (b.status === 'completed') {
+      map[key].totalSpent += (b.finalTotal || b.total || 0);
+    }
+    const date = b.returnDate || b.end || '';
+    if (date > map[key].lastDate) map[key].lastDate = date;
+  });
+  return Object.values(map).sort((a, b) => b.bookings.length - a.bookings.length);
+}
+
+function renderCustomersPage() {
+  const q       = (document.getElementById('customerSearch')?.value || '').toLowerCase();
+  const tagFilter = document.getElementById('customerTagFilter')?.value || '';
+
+  let customers = buildCustomerList().filter(c => {
+    const matchQ   = !q || c.name.toLowerCase().includes(q) || c.phone.includes(q);
+    const tag      = state.customerTags[c.key] || '';
+    const matchTag = !tagFilter || tag === tagFilter;
+    return matchQ && matchTag;
+  });
+
+  document.getElementById('customersCount').textContent = `${customers.length} ราย`;
+
+  if (!customers.length) {
+    document.getElementById('customersTableContainer').innerHTML =
+      '<p class="empty-state" style="text-align:center;padding:2rem;">ไม่พบลูกค้า</p>';
+    return;
+  }
+
+  const html = `
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>ลูกค้า</th>
+            <th>เบอร์โทร</th>
+            <th>จำนวนครั้ง</th>
+            <th>ยอดรวม</th>
+            <th>เช่าล่าสุด</th>
+            <th>แท็ก</th>
+            <th>จัดการ</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${customers.map(c => {
+            const tag = state.customerTags[c.key] || '';
+            const tc  = TAG_COLOR[tag];
+            const tagHtml = tag
+              ? `<span class="pill" style="background:${tc.bg};color:${tc.color};box-shadow:0 0 8px ${tc.shadow};">${TAG_LABEL[tag]}</span>`
+              : `<span style="color:var(--gray-400);font-size:.78rem;">-</span>`;
+            return `
+              <tr>
+                <td><strong>${c.name}</strong></td>
+                <td>${c.phone}</td>
+                <td><strong style="color:var(--primary);text-shadow:0 0 8px var(--glow-primary-sm);">${c.bookings.length}</strong> ครั้ง</td>
+                <td><strong>${c.totalSpent.toLocaleString()} ฿</strong></td>
+                <td>${c.lastDate || '-'}</td>
+                <td>${tagHtml}</td>
+                <td>
+                  <div class="actions">
+                    <button class="btn btn-sm btn-outline btn-icon" onclick="openCustomerDetail('${encodeKey(c.key)}')" title="ดูประวัติ">
+                      <i class="fa-solid fa-eye"></i>
+                    </button>
+                    <button class="btn btn-sm btn-primary btn-icon" onclick="prefillBookingForCustomer('${encodeKey(c.key)}')" title="จองให้ลูกค้านี้">
+                      <i class="fa-solid fa-plus"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+
+  document.getElementById('customersTableContainer').innerHTML = html;
+}
+
+function encodeKey(key) { return encodeURIComponent(key); }
+function decodeKey(key) { return decodeURIComponent(key); }
+
+function openCustomerDetail(encodedKey) {
+  const key = decodeKey(encodedKey);
+  const customers = buildCustomerList();
+  const c = customers.find(x => x.key === key);
+  if (!c) return;
+
+  const tag = state.customerTags[key] || '';
+  const tc  = TAG_COLOR[tag];
+  const tagHtml = tag
+    ? `<span class="pill" style="background:${tc.bg};color:${tc.color};box-shadow:0 0 8px ${tc.shadow};">${TAG_LABEL[tag]}</span>`
+    : '';
+
+  const completed  = c.bookings.filter(b => b.status === 'completed');
+  const active     = c.bookings.filter(b => b.status === 'active');
+  const upcoming   = c.bookings.filter(b => b.status === 'upcoming');
+  const avgSpend   = completed.length ? Math.round(c.totalSpent / completed.length) : 0;
+
+  // Most rented car
+  const carCount = {};
+  c.bookings.forEach(b => { carCount[b.carId] = (carCount[b.carId] || 0) + 1; });
+  const favCarId = Object.entries(carCount).sort((a,b) => b[1]-a[1])[0]?.[0];
+  const favCar   = favCarId ? getCarById(favCarId) : null;
+
+  document.getElementById('customerModalTitle').innerHTML =
+    `<i class="fa-solid fa-user"></i> ${c.name} ${tagHtml}`;
+
+  document.getElementById('customerModalBody').innerHTML = `
+    <!-- Stats row -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:.75rem;margin-bottom:1.25rem;">
+      <div style="background:rgba(250,204,21,0.08);border:1px solid rgba(250,204,21,0.15);border-radius:var(--radius-sm);padding:.85rem;text-align:center;">
+        <div style="font-size:1.5rem;font-weight:700;color:var(--primary);text-shadow:0 0 10px var(--glow-primary);">${c.bookings.length}</div>
+        <div style="font-size:.75rem;color:var(--gray-500);margin-top:.15rem;">ครั้งทั้งหมด</div>
+      </div>
+      <div style="background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.15);border-radius:var(--radius-sm);padding:.85rem;text-align:center;">
+        <div style="font-size:1.5rem;font-weight:700;color:var(--available);text-shadow:0 0 10px var(--available-glow);">${c.totalSpent.toLocaleString()}</div>
+        <div style="font-size:.75rem;color:var(--gray-500);margin-top:.15rem;">ยอดรวม (฿)</div>
+      </div>
+      <div style="background:rgba(96,165,250,0.08);border:1px solid rgba(96,165,250,0.15);border-radius:var(--radius-sm);padding:.85rem;text-align:center;">
+        <div style="font-size:1.5rem;font-weight:700;color:var(--rented);text-shadow:0 0 10px var(--rented-glow);">${avgSpend.toLocaleString()}</div>
+        <div style="font-size:.75rem;color:var(--gray-500);margin-top:.15rem;">เฉลี่ย/ครั้ง (฿)</div>
+      </div>
+      <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:var(--radius-sm);padding:.85rem;text-align:center;">
+        <div style="font-size:.95rem;font-weight:700;color:var(--gray-800);">${favCar ? favCar.brand + ' ' + favCar.model : '-'}</div>
+        <div style="font-size:.75rem;color:var(--gray-500);margin-top:.15rem;">รถที่เช่าบ่อย</div>
+      </div>
+    </div>
+
+    <!-- Info row -->
+    <div style="display:flex;gap:1rem;flex-wrap:wrap;font-size:.85rem;margin-bottom:1rem;padding:.75rem;background:rgba(255,255,255,0.03);border-radius:var(--radius-sm);border:1px solid rgba(255,255,255,0.06);">
+      <div><i class="fa-solid fa-phone" style="color:var(--gray-500);width:16px;"></i> ${c.phone}</div>
+      <div><i class="fa-solid fa-calendar" style="color:var(--gray-500);width:16px;"></i> เช่าล่าสุด: <strong>${c.lastDate || '-'}</strong></div>
+      ${active.length ? `<div><i class="fa-solid fa-road" style="color:var(--rented);width:16px;"></i> <span style="color:var(--rented);">กำลังเช่าอยู่ ${active.length} รายการ</span></div>` : ''}
+      ${upcoming.length ? `<div><i class="fa-solid fa-clock" style="color:var(--maintenance);width:16px;"></i> <span style="color:var(--maintenance);">กำลังจะถึง ${upcoming.length} รายการ</span></div>` : ''}
+    </div>
+
+    <!-- Tag selector -->
+    <div style="margin-bottom:1rem;">
+      <div style="font-size:.82rem;font-weight:600;color:var(--gray-600);margin-bottom:.4rem;">แท็กลูกค้า</div>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+        ${['', 'new', 'regular', 'vip'].map(t => {
+          const active = (state.customerTags[key] || '') === t;
+          const tc = TAG_COLOR[t];
+          return `<button onclick="setCustomerTag('${encodeKey(key)}','${t}')"
+            class="btn btn-sm"
+            style="${active
+              ? `background:${tc ? tc.bg : 'rgba(255,255,255,0.1)'};color:${tc ? tc.color : 'var(--gray-600)'};border:1px solid ${tc ? tc.color : 'rgba(255,255,255,0.2)'};box-shadow:0 0 10px ${tc ? tc.shadow : 'transparent'};`
+              : 'background:rgba(255,255,255,0.04);color:var(--gray-500);border:1px solid rgba(255,255,255,0.08);'}"
+          >${t ? TAG_LABEL[t] : 'ไม่มีแท็ก'}</button>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <!-- Booking history -->
+    <div style="font-size:.85rem;font-weight:600;color:var(--gray-600);margin-bottom:.5rem;">ประวัติการเช่า</div>
+    ${c.bookings.length ? `
+    <div class="table-wrap">
+      <table class="data-table" style="font-size:.82rem;">
+        <thead><tr><th>รถ</th><th>วันรับ</th><th>วันคืน</th><th>ยอด</th><th>สถานะ</th></tr></thead>
+        <tbody>
+          ${[...c.bookings].sort((a,b) => b.start.localeCompare(a.start)).map(b => {
+            const car = getCarById(b.carId);
+            const amount = b.status === 'completed' ? (b.finalTotal || b.total || 0) : (b.total || 0);
+            const pill = { active:'rented', upcoming:'upcoming', completed:'completed' }[b.status] || 'completed';
+            const label = { active:'กำลังเช่า', upcoming:'กำลังจะถึง', completed:'คืนแล้ว' }[b.status] || b.status;
+            return `<tr>
+              <td>${car ? car.plate : '-'}<br><span style="color:var(--gray-400);font-size:.75rem;">${car ? car.brand+' '+car.model : ''}</span></td>
+              <td>${b.start}</td>
+              <td>${b.returnDate || b.end}</td>
+              <td><strong>${amount.toLocaleString()} ฿</strong></td>
+              <td><span class="pill pill-${pill}">${label}</span></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>` : '<p class="empty-state">ไม่มีประวัติ</p>'}
+  `;
+
+  document.getElementById('customerBookBtn').onclick = () => {
+    closeModal('customerModal');
+    prefillBookingForCustomer(encodedKey);
+  };
+
+  showModal('customerModal');
+}
+
+function setCustomerTag(encodedKey, tag) {
+  const key = decodeKey(encodedKey);
+  if (tag === '') {
+    delete state.customerTags[key];
+  } else {
+    state.customerTags[key] = tag;
+  }
+  saveToStorage();
+  // Re-render modal body with updated tag
+  openCustomerDetail(encodedKey);
+  renderCustomersPage();
+  showToast(tag ? `แท็ก "${TAG_LABEL[tag]}" บันทึกแล้ว` : 'ลบแท็กแล้ว', 'success');
+}
+
+function prefillBookingForCustomer(encodedKey) {
+  const key = decodeKey(encodedKey);
+  const [name, phone] = key.split('||');
+  openAddBookingModal();
+  document.getElementById('bookingCustomer').value = name || '';
+  document.getElementById('bookingPhone').value    = phone || '';
+}
+
 // ── Google Sheets Sync ─────────────────────────────────────────────────
 function openSettingsModal() {
   document.getElementById('settingsUrl').value = state.sheetsUrl || '';
@@ -951,7 +1275,7 @@ function populateCarSelect(selectId, availableOnly) {
   const el = document.getElementById(selectId);
   el.innerHTML = '<option value="">— เลือกรถ —</option>';
   state.cars
-    .filter(c => !availableOnly || c.status !== 'rented')
+    .filter(c => !availableOnly || (c.status !== 'rented' && c.status !== 'blocked'))
     .forEach(c => {
       const opt = document.createElement('option');
       opt.value = c.id;
