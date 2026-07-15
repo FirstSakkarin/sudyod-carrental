@@ -99,6 +99,7 @@ function navigate(page) {
 
   document.getElementById('topbarTitle').textContent = PAGE_LABELS[page] || page;
   closeSidebar();
+  document.getElementById('carsBackBtn').style.display = 'none';
 
   if (page === 'dashboard')   renderDashboard();
   if (page === 'cars')        renderCarsPage();
@@ -112,6 +113,7 @@ function goToCarsFiltered(status) {
   navigate('cars');
   document.getElementById('carSearch').value = '';
   document.getElementById('carStatusFilter').value = status;
+  document.getElementById('carsBackBtn').style.display = 'flex';
   renderCarsPage();
 }
 

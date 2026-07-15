@@ -343,7 +343,7 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
 /* ========== STAT CARDS ========== */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 1rem;
   margin-bottom: 1.25rem;
 }
@@ -1160,7 +1160,11 @@ body.is-owner .owner-only { display: flex; }
     margin-left: 0;
     padding: calc(var(--topbar-h) + 1rem) 1rem calc(60px + env(safe-area-inset-bottom, 0px) + 1rem);
   }
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .stats-grid { gap: .6rem; }
+  .stat-card { padding: .75rem .5rem; gap: .5rem; }
+  .stat-icon { font-size: 1.15rem; }
+  .stat-num { font-size: 1.2rem; }
+  .stat-label { font-size: .68rem; }
   .form-row { grid-template-columns: 1fr; }
   .page-header { flex-direction: column; align-items: flex-start; }
   .data-table th:nth-child(n+4),
@@ -1169,8 +1173,12 @@ body.is-owner .owner-only { display: flex; }
 }
 
 @media (max-width: 480px) {
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
-  .car-grid   { grid-template-columns: repeat(2, 1fr); }
+  .car-grid { grid-template-columns: repeat(2, 1fr); }
   .quick-action-btn { font-size: .68rem; padding: .85rem .35rem .7rem; }
   .quick-action-btn i { font-size: 1.15rem; }
+  .stats-grid { gap: .4rem; }
+  .stat-card { flex-direction: column; text-align: center; padding: .55rem .25rem; gap: .3rem; }
+  .stat-icon { font-size: 1rem; }
+  .stat-num { font-size: 1rem; }
+  .stat-label { font-size: .6rem; margin-top: 0; }
 }

@@ -144,9 +144,14 @@
       <!-- CARS PAGE -->
       <section id="page-cars" class="page">
         <div class="page-header">
-          <div>
-            <h2>รถทั้งหมด</h2>
-            <p class="page-subtitle" id="carsCount"></p>
+          <div style="display:flex;align-items:center;gap:.65rem;">
+            <button id="carsBackBtn" class="icon-btn" onclick="navigate('dashboard')" style="display:none;" title="กลับไปภาพรวม">
+              <i class="fa-solid fa-arrow-left"></i>
+            </button>
+            <div>
+              <h2>รถทั้งหมด</h2>
+              <p class="page-subtitle" id="carsCount"></p>
+            </div>
           </div>
           <button class="btn btn-primary" onclick="openAddCarModal()">
             <i class="fa-solid fa-plus"></i> เพิ่มรถ
