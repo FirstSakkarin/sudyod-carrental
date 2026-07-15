@@ -552,8 +552,25 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
   transform: translateY(-50%);
   color: var(--gray-400);
   font-size: .85rem;
+  z-index: 1;
 }
-.search-box input { padding-left: 2.25rem; }
+.search-box input {
+  width: 100%;
+  padding: .55rem .85rem .55rem 2.25rem;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: var(--radius-sm);
+  background: rgba(255,255,255,0.04);
+  backdrop-filter: blur(8px);
+  color: var(--gray-800);
+  outline: none;
+  transition: border-color .18s, box-shadow .18s, background .18s;
+}
+.search-box input::placeholder { color: var(--gray-400); }
+.search-box input:focus {
+  border-color: rgba(250,204,21,0.6);
+  background: rgba(250,204,21,0.03);
+  box-shadow: 0 0 0 3px rgba(250,204,21,0.12), 0 0 16px rgba(250,204,21,0.1);
+}
 .filter-bar select {
   padding: .55rem .85rem;
   border: 1px solid rgba(255,255,255,0.1);

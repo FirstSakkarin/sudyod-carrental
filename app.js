@@ -175,7 +175,7 @@ function renderCarsPage() {
   const status = document.getElementById('carStatusFilter')?.value || '';
 
   let cars = state.cars.filter(c => {
-    const matchQ = !q || `${c.plate} ${c.brand} ${c.model}`.toLowerCase().includes(q);
+    const matchQ = !q || `${c.plate} ${c.brand} ${c.model} ${c.color || ''}`.toLowerCase().includes(q);
     const matchS = !status || c.status === status;
     return matchQ && matchS;
   });
