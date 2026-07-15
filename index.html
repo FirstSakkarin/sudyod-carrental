@@ -316,6 +316,14 @@
       </div>
       <div class="modal-body">
         <input type="hidden" id="carModalId" />
+        <input type="hidden" id="carPhotoData" />
+        <div class="form-group" style="align-items:center;">
+          <label>รูปรถ</label>
+          <div style="display:flex;align-items:center;gap:1rem;">
+            <div class="car-photo-preview" id="carPhotoPreview"><i class="fa-solid fa-car"></i></div>
+            <input type="file" id="carPhotoInput" accept="image/*" onchange="handleCarPhotoUpload(event)" />
+          </div>
+        </div>
         <div class="form-row">
           <div class="form-group">
             <label>ทะเบียนรถ *</label>

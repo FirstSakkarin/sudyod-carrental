@@ -479,6 +479,10 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
   backdrop-filter: blur(10px);
   cursor: pointer;
   transition: all .18s;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .6rem;
 }
 .car-mini-card:hover {
   transform: translateY(-2px);
@@ -486,6 +490,37 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
   box-shadow: 0 4px 20px rgba(250,204,21,0.1), 0 0 0 1px rgba(250,204,21,0.08);
   background: rgba(250,204,21,0.04);
 }
+.car-mini-info { min-width: 0; flex: 1; }
+.car-mini-photo {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 2px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,0.35);
+  font-size: 1.1rem;
+}
+.car-mini-photo img { width: 100%; height: 100%; object-fit: cover; }
+.car-photo-preview {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 2px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,0.35);
+  font-size: 1.4rem;
+}
+.car-photo-preview img { width: 100%; height: 100%; object-fit: cover; }
 .car-mini-plate { font-weight: 700; font-size: .9rem; color: var(--gray-900); }
 .car-mini-model { font-size: .78rem; color: var(--gray-500); margin-top: .1rem; }
 .car-mini-status {

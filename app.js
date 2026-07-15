@@ -199,9 +199,12 @@ function renderDashboard() {
     const statusLabel = { available: 'ว่าง', rented: 'เช่าอยู่', maintenance: 'ซ่อมบำรุง', blocked: 'ปิดตา' }[car.status] || car.status;
     return `
       <div class="car-mini-card status-${car.status}" onclick="openCarDetail('${car.id}')">
-        <div class="car-mini-plate">${vehicleTypeIcon(car.type)} ${car.plate}</div>
-        <div class="car-mini-model">${car.brand} ${car.model} · ${car.color}</div>
-        <span class="car-mini-status pill pill-${car.status}">${statusLabel}</span>
+        <div class="car-mini-info">
+          <div class="car-mini-plate">${vehicleTypeIcon(car.type)} ${car.plate}</div>
+          <div class="car-mini-model">${car.brand} ${car.model} · ${car.color}</div>
+          <span class="car-mini-status pill pill-${car.status}">${statusLabel}</span>
+        </div>
+        <div class="car-mini-photo">${car.photo ? `<img src="${car.photo}" alt="" />` : vehicleTypeIcon(car.type)}</div>
       </div>`;
   }).join('');
 }
@@ -281,10 +284,38 @@ function populateCarDatalists() {
   fill('carColorList',  state.cars.map(c => c.color));
 }
 
+function handleCarPhotoUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const size = 240;
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      const scale = Math.max(size / img.width, size / img.height);
+      const dw = img.width * scale, dh = img.height * scale;
+      ctx.drawImage(img, (size - dw) / 2, (size - dh) / 2, dw, dh);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+      document.getElementById('carPhotoData').value = dataUrl;
+      document.getElementById('carPhotoPreview').innerHTML = `<img src="${dataUrl}" alt="" />`;
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 function openAddCarModal() {
   populateCarDatalists();
   document.getElementById('carModalTitle').textContent = 'เพิ่มรถ';
   document.getElementById('carModalId').value   = '';
+  document.getElementById('carPhotoData').value = '';
+  document.getElementById('carPhotoInput').value = '';
+  document.getElementById('carPhotoPreview').innerHTML = '<i class="fa-solid fa-car"></i>';
   document.getElementById('carPlate').value     = '';
   document.getElementById('carType').value      = 'sedan';
   document.getElementById('carBrand').value     = '';
@@ -305,6 +336,11 @@ function openEditCarModal(id) {
   populateCarDatalists();
   document.getElementById('carModalTitle').textContent    = 'แก้ไขข้อมูลรถ';
   document.getElementById('carModalId').value            = car.id;
+  document.getElementById('carPhotoData').value          = car.photo || '';
+  document.getElementById('carPhotoInput').value         = '';
+  document.getElementById('carPhotoPreview').innerHTML   = car.photo
+    ? `<img src="${car.photo}" alt="" />`
+    : `<i class="fa-solid fa-car"></i>`;
   document.getElementById('carPlate').value              = car.plate;
   document.getElementById('carType').value               = car.type || 'sedan';
   document.getElementById('carBrand').value              = car.brand;
@@ -337,6 +373,7 @@ function saveCar() {
     dailyRate:   +document.getElementById('carDailyRate').value || 0,
     status:      document.getElementById('carStatus').value,
     note:        document.getElementById('carNote').value.trim(),
+    photo:       document.getElementById('carPhotoData').value || null,
   };
 
   if (id) {
