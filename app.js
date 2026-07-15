@@ -426,7 +426,7 @@ function renderBookingsPage() {
                 <td><strong>${car ? car.plate : '-'}</strong><br><span style="font-size:.78rem;color:var(--gray-400);">${car ? car.brand+' '+car.model : ''}</span></td>
                 <td>${b.customer}<br><span style="font-size:.78rem;color:var(--gray-400);">${b.phone || '-'}</span></td>
                 <td>${b.start}<br>– ${b.end}${isOverdue ? ' <span class="pill pill-overdue" style="font-size:.68rem;">เกินกำหนด</span>' : ''}</td>
-                <td><strong>${(b.total||0).toLocaleString()} ฿</strong></td>
+                <td><strong>${(b.status === 'completed' ? (b.finalTotal || b.total || 0) : (b.total || 0)).toLocaleString()} ฿</strong></td>
                 <td><span class="pill pill-${STATUS_PILL[b.status]||'completed'}">${STATUS_LABEL[b.status]||b.status}</span></td>
                 <td>
                   <div class="actions">
