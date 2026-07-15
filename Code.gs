@@ -90,6 +90,68 @@ function handlePost(e) {
 }
 
 /* ─────────────────────────────────────────
+   Cascading dropdowns (Cars sheet: type → brand → model)
+   Mirrors VEHICLE_CATALOG in app.js — keep both in sync.
+───────────────────────────────────────── */
+var VEHICLE_CATALOG = {
+  car: {
+    'Toyota':     ['Yaris', 'Yaris Ativ', 'Vios', 'Corolla Altis', 'Corolla Cross', 'Camry', 'Fortuner', 'Hilux Revo', 'Innova'],
+    'Honda':      ['City', 'Civic', 'Accord', 'Jazz', 'HR-V', 'CR-V', 'BR-V'],
+    'Isuzu':      ['D-Max', 'MU-X'],
+    'Mazda':      ['Mazda2', 'Mazda3', 'CX-3', 'CX-30', 'CX-5', 'BT-50'],
+    'Mitsubishi': ['Attrage', 'Mirage', 'Xpander', 'Triton', 'Pajero Sport'],
+    'Nissan':     ['Almera', 'Note', 'Kicks', 'Navara', 'Terra'],
+    'Ford':       ['Ranger', 'Everest', 'Focus'],
+    'MG':         ['MG3', 'MG5', 'ZS', 'HS', 'Extender'],
+    'Hyundai':    ['Accent', 'Elantra', 'Tucson', 'Creta']
+  },
+  motorcycle: {
+    'Honda':  ['Wave110i', 'Wave125i', 'Click125i', 'Click160i', 'PCX160', 'ADV160', 'CBR150R', 'Forza'],
+    'Yamaha': ['Fino', 'Grand Filano', 'NMAX', 'Aerox', 'XMAX', 'YZF-R15'],
+    'GPX':    ['Demon', 'Legend']
+  }
+};
+
+function catalogForType_(type) {
+  return type === 'motorcycle' ? VEHICLE_CATALOG.motorcycle : VEHICLE_CATALOG.car;
+}
+
+function setListValidation_(range, values) {
+  if (values && values.length) {
+    range.setDataValidation(
+      SpreadsheetApp.newDataValidation().requireValueInList(values, true).setAllowInvalid(true).build()
+    );
+  } else {
+    range.clearDataValidations();
+  }
+}
+
+// Simple trigger: keeps the brand/model dropdowns on the Cars sheet in sync
+// with the row's type/brand. Wrapped in try/catch so a trigger error never
+// blocks manual sheet editing.
+function onEdit(e) {
+  try {
+    var sheet = e.range.getSheet();
+    if (sheet.getName() !== SHEET_NAMES.cars) return;
+    var row = e.range.getRow();
+    if (row === 1) return;
+    var col = e.range.getColumn(); // A=1 id, B=2 plate, C=3 brand, D=4 model, E=5 type
+    if (col !== 3 && col !== 5) return;
+
+    var type    = sheet.getRange(row, 5).getValue();
+    var brand   = sheet.getRange(row, 3).getValue();
+    var catalog = catalogForType_(type);
+
+    if (col === 5) {
+      setListValidation_(sheet.getRange(row, 3), Object.keys(catalog));
+    }
+    setListValidation_(sheet.getRange(row, 4), catalog[brand] || []);
+  } catch (err) {
+    // ignore — never block manual edits
+  }
+}
+
+/* ─────────────────────────────────────────
    Helpers
 ───────────────────────────────────────── */
 
