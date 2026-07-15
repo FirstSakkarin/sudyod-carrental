@@ -17,7 +17,8 @@ const SHEET_NAMES = {
   cars:        'Cars',
   bookings:    'Bookings',
   maintenance: 'Maintenance',
-  expenses:    'Expenses'
+  expenses:    'Expenses',
+  catalog:     'VehicleCatalog'
 };
 
 // Column headers — must match app.js data structure exactly
@@ -25,7 +26,8 @@ const HEADERS = {
   cars:        ['id','plate','brand','model','type','year','color','mileage','nextService','dailyRate','status','note','blockedUntil','blockedReason'],
   bookings:    ['id','carId','customer','phone','start','end','mileageOut','rate','total','status','note','returnDate','returnMileage','extra','finalTotal','returnNote'],
   maintenance: ['id','carId','date','type','mileage','cost','nextService','detail'],
-  expenses:    ['id','carId','date','expenseType','amount','detail']
+  expenses:    ['id','carId','date','expenseType','amount','detail'],
+  catalog:     ['type','brand','model']
 };
 
 /* ─────────────────────────────────────────
@@ -60,7 +62,8 @@ function handleGet() {
         cars:        sheetToArray(ss, SHEET_NAMES.cars,        HEADERS.cars),
         bookings:    sheetToArray(ss, SHEET_NAMES.bookings,    HEADERS.bookings),
         maintenance: sheetToArray(ss, SHEET_NAMES.maintenance, HEADERS.maintenance),
-        expenses:    sheetToArray(ss, SHEET_NAMES.expenses,    HEADERS.expenses)
+        expenses:    sheetToArray(ss, SHEET_NAMES.expenses,    HEADERS.expenses),
+        catalog:     sheetToArray(ss, SHEET_NAMES.catalog,     HEADERS.catalog)
       },
       timestamp: new Date().toISOString()
     };
@@ -91,9 +94,11 @@ function handlePost(e) {
 
 /* ─────────────────────────────────────────
    Cascading dropdowns (Cars sheet: type → brand → model)
-   Mirrors VEHICLE_CATALOG in app.js — keep both in sync.
+   Source of truth is the "VehicleCatalog" sheet — add brands/models by
+   adding rows there (columns: type, brand, model). app.js reads the same
+   sheet via handleGet(), so both stay in sync automatically.
 ───────────────────────────────────────── */
-var VEHICLE_CATALOG = {
+var DEFAULT_VEHICLE_CATALOG_SEED = {
   car: {
     'Toyota':     ['Yaris', 'Yaris Ativ', 'Vios', 'Corolla Altis', 'Corolla Cross', 'Camry', 'Fortuner', 'Hilux Revo', 'Innova'],
     'Honda':      ['City', 'Civic', 'Accord', 'Jazz', 'HR-V', 'CR-V', 'BR-V'],
@@ -112,8 +117,33 @@ var VEHICLE_CATALOG = {
   }
 };
 
-function catalogForType_(type) {
-  return type === 'motorcycle' ? VEHICLE_CATALOG.motorcycle : VEHICLE_CATALOG.car;
+function seedVehicleCatalogSheet_(sheet) {
+  var rows = [];
+  Object.keys(DEFAULT_VEHICLE_CATALOG_SEED).forEach(function (type) {
+    var brands = DEFAULT_VEHICLE_CATALOG_SEED[type];
+    Object.keys(brands).forEach(function (brand) {
+      brands[brand].forEach(function (model) {
+        rows.push([type, brand, model]);
+      });
+    });
+  });
+  if (rows.length) sheet.getRange(2, 1, rows.length, 3).setValues(rows);
+}
+
+function getVehicleCatalog_(ss) {
+  var rows = sheetToArray(ss, SHEET_NAMES.catalog, HEADERS.catalog);
+  var catalog = { car: {}, motorcycle: {} };
+  rows.forEach(function (r) {
+    if (!r.brand || !r.model) return;
+    var type = r.type === 'motorcycle' ? 'motorcycle' : 'car';
+    if (!catalog[type][r.brand]) catalog[type][r.brand] = [];
+    catalog[type][r.brand].push(r.model);
+  });
+  return catalog;
+}
+
+function catalogForType_(vehicleCatalog, type) {
+  return type === 'motorcycle' ? vehicleCatalog.motorcycle : vehicleCatalog.car;
 }
 
 function setListValidation_(range, values) {
@@ -138,9 +168,10 @@ function onEdit(e) {
     var col = e.range.getColumn(); // A=1 id, B=2 plate, C=3 brand, D=4 model, E=5 type
     if (col !== 3 && col !== 5) return;
 
+    var vehicleCatalog = getVehicleCatalog_(sheet.getParent());
     var type    = sheet.getRange(row, 5).getValue();
     var brand   = sheet.getRange(row, 3).getValue();
-    var catalog = catalogForType_(type);
+    var catalog = catalogForType_(vehicleCatalog, type);
 
     if (col === 5) {
       setListValidation_(sheet.getRange(row, 3), Object.keys(catalog));
@@ -166,6 +197,7 @@ function ensureSheets(ss) {
       r.setValues([HEADERS[key]]);
       styleHeader(r);
       sheet.setFrozenRows(1);
+      if (key === 'catalog') seedVehicleCatalogSheet_(sheet);
     }
   }
 }

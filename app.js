@@ -12,10 +12,14 @@ let state = {
   customerTags: {},     // { 'name||phone': 'vip' | 'regular' | 'new' | '' }
   sheetsUrl: '',
   syncing: false,
+  catalog: null,        // { car: {brand: [models]}, motorcycle: {...} } — synced from the "VehicleCatalog" sheet
 };
 
 // ── Vehicle catalog (type → brand → models) ─────────────────────────────
-const VEHICLE_CATALOG = {
+// Fallback used only until the first successful sync from the Google Sheet's
+// "VehicleCatalog" tab, which is the real source of truth going forward —
+// add new brands/models there, not here.
+const DEFAULT_VEHICLE_CATALOG = {
   car: {
     'Toyota':     ['Yaris', 'Yaris Ativ', 'Vios', 'Corolla Altis', 'Corolla Cross', 'Camry', 'Fortuner', 'Hilux Revo', 'Innova'],
     'Honda':      ['City', 'Civic', 'Accord', 'Jazz', 'HR-V', 'CR-V', 'BR-V'],
@@ -33,7 +37,23 @@ const VEHICLE_CATALOG = {
     'GPX':    ['Demon', 'Legend'],
   },
 };
-function catalogForType(type) { return type === 'motorcycle' ? VEHICLE_CATALOG.motorcycle : VEHICLE_CATALOG.car; }
+
+function buildVehicleCatalog(rows) {
+  const catalog = { car: {}, motorcycle: {} };
+  (rows || []).forEach(r => {
+    if (!r.brand || !r.model) return;
+    const type = r.type === 'motorcycle' ? 'motorcycle' : 'car';
+    if (!catalog[type][r.brand]) catalog[type][r.brand] = [];
+    catalog[type][r.brand].push(r.model);
+  });
+  return catalog;
+}
+
+function catalogForType(type) {
+  const hasSynced = state.catalog && (Object.keys(state.catalog.car).length || Object.keys(state.catalog.motorcycle).length);
+  const catalog = hasSynced ? state.catalog : DEFAULT_VEHICLE_CATALOG;
+  return type === 'motorcycle' ? catalog.motorcycle : catalog.car;
+}
 
 // ── Auto-init (no login) ───────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -60,6 +80,7 @@ function loadFromStorage() {
   state.maintenance   = JSON.parse(localStorage.getItem('maintenance')   || '[]');
   state.expenses      = JSON.parse(localStorage.getItem('expenses')      || '[]');
   state.customerTags  = JSON.parse(localStorage.getItem('customerTags')  || '{}');
+  state.catalog       = JSON.parse(localStorage.getItem('vehicleCatalog') || 'null');
   if (!state.cars.length) seedSampleData();
 }
 
@@ -1330,6 +1351,10 @@ async function loadFromSheets() {
       if (d.bookings?.length)    state.bookings    = d.bookings;
       if (d.maintenance?.length) state.maintenance = d.maintenance;
       if (d.expenses?.length)    state.expenses    = d.expenses;
+      if (d.catalog?.length) {
+        state.catalog = buildVehicleCatalog(d.catalog);
+        localStorage.setItem('vehicleCatalog', JSON.stringify(state.catalog));
+      }
       saveToStorage();
       renderDashboard();
       setSyncStatus('on');
