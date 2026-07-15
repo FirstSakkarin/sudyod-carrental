@@ -232,7 +232,20 @@ function renderCarsPage() {
 }
 
 // Car modals
+const COMMON_CAR_BRANDS = ['Toyota', 'Honda', 'Mazda', 'Mitsubishi', 'Hyundai'];
+
+function populateCarDatalists() {
+  const fill = (listId, values) => {
+    const unique = [...new Set(values.filter(Boolean))].sort();
+    document.getElementById(listId).innerHTML = unique.map(v => `<option value="${v}"></option>`).join('');
+  };
+  fill('carBrandList', [...COMMON_CAR_BRANDS, ...state.cars.map(c => c.brand)]);
+  fill('carModelList', state.cars.map(c => c.model));
+  fill('carColorList',  state.cars.map(c => c.color));
+}
+
 function openAddCarModal() {
+  populateCarDatalists();
   document.getElementById('carModalTitle').textContent = 'เพิ่มรถ';
   document.getElementById('carModalId').value   = '';
   document.getElementById('carPlate').value     = '';
@@ -252,6 +265,7 @@ function openAddCarModal() {
 function openEditCarModal(id) {
   const car = getCarById(id);
   if (!car) return;
+  populateCarDatalists();
   document.getElementById('carModalTitle').textContent    = 'แก้ไขข้อมูลรถ';
   document.getElementById('carModalId').value            = car.id;
   document.getElementById('carPlate').value              = car.plate;

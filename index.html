@@ -322,11 +322,13 @@
         <div class="form-row">
           <div class="form-group">
             <label>ยี่ห้อ *</label>
-            <input type="text" id="carBrand" placeholder="เช่น Toyota" />
+            <input type="text" id="carBrand" list="carBrandList" placeholder="เช่น Toyota" autocomplete="off" />
+            <datalist id="carBrandList"></datalist>
           </div>
           <div class="form-group">
             <label>รุ่น *</label>
-            <input type="text" id="carModel" placeholder="เช่น Camry" />
+            <input type="text" id="carModel" list="carModelList" placeholder="เช่น Camry" autocomplete="off" />
+            <datalist id="carModelList"></datalist>
           </div>
         </div>
         <div class="form-row">
@@ -336,7 +338,8 @@
           </div>
           <div class="form-group">
             <label>สี</label>
-            <input type="text" id="carColor" placeholder="เช่น ขาว" />
+            <input type="text" id="carColor" list="carColorList" placeholder="เช่น ขาว" autocomplete="off" />
+            <datalist id="carColorList"></datalist>
           </div>
         </div>
         <div class="form-row">
