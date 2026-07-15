@@ -126,13 +126,11 @@ function renderDashboard() {
   const available   = cars.filter(c => c.status === 'available').length;
   const rented      = cars.filter(c => c.status === 'rented').length;
   const maintenance = cars.filter(c => c.status === 'maintenance').length;
-  const blocked     = cars.filter(c => c.status === 'blocked').length;
 
   document.getElementById('statTotal').textContent       = cars.length;
   document.getElementById('statAvailable').textContent   = available;
   document.getElementById('statRented').textContent      = rented;
   document.getElementById('statMaintenance').textContent = maintenance;
-  document.getElementById('statBlocked').textContent     = blocked;
 
   // (blockedDueCard removed from dashboard — will be placed elsewhere)
 
