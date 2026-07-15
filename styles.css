@@ -1129,6 +1129,7 @@ body.is-owner .owner-only { display: flex; }
 
 /* ========== RESPONSIVE ========== */
 @media (max-width: 768px) {
+  #syncStatusDesk { display: none; }
   .sidebar {
     transform: translateX(-100%);
     box-shadow: var(--shadow-lg), 0 0 40px rgba(250,204,21,0.08);
