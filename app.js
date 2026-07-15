@@ -14,6 +14,27 @@ let state = {
   syncing: false,
 };
 
+// ── Vehicle catalog (type → brand → models) ─────────────────────────────
+const VEHICLE_CATALOG = {
+  car: {
+    'Toyota':     ['Yaris', 'Yaris Ativ', 'Vios', 'Corolla Altis', 'Corolla Cross', 'Camry', 'Fortuner', 'Hilux Revo', 'Innova'],
+    'Honda':      ['City', 'Civic', 'Accord', 'Jazz', 'HR-V', 'CR-V', 'BR-V'],
+    'Isuzu':      ['D-Max', 'MU-X'],
+    'Mazda':      ['Mazda2', 'Mazda3', 'CX-3', 'CX-30', 'CX-5', 'BT-50'],
+    'Mitsubishi': ['Attrage', 'Mirage', 'Xpander', 'Triton', 'Pajero Sport'],
+    'Nissan':     ['Almera', 'Note', 'Kicks', 'Navara', 'Terra'],
+    'Ford':       ['Ranger', 'Everest', 'Focus'],
+    'MG':         ['MG3', 'MG5', 'ZS', 'HS', 'Extender'],
+    'Hyundai':    ['Accent', 'Elantra', 'Tucson', 'Creta'],
+  },
+  motorcycle: {
+    'Honda':  ['Wave110i', 'Wave125i', 'Click125i', 'Click160i', 'PCX160', 'ADV160', 'CBR150R', 'Forza'],
+    'Yamaha': ['Fino', 'Grand Filano', 'NMAX', 'Aerox', 'XMAX', 'YZF-R15'],
+    'GPX':    ['Demon', 'Legend'],
+  },
+};
+function catalogForType(type) { return type === 'motorcycle' ? VEHICLE_CATALOG.motorcycle : VEHICLE_CATALOG.car; }
+
 // ── Auto-init (no login) ───────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   state.user = { username: 'admin', role: 'owner', display: 'เจ้าของ' };
@@ -272,16 +293,38 @@ function renderCarsPage() {
 }
 
 // Car modals
-const COMMON_CAR_BRANDS = ['Toyota', 'Honda', 'Mazda', 'Mitsubishi', 'Hyundai'];
+function populateCarColorList() {
+  const unique = [...new Set(state.cars.map(c => c.color).filter(Boolean))].sort();
+  document.getElementById('carColorList').innerHTML = unique.map(v => `<option value="${v}"></option>`).join('');
+}
 
-function populateCarDatalists() {
-  const fill = (listId, values) => {
-    const unique = [...new Set(values.filter(Boolean))].sort();
-    document.getElementById(listId).innerHTML = unique.map(v => `<option value="${v}"></option>`).join('');
-  };
-  fill('carBrandList', [...COMMON_CAR_BRANDS, ...state.cars.map(c => c.brand)]);
-  fill('carModelList', state.cars.map(c => c.model));
-  fill('carColorList',  state.cars.map(c => c.color));
+function populateBrandSelect(selectedBrand) {
+  const catalog = catalogForType(document.getElementById('carType').value);
+  const brands  = Object.keys(catalog);
+  const extra   = selectedBrand && !brands.includes(selectedBrand) ? [selectedBrand] : [];
+  const brandEl = document.getElementById('carBrand');
+  brandEl.innerHTML = '<option value="">— เลือกยี่ห้อ —</option>' +
+    [...brands, ...extra].map(b => `<option value="${b}">${b}</option>`).join('');
+  brandEl.value = selectedBrand || '';
+}
+
+function populateModelSelect(selectedModel) {
+  const catalog = catalogForType(document.getElementById('carType').value);
+  const brand   = document.getElementById('carBrand').value;
+  const models  = catalog[brand] || [];
+  const extra   = selectedModel && !models.includes(selectedModel) ? [selectedModel] : [];
+  const modelEl = document.getElementById('carModel');
+  modelEl.innerHTML = '<option value="">— เลือกรุ่น —</option>' +
+    [...models, ...extra].map(m => `<option value="${m}">${m}</option>`).join('');
+  modelEl.value = selectedModel || '';
+}
+
+function onCarTypeChange() {
+  populateBrandSelect();
+  populateModelSelect();
+}
+function onCarBrandChange() {
+  populateModelSelect();
 }
 
 function handleCarPhotoUpload(event) {
@@ -310,7 +353,7 @@ function handleCarPhotoUpload(event) {
 }
 
 function openAddCarModal() {
-  populateCarDatalists();
+  populateCarColorList();
   document.getElementById('carModalTitle').textContent = 'เพิ่มรถ';
   document.getElementById('carModalId').value   = '';
   document.getElementById('carPhotoData').value = '';
@@ -318,8 +361,8 @@ function openAddCarModal() {
   document.getElementById('carPhotoPreview').innerHTML = '<i class="fa-solid fa-car"></i>';
   document.getElementById('carPlate').value     = '';
   document.getElementById('carType').value      = 'sedan';
-  document.getElementById('carBrand').value     = '';
-  document.getElementById('carModel').value     = '';
+  populateBrandSelect();
+  populateModelSelect();
   document.getElementById('carYear').value      = '';
   document.getElementById('carColor').value     = '';
   document.getElementById('carMileage').value   = '';
@@ -333,7 +376,7 @@ function openAddCarModal() {
 function openEditCarModal(id) {
   const car = getCarById(id);
   if (!car) return;
-  populateCarDatalists();
+  populateCarColorList();
   document.getElementById('carModalTitle').textContent    = 'แก้ไขข้อมูลรถ';
   document.getElementById('carModalId').value            = car.id;
   document.getElementById('carPhotoData').value          = car.photo || '';
@@ -343,8 +386,8 @@ function openEditCarModal(id) {
     : `<i class="fa-solid fa-car"></i>`;
   document.getElementById('carPlate').value              = car.plate;
   document.getElementById('carType').value               = car.type || 'sedan';
-  document.getElementById('carBrand').value              = car.brand;
-  document.getElementById('carModel').value              = car.model;
+  populateBrandSelect(car.brand);
+  populateModelSelect(car.model);
   document.getElementById('carYear').value               = car.year || '';
   document.getElementById('carColor').value              = car.color || '';
   document.getElementById('carMileage').value            = car.mileage;

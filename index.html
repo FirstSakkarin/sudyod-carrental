@@ -331,7 +331,7 @@
           </div>
           <div class="form-group">
             <label>ประเภท</label>
-            <select id="carType">
+            <select id="carType" onchange="onCarTypeChange()">
               <option value="sedan">ซีดาน</option>
               <option value="suv">SUV</option>
               <option value="pickup">กระบะ</option>
@@ -343,13 +343,11 @@
         <div class="form-row">
           <div class="form-group">
             <label>ยี่ห้อ *</label>
-            <input type="text" id="carBrand" list="carBrandList" placeholder="เช่น Toyota" autocomplete="off" />
-            <datalist id="carBrandList"></datalist>
+            <select id="carBrand" onchange="onCarBrandChange()"></select>
           </div>
           <div class="form-group">
             <label>รุ่น *</label>
-            <input type="text" id="carModel" list="carModelList" placeholder="เช่น Camry" autocomplete="off" />
-            <datalist id="carModelList"></datalist>
+            <select id="carModel"></select>
           </div>
         </div>
         <div class="form-row">
