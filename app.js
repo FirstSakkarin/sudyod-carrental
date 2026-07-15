@@ -85,12 +85,17 @@ const PAGE_LABELS = {
 function navigate(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(a => a.classList.remove('active'));
+  document.querySelectorAll('.bnav-item').forEach(a => a.classList.remove('active'));
 
   const el = document.getElementById('page-' + page);
   if (el) el.classList.add('active');
 
   const nav = document.querySelector(`.nav-item[onclick="navigate('${page}')"]`);
   if (nav) nav.classList.add('active');
+
+  // Bottom nav active state
+  const bnav = document.querySelector(`.bnav-item[data-page="${page}"]`);
+  if (bnav) bnav.classList.add('active');
 
   document.getElementById('topbarTitle').textContent = PAGE_LABELS[page] || page;
   closeSidebar();

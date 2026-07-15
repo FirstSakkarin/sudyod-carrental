@@ -32,11 +32,12 @@
         <a href="#" class="nav-item" onclick="navigate('maintenance')">
           <i class="fa-solid fa-wrench"></i><span>ซ่อมบำรุง</span>
         </a>
-        <a href="#" class="nav-item" onclick="navigate('suggest')">
-          <i class="fa-solid fa-lightbulb"></i><span>แนะนำรถ</span>
-        </a>
         <a href="#" class="nav-item owner-only" onclick="navigate('finance')">
           <i class="fa-solid fa-coins"></i><span>รายรับ-รายจ่าย</span>
+        </a>
+        <div style="height:1px;background:rgba(255,255,255,0.06);margin:.5rem 1rem;"></div>
+        <a href="#" class="nav-item" onclick="navigate('suggest')">
+          <i class="fa-solid fa-lightbulb"></i><span>แนะนำรถ</span>
         </a>
         <a href="#" class="nav-item" onclick="navigate('customers')">
           <i class="fa-solid fa-users"></i><span>ลูกค้า</span>
@@ -94,6 +95,26 @@
             <i class="fa-solid fa-rotate"></i> รีเฟรช
           </button>
         </div>
+        <!-- Quick Access Shortcuts -->
+        <div class="quick-actions-grid">
+          <button class="quick-action-btn" onclick="navigate('cars')">
+            <i class="fa-solid fa-car"></i>
+            <span>รถทั้งหมด</span>
+          </button>
+          <button class="quick-action-btn" onclick="navigate('suggest')">
+            <i class="fa-solid fa-lightbulb"></i>
+            <span>แนะนำรถ</span>
+          </button>
+          <button class="quick-action-btn" onclick="navigate('customers')">
+            <i class="fa-solid fa-users"></i>
+            <span>ลูกค้า</span>
+          </button>
+          <button class="quick-action-btn" onclick="openAddBookingModal()">
+            <i class="fa-solid fa-calendar-plus"></i>
+            <span>จองใหม่</span>
+          </button>
+        </div>
+
         <div class="stats-grid">
           <div class="stat-card stat-total">
             <div class="stat-icon"><i class="fa-solid fa-car"></i></div>
@@ -704,6 +725,28 @@
 
   <!-- Toast -->
   <div id="toast" class="toast" style="display:none;"></div>
+
+  <!-- BOTTOM NAV (Mobile) -->
+  <nav class="bottom-nav" id="bottomNav">
+    <div class="bnav-inner">
+      <a class="bnav-item active" data-page="dashboard" onclick="navigate('dashboard')">
+        <i class="fa-solid fa-chart-pie"></i>
+        <span>ภาพรวม</span>
+      </a>
+      <a class="bnav-item" data-page="bookings" onclick="navigate('bookings')">
+        <i class="fa-solid fa-calendar-check"></i>
+        <span>จองรถ</span>
+      </a>
+      <a class="bnav-item" data-page="finance" onclick="navigate('finance')">
+        <i class="fa-solid fa-coins"></i>
+        <span>การเงิน</span>
+      </a>
+      <a class="bnav-item" data-page="maintenance" onclick="navigate('maintenance')">
+        <i class="fa-solid fa-wrench"></i>
+        <span>ซ่อมบำรุง</span>
+      </a>
+    </div>
+  </nav>
 
   <script src="app.js"></script>
 </body>
