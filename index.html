@@ -69,9 +69,9 @@
         <span class="topbar-title" id="topbarTitle">ภาพรวม</span>
       </div>
       <div class="topbar-right">
-        <span id="syncStatus" class="sync-badge sync-off">
+        <button id="syncStatus" class="sync-badge sync-off" onclick="refreshApp()" style="border:none;background:none;font-family:inherit;cursor:pointer;">
           <i class="fa-solid fa-circle"></i> ออฟไลน์
-        </span>
+        </button>
         <button class="menu-btn" onclick="openSettingsModal()">
           <i class="fa-solid fa-gear"></i>
         </button>
@@ -91,8 +91,8 @@
             <h2>ภาพรวมฝูงรถ</h2>
             <p class="page-subtitle" id="todayDate"></p>
           </div>
-          <button class="btn btn-outline btn-sm" onclick="syncNow()">
-            <i class="fa-solid fa-rotate"></i> รีเฟรช
+          <button id="syncStatusDesk" class="sync-badge sync-off" onclick="refreshApp()" style="border:none;background:none;font-family:inherit;cursor:pointer;">
+            <i class="fa-solid fa-circle"></i> ออฟไลน์
           </button>
         </div>
         <div class="stats-grid">
@@ -131,14 +131,6 @@
               <div class="stat-label">ปิดตา</div>
             </div>
           </div>
-        </div>
-
-        <!-- รถที่ครบกำหนดปิดตา -->
-        <div class="section-card" id="blockedDueCard" style="display:none;">
-          <div class="section-card-header">
-            <h3><i class="fa-solid fa-lock-open" style="color:var(--blocked);"></i> <span style="color:var(--blocked);">รถถึงกำหนดเปิดตา</span></h3>
-          </div>
-          <div id="blockedDueList" class="return-list"></div>
         </div>
 
         <div class="section-card">

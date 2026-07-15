@@ -134,26 +134,7 @@ function renderDashboard() {
   document.getElementById('statMaintenance').textContent = maintenance;
   document.getElementById('statBlocked').textContent     = blocked;
 
-  // รถที่ถึงกำหนดเปิดตาแล้ว
-  const blockedDue = cars.filter(c => c.status === 'blocked' && c.blockedUntil && c.blockedUntil <= today);
-  const blockedDueCard = document.getElementById('blockedDueCard');
-  const blockedDueList = document.getElementById('blockedDueList');
-  if (blockedDue.length) {
-    blockedDueCard.style.display = '';
-    blockedDueList.innerHTML = blockedDue.map(car => `
-      <div class="blocked-alert">
-        <div class="blocked-alert-info">
-          <div class="blocked-alert-plate"><i class="fa-solid fa-lock-open"></i> ${car.plate} — ${car.brand} ${car.model}</div>
-          <div class="blocked-alert-detail">กำหนดเปิดตา: ${car.blockedUntil}${car.blockedReason ? ' · ' + car.blockedReason : ''}</div>
-        </div>
-        <button class="btn btn-sm" onclick="unblockCar('${car.id}')"
-          style="background:var(--blocked-bg);color:var(--blocked);border:1px solid rgba(167,139,250,0.3);box-shadow:0 0 10px var(--blocked-glow);">
-          <i class="fa-solid fa-lock-open"></i> เปิดตา
-        </button>
-      </div>`).join('');
-  } else {
-    blockedDueCard.style.display = 'none';
-  }
+  // (blockedDueCard removed from dashboard — will be placed elsewhere)
 
   // Today's returns
   const returns = state.bookings.filter(b => b.end === today && b.status === 'active');
@@ -1259,13 +1240,29 @@ async function syncNow() {
 
 function pushToSheets() { if (state.sheetsUrl) syncNow(); }
 
+function refreshApp() {
+  if (!state.sheetsUrl) {
+    renderDashboard();
+    showToast('รีเฟรชเรียบร้อย', 'success');
+    return;
+  }
+  loadFromSheets();
+}
+
 function setSyncStatus(s) {
-  const el = document.getElementById('syncStatus');
-  el.className = 'sync-badge';
-  if (s === 'on')      { el.classList.add('sync-on');    el.innerHTML = '<i class="fa-solid fa-circle"></i> ออนไลน์'; }
-  else if (s === 'off'){ el.classList.add('sync-off');   el.innerHTML = '<i class="fa-solid fa-circle"></i> ออฟไลน์'; }
-  else if (s === 'syncing') { el.classList.add('sync-off'); el.innerHTML = '<i class="fa-solid fa-rotate fa-spin"></i> sync...'; }
-  else                 { el.classList.add('sync-error'); el.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> ผิดพลาด'; }
+  let cls, html;
+  if (s === 'on')       { cls = 'sync-on';    html = '<i class="fa-solid fa-circle"></i> ออนไลน์'; }
+  else if (s === 'off') { cls = 'sync-off';   html = '<i class="fa-solid fa-circle"></i> ออฟไลน์'; }
+  else if (s === 'syncing') { cls = 'sync-off'; html = '<i class="fa-solid fa-rotate fa-spin"></i> sync...'; }
+  else                  { cls = 'sync-error'; html = '<i class="fa-solid fa-circle-exclamation"></i> ผิดพลาด'; }
+
+  ['syncStatus', 'syncStatusDesk'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.className = 'sync-badge ' + cls;
+    el.style.cssText = 'border:none;background:none;font-family:inherit;cursor:pointer;';
+    el.innerHTML = html;
+  });
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
