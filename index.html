@@ -218,25 +218,45 @@
         <div id="maintenanceTableContainer"></div>
       </section>
 
-      <!-- SUGGEST PAGE -->
+      <!-- SUGGEST / BOOKING SEARCH PAGE -->
       <section id="page-suggest" class="page">
         <div class="page-header">
           <div>
-            <h2>แนะนำรถ</h2>
-            <p class="page-subtitle">ค้นหารถว่างตามวันที่ต้องการ</p>
+            <h2>ค้นหา &amp; จองรถ</h2>
+            <p class="page-subtitle">กรอกวัน-เวลา-สถานที่ที่ลูกค้าต้องการ ระบบจะแนะนำรถว่าง และรถที่ติดคิวคืนวันเดียวกันพร้อมเวลาเตรียมรถ</p>
           </div>
         </div>
         <div class="section-card">
           <div class="suggest-form">
-            <div class="form-row">
+            <div class="form-row-3">
               <div class="form-group">
                 <label><i class="fa-solid fa-calendar"></i> วันรับรถ</label>
                 <input type="date" id="suggestDate" onchange="runSuggest()" />
               </div>
               <div class="form-group">
+                <label><i class="fa-solid fa-clock"></i> เวลารับรถ</label>
+                <input type="time" id="suggestTime" onchange="runSuggest()" />
+              </div>
+              <div class="form-group">
+                <label><i class="fa-solid fa-location-dot"></i> สถานที่รับรถ</label>
+                <input type="text" id="suggestLocation" placeholder="เช่น สนามบินเชียงใหม่" onchange="runSuggest()" />
+              </div>
+            </div>
+            <div class="form-row-3">
+              <div class="form-group">
                 <label><i class="fa-solid fa-calendar-xmark"></i> วันคืนรถ</label>
                 <input type="date" id="suggestEndDate" onchange="runSuggest()" />
               </div>
+              <div class="form-group">
+                <label><i class="fa-solid fa-clock"></i> เวลาคืนรถ</label>
+                <input type="time" id="suggestEndTime" onchange="runSuggest()" />
+              </div>
+              <div class="form-group">
+                <label><i class="fa-solid fa-location-dot"></i> สถานที่คืนรถ</label>
+                <input type="text" id="suggestEndLocation" placeholder="เช่น สำนักงาน" onchange="runSuggest()" />
+              </div>
+            </div>
+            <div class="form-row">
               <div class="form-group">
                 <label><i class="fa-solid fa-car"></i> ประเภทรถ</label>
                 <select id="suggestType" onchange="runSuggest()">
@@ -443,12 +463,25 @@
             <label>วันรับรถ *</label>
             <div style="display:flex;gap:.5rem;">
               <input type="date" id="bookingStart" onchange="calcBookingTotal()" style="flex:2;" />
-              <input type="time" id="bookingStartTime" title="เวลาส่งรถ" style="flex:1;" />
+              <input type="time" id="bookingStartTime" title="เวลารับรถ" style="flex:1;" />
             </div>
           </div>
           <div class="form-group">
             <label>วันคืนรถ *</label>
-            <input type="date" id="bookingEnd" onchange="calcBookingTotal()" />
+            <div style="display:flex;gap:.5rem;">
+              <input type="date" id="bookingEnd" onchange="calcBookingTotal()" style="flex:2;" />
+              <input type="time" id="bookingEndTime" title="เวลาคืนรถ" style="flex:1;" />
+            </div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>สถานที่รับรถ</label>
+            <input type="text" id="bookingPickupLocation" placeholder="เช่น สนามบินเชียงใหม่" />
+          </div>
+          <div class="form-group">
+            <label>สถานที่คืนรถ</label>
+            <input type="text" id="bookingReturnLocation" placeholder="เช่น สำนักงาน" />
           </div>
         </div>
         <div class="form-row">

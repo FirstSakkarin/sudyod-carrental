@@ -578,6 +578,9 @@ function openAddBookingModal() {
   document.getElementById('bookingStart').value      = '';
   document.getElementById('bookingStartTime').value  = '';
   document.getElementById('bookingEnd').value        = '';
+  document.getElementById('bookingEndTime').value    = '';
+  document.getElementById('bookingPickupLocation').value = '';
+  document.getElementById('bookingReturnLocation').value  = '';
   document.getElementById('bookingMileageOut').value = '';
   document.getElementById('bookingRate').value       = '';
   document.getElementById('bookingNote').value       = '';
@@ -597,6 +600,9 @@ function openEditBookingModal(id) {
   document.getElementById('bookingStart').value      = b.start;
   document.getElementById('bookingStartTime').value  = b.startTime || '';
   document.getElementById('bookingEnd').value        = b.end;
+  document.getElementById('bookingEndTime').value    = b.endTime || '';
+  document.getElementById('bookingPickupLocation').value = b.pickupLocation || '';
+  document.getElementById('bookingReturnLocation').value  = b.returnLocation || '';
   document.getElementById('bookingMileageOut').value = b.mileageOut || '';
   document.getElementById('bookingRate').value       = b.rate || '';
   document.getElementById('bookingNote').value       = b.note || '';
@@ -644,7 +650,10 @@ function saveBooking() {
 
   const data = {
     carId, customer, start, end, rate, total, status,
-    startTime:    document.getElementById('bookingStartTime').value || '',
+    startTime:       document.getElementById('bookingStartTime').value || '',
+    endTime:         document.getElementById('bookingEndTime').value || '',
+    pickupLocation:  document.getElementById('bookingPickupLocation').value.trim(),
+    returnLocation:  document.getElementById('bookingReturnLocation').value.trim(),
     phone:        document.getElementById('bookingPhone').value.trim(),
     mileageOut:   +document.getElementById('bookingMileageOut').value || null,
     note:         document.getElementById('bookingNote').value.trim(),
@@ -841,10 +850,14 @@ function deleteMaintenance(id) {
 
 // ── Suggest Page ───────────────────────────────────────────────────────
 function runSuggest() {
-  const start   = document.getElementById('suggestDate').value;
-  const end     = document.getElementById('suggestEndDate').value;
-  const type    = document.getElementById('suggestType').value;
-  const results = document.getElementById('suggestResults');
+  const start    = document.getElementById('suggestDate').value;
+  const startTime = document.getElementById('suggestTime').value;
+  const startLoc  = document.getElementById('suggestLocation').value.trim();
+  const end      = document.getElementById('suggestEndDate').value;
+  const endTime   = document.getElementById('suggestEndTime').value;
+  const endLoc    = document.getElementById('suggestEndLocation').value.trim();
+  const type     = document.getElementById('suggestType').value;
+  const results  = document.getElementById('suggestResults');
 
   if (!start || !end) { results.innerHTML = ''; return; }
 
@@ -854,53 +867,87 @@ function runSuggest() {
     return;
   }
 
-  // Find available cars (no active booking in date range)
-  const available = state.cars.filter(car => {
-    if (car.status === 'maintenance') return false;
-    if (car.status === 'blocked')     return false;
-    if (type && car.type !== type)    return false;
-    // Check for booking conflicts
-    const conflict = state.bookings.some(b =>
-      b.carId === car.id &&
-      b.status !== 'completed' &&
-      b.start < end && b.end > start
-    );
-    return !conflict;
+  const available   = [];
+  const sameDayQueue = [];
+
+  state.cars.forEach(car => {
+    if (car.status === 'maintenance') return;
+    if (car.status === 'blocked')     return;
+    if (type && car.type !== type)    return;
+
+    const carBookings = state.bookings.filter(b => b.carId === car.id && b.status !== 'completed');
+    const trueConflict = carBookings.some(b => b.start < end && b.end > start);
+    if (trueConflict) return; // genuinely busy during the requested window — don't show
+
+    const returningOnPickupDay = carBookings.find(b => b.end === start);
+    if (returningOnPickupDay) {
+      const prepMins = minutesBetween(returningOnPickupDay.end, returningOnPickupDay.endTime, start, startTime);
+      sameDayQueue.push({ car, booking: returningOnPickupDay, prepMins });
+    } else {
+      available.push(car);
+    }
   });
 
-  if (!available.length) {
+  sameDayQueue.sort((a, b) => (a.prepMins ?? Infinity) - (b.prepMins ?? Infinity));
+
+  if (!available.length && !sameDayQueue.length) {
     results.innerHTML = `<div class="section-card"><div class="modal-body"><p class="empty-state">ไม่พบรถว่างในช่วงเวลานี้</p></div></div>`;
     return;
   }
 
-  results.innerHTML = `
+  const carCardHtml = (car, tag, extraInfo, bookingId) => `
+    <div class="suggest-car-card">
+      <div class="suggest-car-info">
+        <div class="suggest-car-plate">${car.plate} ${tag}</div>
+        <div class="suggest-car-model">${car.brand} ${car.model} · ${car.color||'-'} · ปี ${car.year||'-'}</div>
+        ${extraInfo || ''}
+      </div>
+      <div style="text-align:right;">
+        <div class="suggest-rate">${car.dailyRate.toLocaleString()} ฿/วัน</div>
+        <div style="font-size:.78rem;color:var(--gray-400);">รวม ${(car.dailyRate*days).toLocaleString()} ฿</div>
+        <button class="btn btn-primary btn-sm" style="margin-top:.35rem;" onclick="prefillBooking('${car.id}')">
+          <i class="fa-solid fa-plus"></i> จอง
+        </button>
+      </div>
+    </div>`;
+
+  const availableSection = available.length ? `
     <div class="section-card">
       <div class="section-card-header">
         <h3>รถว่าง ${available.length} คัน · ${days} วัน</h3>
       </div>
-      ${available.map(car => `
-        <div class="suggest-car-card">
-          <div class="suggest-car-info">
-            <div class="suggest-car-plate">${car.plate} <span class="pill pill-available" style="font-size:.7rem;">ว่าง</span></div>
-            <div class="suggest-car-model">${car.brand} ${car.model} · ${car.color||'-'} · ปี ${car.year||'-'}</div>
-          </div>
-          <div style="text-align:right;">
-            <div class="suggest-rate">${car.dailyRate.toLocaleString()} ฿/วัน</div>
-            <div style="font-size:.78rem;color:var(--gray-400);">รวม ${(car.dailyRate*days).toLocaleString()} ฿</div>
-            <button class="btn btn-primary btn-sm" style="margin-top:.35rem;"
-              onclick="prefillBooking('${car.id}','${start}','${end}')">
-              <i class="fa-solid fa-plus"></i> จอง
-            </button>
-          </div>
-        </div>`).join('')}
-    </div>`;
+      ${available.map(car => carCardHtml(car, '<span class="pill pill-available" style="font-size:.7rem;">ว่าง</span>')).join('')}
+    </div>` : '';
+
+  const queueSection = sameDayQueue.length ? `
+    <div class="section-card">
+      <div class="section-card-header">
+        <h3><i class="fa-solid fa-clock-rotate-left"></i> รถติดคิวคืนวันเดียวกัน ${sameDayQueue.length} คัน</h3>
+      </div>
+      ${sameDayQueue.map(({ car, booking, prepMins }) => carCardHtml(
+        car,
+        '<span class="pill pill-rented" style="font-size:.7rem;">มีคิวคืน</span>',
+        `<div style="font-size:.78rem;color:var(--gray-400);margin-top:.2rem;">
+           คืนจาก ${booking.customer} · ${booking.end}${booking.endTime ? ' เวลา ' + booking.endTime : ''}
+         </div>
+         <div style="font-size:.78rem;font-weight:700;margin-top:.15rem;color:${prepMins !== null && prepMins < 0 ? 'var(--danger)' : 'var(--maintenance)'};">
+           ${formatPrepTime(prepMins)}
+         </div>`
+      )).join('')}
+    </div>` : '';
+
+  results.innerHTML = availableSection + queueSection;
 }
 
-function prefillBooking(carId, start, end) {
+function prefillBooking(carId) {
   openAddBookingModal();
-  document.getElementById('bookingCar').value  = carId;
-  document.getElementById('bookingStart').value = start;
-  document.getElementById('bookingEnd').value   = end;
+  document.getElementById('bookingCar').value             = carId;
+  document.getElementById('bookingStart').value           = document.getElementById('suggestDate').value;
+  document.getElementById('bookingStartTime').value       = document.getElementById('suggestTime').value;
+  document.getElementById('bookingPickupLocation').value  = document.getElementById('suggestLocation').value.trim();
+  document.getElementById('bookingEnd').value             = document.getElementById('suggestEndDate').value;
+  document.getElementById('bookingEndTime').value         = document.getElementById('suggestEndTime').value;
+  document.getElementById('bookingReturnLocation').value  = document.getElementById('suggestEndLocation').value.trim();
   calcBookingTotal();
 }
 
@@ -1456,6 +1503,23 @@ function daysBetween(start, end) {
   const a = new Date(start);
   const b = new Date(end);
   return Math.round((b - a) / 86400000);
+}
+
+// Minutes from (date1,time1) to (date2,time2). Returns null if either time is missing.
+function minutesBetween(date1, time1, date2, time2) {
+  if (!time1 || !time2) return null;
+  const a = new Date(`${date1}T${time1}:00`);
+  const b = new Date(`${date2}T${time2}:00`);
+  return Math.round((b - a) / 60000);
+}
+
+function formatPrepTime(mins) {
+  if (mins === null) return 'ไม่ทราบเวลาคืนที่แน่นอน';
+  if (mins < 0) return `ช้ากว่ากำหนด ${Math.abs(mins)} นาที (คืนหลังลูกค้าใหม่มารับรถ)`;
+  if (mins === 0) return 'มีเวลาเตรียมรถ 0 นาที (คืน-รับต่อกันพอดี)';
+  if (mins < 60) return `มีเวลาเตรียมรถ ${mins} นาที`;
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return `มีเวลาเตรียมรถ ${h} ชม.${m ? ' ' + m + ' นาที' : ''}`;
 }
 
 function formatDateThai(d) {

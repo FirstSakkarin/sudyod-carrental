@@ -24,7 +24,7 @@ const SHEET_NAMES = {
 // Column headers — must match app.js data structure exactly
 const HEADERS = {
   cars:        ['id','plate','brand','model','type','year','color','mileage','nextService','dailyRate','status','note','blockedUntil','blockedReason'],
-  bookings:    ['id','carId','customer','phone','start','end','mileageOut','rate','total','status','note','returnDate','returnMileage','extra','finalTotal','returnNote'],
+  bookings:    ['id','carId','customer','phone','start','startTime','pickupLocation','end','endTime','returnLocation','mileageOut','rate','total','status','note','returnDate','returnMileage','extra','finalTotal','returnNote'],
   maintenance: ['id','carId','date','type','mileage','cost','nextService','detail'],
   expenses:    ['id','carId','date','expenseType','amount','detail'],
   catalog:     ['type','brand','model']
