@@ -145,6 +145,30 @@ function renderDashboard() {
 
   // (blockedDueCard removed from dashboard — will be placed elsewhere)
 
+  // Today's deliveries
+  const deliveries = state.bookings
+    .filter(b => b.start === today && b.status !== 'completed')
+    .sort((a, b) => (a.startTime || '99:99').localeCompare(b.startTime || '99:99'));
+  const deliveryEl = document.getElementById('todayDeliveries');
+  if (!deliveries.length) {
+    deliveryEl.innerHTML = '<p class="empty-state">ไม่มีรถที่ต้องส่งวันนี้</p>';
+  } else {
+    deliveryEl.innerHTML = deliveries.map(b => {
+      const car = getCarById(b.carId);
+      return `
+        <div class="return-item">
+          <div class="return-item-info">
+            <div class="return-plate">${car ? car.plate : '-'} <span style="font-weight:400;color:var(--gray-500);font-size:.8rem;">${car ? car.brand + ' ' + car.model : ''}</span></div>
+            <div class="return-customer">${b.customer} · ${b.phone || '-'}</div>
+          </div>
+          <div>
+            <span class="return-tag">${b.startTime || 'ไม่ระบุเวลา'}</span>
+            <button class="btn btn-sm btn-primary" style="margin-top:.35rem;" onclick="openEditBookingModal('${b.id}')">รายละเอียด</button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
   // Today's returns
   const returns = state.bookings.filter(b => b.end === today && b.status === 'active');
   const returnEl = document.getElementById('todayReturns');
@@ -451,6 +475,7 @@ function openAddBookingModal() {
   document.getElementById('bookingCustomer').value   = '';
   document.getElementById('bookingPhone').value      = '';
   document.getElementById('bookingStart').value      = '';
+  document.getElementById('bookingStartTime').value  = '';
   document.getElementById('bookingEnd').value        = '';
   document.getElementById('bookingMileageOut').value = '';
   document.getElementById('bookingRate').value       = '';
@@ -469,6 +494,7 @@ function openEditBookingModal(id) {
   document.getElementById('bookingCustomer').value   = b.customer;
   document.getElementById('bookingPhone').value      = b.phone || '';
   document.getElementById('bookingStart').value      = b.start;
+  document.getElementById('bookingStartTime').value  = b.startTime || '';
   document.getElementById('bookingEnd').value        = b.end;
   document.getElementById('bookingMileageOut').value = b.mileageOut || '';
   document.getElementById('bookingRate').value       = b.rate || '';
@@ -517,6 +543,7 @@ function saveBooking() {
 
   const data = {
     carId, customer, start, end, rate, total, status,
+    startTime:    document.getElementById('bookingStartTime').value || '',
     phone:        document.getElementById('bookingPhone').value.trim(),
     mileageOut:   +document.getElementById('bookingMileageOut').value || null,
     note:         document.getElementById('bookingNote').value.trim(),

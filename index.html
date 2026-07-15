@@ -124,11 +124,19 @@
           </div>
         </div>
 
-        <div class="section-card">
-          <div class="section-card-header">
-            <h3><i class="fa-solid fa-rotate-left"></i> คืนรถวันนี้</h3>
+        <div class="today-grid">
+          <div class="section-card">
+            <div class="section-card-header">
+              <h3><i class="fa-solid fa-truck-fast"></i> ส่งรถวันนี้</h3>
+            </div>
+            <div id="todayDeliveries" class="return-list"></div>
           </div>
-          <div id="todayReturns" class="return-list"></div>
+          <div class="section-card">
+            <div class="section-card-header">
+              <h3><i class="fa-solid fa-rotate-left"></i> คืนรถวันนี้</h3>
+            </div>
+            <div id="todayReturns" class="return-list"></div>
+          </div>
         </div>
 
         <div class="section-card">
@@ -425,7 +433,10 @@
         <div class="form-row">
           <div class="form-group">
             <label>วันรับรถ *</label>
-            <input type="date" id="bookingStart" onchange="calcBookingTotal()" />
+            <div style="display:flex;gap:.5rem;">
+              <input type="date" id="bookingStart" onchange="calcBookingTotal()" style="flex:2;" />
+              <input type="time" id="bookingStartTime" title="เวลาส่งรถ" style="flex:1;" />
+            </div>
           </div>
           <div class="form-group">
             <label>วันคืนรถ *</label>
