@@ -141,6 +141,18 @@
 
         <div class="section-card">
           <div class="section-card-header">
+            <h3><i class="fa-solid fa-chart-gantt"></i> ตารางคิวรถ</h3>
+            <div style="display:flex;gap:.4rem;align-items:center;">
+              <button class="icon-btn" onclick="shiftGantt(-7)" title="7 วันก่อนหน้า"><i class="fa-solid fa-chevron-left"></i></button>
+              <button class="btn btn-secondary btn-sm" onclick="resetGantt()">วันนี้</button>
+              <button class="icon-btn" onclick="shiftGantt(7)" title="7 วันถัดไป"><i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+          </div>
+          <div id="ganttChart" class="gantt-wrap"></div>
+        </div>
+
+        <div class="section-card">
+          <div class="section-card-header">
             <h3><i class="fa-solid fa-list"></i> สถานะรถทุกคัน</h3>
           </div>
           <div id="dashboardCarList" class="car-grid"></div>

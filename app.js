@@ -249,6 +249,122 @@ function renderDashboard() {
         <div class="car-mini-photo">${car.photo ? `<img src="${car.photo}" alt="" />` : vehicleTypeIcon(car.type)}</div>
       </div>`;
   }).join('');
+
+  renderGanttChart();
+}
+
+// ── Gantt chart (dashboard queue view) ──────────────────────────────────
+let ganttOffset = 0;
+
+function shiftGantt(days) { ganttOffset += days; renderGanttChart(); }
+function resetGantt()     { ganttOffset = 0;     renderGanttChart(); }
+
+function addDaysStr(dateStr, n) {
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+// Interval-scheduling lane assignment: overlapping bookings get stacked into
+// separate lanes instead of drawn on top of each other, so a double-booking
+// mistake is visually obvious instead of hidden.
+function assignGanttLanes(bookings) {
+  const sorted = [...bookings].sort((a, b) => a.start.localeCompare(b.start));
+  const laneEnds = [];
+  const laneOf = {};
+  sorted.forEach(b => {
+    let lane = laneEnds.findIndex(end => end <= b.start);
+    if (lane === -1) { lane = laneEnds.length; laneEnds.push(b.end); }
+    else { laneEnds[lane] = b.end; }
+    laneOf[b.id] = lane;
+  });
+  return { laneOf, laneCount: laneEnds.length || 1 };
+}
+
+function renderGanttChart() {
+  const wrap = document.getElementById('ganttChart');
+  if (!wrap) return;
+
+  const WINDOW = 7;
+  const today       = todayStr();
+  const windowStart = addDaysStr(today, ganttOffset);
+  const windowEnd   = addDaysStr(windowStart, WINDOW); // exclusive
+  const days        = Array.from({ length: WINDOW }, (_, i) => addDaysStr(windowStart, i));
+  const DOW         = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+
+  const headerCells = days.map(d => {
+    const dt = new Date(d);
+    return `<div class="gantt-day-head ${d === today ? 'gantt-today' : ''}">
+      <div class="gantt-dow">${DOW[dt.getDay()]}</div>
+      <div class="gantt-date">${dt.getDate()}/${dt.getMonth() + 1}</div>
+    </div>`;
+  }).join('');
+
+  const trackCols = '<div class="gantt-track-cols">' + '<div class="gantt-col"></div>'.repeat(WINDOW) + '</div>';
+
+  const rows = state.cars.map(car => {
+    if (car.status === 'maintenance' || car.status === 'blocked') {
+      const label = car.status === 'maintenance' ? 'ซ่อมบำรุง' : 'ปิดตา';
+      return `
+        <div class="gantt-row">
+          <div class="gantt-carlabel" title="${car.plate}">${vehicleTypeIcon(car.type)} ${car.plate}</div>
+          <div class="gantt-track gantt-track-disabled">
+            ${trackCols}
+            <span class="pill pill-${car.status}" style="position:relative;">${label}</span>
+          </div>
+        </div>`;
+    }
+
+    const bookings = state.bookings.filter(b =>
+      b.carId === car.id && b.status !== 'completed' &&
+      b.start < windowEnd && b.end >= windowStart
+    );
+
+    const { laneOf, laneCount } = assignGanttLanes(bookings);
+    const conflictIds = new Set();
+    for (let i = 0; i < bookings.length; i++) {
+      for (let j = i + 1; j < bookings.length; j++) {
+        if (bookings[i].start < bookings[j].end && bookings[i].end > bookings[j].start) {
+          conflictIds.add(bookings[i].id);
+          conflictIds.add(bookings[j].id);
+        }
+      }
+    }
+
+    const bars = bookings.map(b => {
+      const clipStart = b.start < windowStart ? windowStart : b.start;
+      const clipEnd    = b.end > windowEnd ? windowEnd : b.end;
+      const startIdx   = daysBetween(windowStart, clipStart);
+      const endIdx     = Math.max(daysBetween(windowStart, clipEnd), startIdx + 0.4);
+      const leftPct    = (startIdx / WINDOW) * 100;
+      const widthPct   = ((endIdx - startIdx) / WINDOW) * 100;
+      const isConflict = conflictIds.has(b.id);
+      const statusClass = isConflict ? 'gantt-bar-conflict' : (b.status === 'active' ? 'gantt-bar-active' : 'gantt-bar-upcoming');
+      const title = `${car.plate} · ${b.customer}\n${b.start}${b.startTime ? ' ' + b.startTime : ''} → ${b.end}${b.endTime ? ' ' + b.endTime : ''}` +
+        (isConflict ? '\n⚠ ชนกับการจองอื่นของรถคันนี้' : '');
+      return `<div class="gantt-bar ${statusClass}"
+        style="left:${leftPct}%;width:${widthPct}%;top:${3 + laneOf[b.id] * 32}px;"
+        title="${title.replace(/"/g, '&quot;')}"
+        onclick="openEditBookingModal('${b.id}')">
+        ${isConflict ? '<i class="fa-solid fa-triangle-exclamation"></i>&nbsp;' : ''}${b.customer}
+      </div>`;
+    }).join('');
+
+    return `
+      <div class="gantt-row" style="min-height:${Math.max(44, laneCount * 32 + 12)}px;">
+        <div class="gantt-carlabel" title="${car.plate}">${vehicleTypeIcon(car.type)} ${car.plate}</div>
+        <div class="gantt-track">${trackCols}${bars}</div>
+      </div>`;
+  }).join('');
+
+  wrap.innerHTML = `
+    <div class="gantt-table">
+      <div class="gantt-header-row">
+        <div class="gantt-carlabel-head">รถ</div>
+        ${headerCells}
+      </div>
+      ${rows}
+    </div>`;
 }
 
 // ── Cars Page ──────────────────────────────────────────────────────────
