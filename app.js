@@ -72,6 +72,7 @@ function initApp() {
   renderDashboard();
   navigate('dashboard');
   initCustomPickers();
+  enhanceAllSelects();
   if (state.sheetsUrl) {
     loadFromSheets();
     startSheetsPolling();
@@ -1819,6 +1820,122 @@ function renderTimePicker() {
       <button type="button" class="btn btn-sm btn-primary" onclick="confirmPickerTime()">ตกลง</button>
     </div>`;
 }
+
+// ── Custom select dropdown ──────────────────────────────────────────────
+// Native <select> popups are OS-rendered and can't be restyled either, so
+// every <select> gets a theme-matching trigger next to it, while the
+// native element stays in the DOM (visually hidden) as the real source of
+// truth — existing code that reads/writes .value or rebuilds <option>s via
+// innerHTML keeps working untouched.
+//
+// The dropdown panel itself is ONE shared element appended to <body>
+// (mirroring the date/time pickers), not nested inside each trigger —
+// several containers in this app (.section-card, .modal) use
+// backdrop-filter + overflow:hidden, and backdrop-filter makes an element
+// the containing block for any position:fixed descendant, silently
+// clipping a panel that lived inside one of those instead of escaping to
+// the viewport like it's supposed to.
+let customSelectActive = null;
+
+function enhanceAllSelects() {
+  document.querySelectorAll('select').forEach(enhanceSelect);
+}
+
+function enhanceSelect(select) {
+  if (select.dataset.csEnhanced) return;
+  select.dataset.csEnhanced = '1';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'custom-select-wrap';
+  select.parentNode.insertBefore(wrap, select);
+  wrap.appendChild(select);
+  select.classList.add('cs-native');
+  select.tabIndex = -1;
+
+  const trigger = document.createElement('div');
+  trigger.className = 'custom-select-trigger';
+  trigger.innerHTML = `<span class="cs-label"></span><i class="fa-solid fa-chevron-down"></i>`;
+  wrap.appendChild(trigger);
+
+  select._csTrigger = trigger;
+  select._csWrap    = wrap;
+
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (select.disabled) return;
+    const wasOpen = customSelectActive === select;
+    closeAllCustomSelects();
+    if (!wasOpen) openCustomSelect(select, trigger);
+  });
+
+  // Options get rebuilt dynamically (brand/model cascading, car/maintenance/
+  // expense pickers) — catch that even when nothing calls syncSelectLabel.
+  new MutationObserver(() => syncSelectLabel(select)).observe(select, { childList: true });
+
+  syncSelectLabel(select);
+}
+
+function syncSelectLabel(select) {
+  const trigger = select._csTrigger;
+  if (!trigger) return;
+  const opt = select.options[select.selectedIndex];
+  trigger.querySelector('.cs-label').textContent = opt ? opt.textContent : '';
+  trigger.classList.toggle('placeholder', !opt || !opt.value);
+  trigger.classList.toggle('disabled', select.disabled);
+}
+
+function openCustomSelect(select, trigger) {
+  const panel = document.getElementById('customSelectPanel');
+  panel.innerHTML = Array.from(select.options).map((opt, i) => `
+    <div class="custom-select-option ${opt.disabled ? 'disabled' : ''} ${i === select.selectedIndex ? 'selected' : ''}"
+         data-index="${i}">${opt.textContent}</div>`).join('');
+  panel.classList.add('open');
+  trigger.parentElement.classList.add('open');
+  customSelectActive = select;
+  positionSelectPanel(panel, trigger);
+  panel.querySelector('.selected')?.scrollIntoView({ block: 'nearest' });
+}
+
+function positionSelectPanel(panel, trigger) {
+  const rect = trigger.getBoundingClientRect();
+  panel.style.width = `${rect.width}px`;
+  let left = rect.left;
+  if (left + rect.width > window.innerWidth - 8) left = window.innerWidth - rect.width - 8;
+  panel.style.left = `${Math.max(8, left)}px`;
+  panel.style.top  = `${rect.bottom + 6}px`;
+}
+
+function closeAllCustomSelects() {
+  document.getElementById('customSelectPanel')?.classList.remove('open');
+  document.querySelectorAll('.custom-select-wrap.open').forEach(w => w.classList.remove('open'));
+  customSelectActive = null;
+}
+
+document.getElementById('customSelectPanel')?.addEventListener('click', (e) => {
+  const item = e.target.closest('.custom-select-option');
+  if (!item || item.classList.contains('disabled') || !customSelectActive) return;
+  const select = customSelectActive;
+  select.selectedIndex = +item.dataset.index;
+  syncSelectLabel(select);
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+  closeAllCustomSelects();
+});
+
+document.addEventListener('click', closeAllCustomSelects);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAllCustomSelects(); });
+window.addEventListener('scroll', closeAllCustomSelects, true);
+window.addEventListener('resize', closeAllCustomSelects);
+
+// Catches every `select.value = ...` assignment app-wide (e.g. modals
+// prefilling a field, goToCarsFiltered() setting the status filter) so the
+// custom trigger's label never goes stale, without touching each call site.
+(function interceptSelectValue() {
+  const desc = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+  Object.defineProperty(HTMLSelectElement.prototype, 'value', {
+    get() { return desc.get.call(this); },
+    set(v) { desc.set.call(this, v); syncSelectLabel(this); },
+  });
+})();
 
 function showModal(id)  { document.getElementById(id).style.display = 'flex'; }
 function closeModal(id) { document.getElementById(id).style.display = 'none'; }

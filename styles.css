@@ -931,6 +931,74 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 }
 .picker-time-item:hover { background: rgba(250,204,21,0.12); color: var(--primary); }
 .picker-time-item.picker-selected { background: var(--primary); color: #1a1a1a; font-weight: 700; }
+
+/* ========== CUSTOM SELECT DROPDOWN ========== */
+/* Native <select> popups are OS-rendered and can't be restyled either, so
+   every <select> gets wrapped with a theme-matching trigger + panel while
+   the native element stays in the DOM (hidden) as the real source of truth. */
+.custom-select-wrap { position: relative; width: 100%; }
+.cs-native {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 1px;
+  height: 1px;
+}
+.custom-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  padding: .55rem .85rem;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: var(--radius-sm);
+  background: rgba(255,255,255,0.04);
+  backdrop-filter: blur(8px);
+  color: var(--gray-800);
+  cursor: pointer;
+  transition: border-color .18s, box-shadow .18s, background .18s;
+  font-size: .95rem;
+  user-select: none;
+}
+.custom-select-trigger.placeholder { color: var(--gray-400); }
+.custom-select-trigger.disabled { opacity: .5; cursor: not-allowed; }
+.custom-select-trigger:hover { border-color: rgba(250,204,21,0.3); }
+.custom-select-wrap.open .custom-select-trigger {
+  border-color: rgba(250,204,21,0.6);
+  background: rgba(250,204,21,0.03);
+  box-shadow: 0 0 0 3px rgba(250,204,21,0.12), 0 0 16px rgba(250,204,21,0.1);
+}
+.cs-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.custom-select-trigger i { font-size: .72rem; color: var(--gray-500); transition: transform .2s; flex-shrink: 0; }
+.custom-select-wrap.open .custom-select-trigger i { transform: rotate(180deg); color: var(--primary); }
+
+.custom-select-panel {
+  position: fixed;
+  z-index: 500;
+  max-height: 260px;
+  overflow-y: auto;
+  background: rgba(10,10,10,0.96);
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  border: 1px solid rgba(250,204,21,0.25);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.6), 0 0 0 0.5px rgba(255,255,255,0.05) inset;
+  padding: .35rem;
+  display: none;
+}
+.custom-select-panel.open { display: block; }
+.custom-select-option {
+  padding: .5rem .75rem;
+  border-radius: 6px;
+  font-size: .88rem;
+  color: var(--gray-700);
+  cursor: pointer;
+  transition: all .12s;
+}
+.custom-select-option:hover { background: rgba(250,204,21,0.12); color: var(--primary); }
+.custom-select-option.selected { background: var(--primary); color: #1a1a1a; font-weight: 700; }
+.custom-select-option.disabled { color: var(--gray-500); cursor: default; pointer-events: none; opacity: .6; }
+
 .input-icon { position: relative; }
 .input-icon i {
   position: absolute;
