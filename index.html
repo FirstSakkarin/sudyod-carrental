@@ -138,59 +138,6 @@
 
         <div class="section-card">
           <div class="section-card-header">
-            <h3><i class="fa-solid fa-magnifying-glass"></i> เช็ครถว่างด่วน</h3>
-          </div>
-          <div class="suggest-form">
-            <div class="form-row-3">
-              <div class="form-group">
-                <label><i class="fa-solid fa-calendar"></i> วันรับรถ</label>
-                <input type="date" id="dashSuggestDate" onchange="runDashboardSearch()" />
-              </div>
-              <div class="form-group">
-                <label><i class="fa-solid fa-clock"></i> เวลารับรถ</label>
-                <input type="time" id="dashSuggestTime" onchange="runDashboardSearch()" />
-              </div>
-              <div class="form-group">
-                <label><i class="fa-solid fa-location-dot"></i> สถานที่รับรถ</label>
-                <input type="text" id="dashSuggestLocation" placeholder="เช่น สนามบินเชียงใหม่" onchange="runDashboardSearch()" />
-              </div>
-            </div>
-            <div class="form-row-3">
-              <div class="form-group">
-                <label><i class="fa-solid fa-calendar-xmark"></i> วันคืนรถ</label>
-                <input type="date" id="dashSuggestEndDate" onchange="runDashboardSearch()" />
-              </div>
-              <div class="form-group">
-                <label><i class="fa-solid fa-clock"></i> เวลาคืนรถ</label>
-                <input type="time" id="dashSuggestEndTime" onchange="runDashboardSearch()" />
-              </div>
-              <div class="form-group">
-                <label><i class="fa-solid fa-location-dot"></i> สถานที่คืนรถ</label>
-                <input type="text" id="dashSuggestEndLocation" placeholder="เช่น สำนักงาน" onchange="runDashboardSearch()" />
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label><i class="fa-solid fa-car"></i> ประเภทรถ</label>
-                <select id="dashSuggestType" onchange="runDashboardSearch()">
-                  <option value="">ทุกประเภท</option>
-                  <option value="sedan">ซีดาน</option>
-                  <option value="suv">SUV</option>
-                  <option value="pickup">กระบะ</option>
-                  <option value="van">ตู้</option>
-                  <option value="motorcycle">มอเตอร์ไซค์</option>
-                </select>
-              </div>
-            </div>
-            <button class="btn btn-primary" onclick="runDashboardSearch()">
-              <i class="fa-solid fa-magnifying-glass"></i> ค้นหารถ
-            </button>
-          </div>
-          <div id="dashSuggestResults"></div>
-        </div>
-
-        <div class="section-card">
-          <div class="section-card-header">
             <h3><i class="fa-solid fa-list"></i> สถานะรถทุกคัน</h3>
           </div>
           <div id="dashboardCarList" class="car-grid"></div>
@@ -239,6 +186,60 @@
             <i class="fa-solid fa-plus"></i> เพิ่มการจอง
           </button>
         </div>
+
+        <div class="section-card">
+          <div class="section-card-header">
+            <h3><i class="fa-solid fa-magnifying-glass"></i> เช็ครถว่างด่วน</h3>
+          </div>
+          <div class="suggest-form">
+            <div class="form-row-3">
+              <div class="form-group">
+                <label><i class="fa-solid fa-calendar"></i> วันรับรถ</label>
+                <input type="date" id="bookSuggestDate" onchange="runBookingsSearch()" onclick="this.showPicker && this.showPicker()" />
+              </div>
+              <div class="form-group">
+                <label><i class="fa-solid fa-clock"></i> เวลารับรถ</label>
+                <input type="time" id="bookSuggestTime" onchange="runBookingsSearch()" onclick="this.showPicker && this.showPicker()" />
+              </div>
+              <div class="form-group">
+                <label><i class="fa-solid fa-location-dot"></i> สถานที่รับรถ</label>
+                <input type="text" id="bookSuggestLocation" placeholder="เช่น สนามบินเชียงใหม่" onchange="runBookingsSearch()" />
+              </div>
+            </div>
+            <div class="form-row-3">
+              <div class="form-group">
+                <label><i class="fa-solid fa-calendar-xmark"></i> วันคืนรถ</label>
+                <input type="date" id="bookSuggestEndDate" onchange="runBookingsSearch()" onclick="this.showPicker && this.showPicker()" />
+              </div>
+              <div class="form-group">
+                <label><i class="fa-solid fa-clock"></i> เวลาคืนรถ</label>
+                <input type="time" id="bookSuggestEndTime" onchange="runBookingsSearch()" onclick="this.showPicker && this.showPicker()" />
+              </div>
+              <div class="form-group">
+                <label><i class="fa-solid fa-location-dot"></i> สถานที่คืนรถ</label>
+                <input type="text" id="bookSuggestEndLocation" placeholder="เช่น สำนักงาน" onchange="runBookingsSearch()" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label><i class="fa-solid fa-car"></i> ประเภทรถ</label>
+                <select id="bookSuggestType" onchange="runBookingsSearch()">
+                  <option value="">ทุกประเภท</option>
+                  <option value="sedan">ซีดาน</option>
+                  <option value="suv">SUV</option>
+                  <option value="pickup">กระบะ</option>
+                  <option value="van">ตู้</option>
+                  <option value="motorcycle">มอเตอร์ไซค์</option>
+                </select>
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="runBookingsSearch()">
+              <i class="fa-solid fa-magnifying-glass"></i> ค้นหารถ
+            </button>
+          </div>
+          <div id="bookSuggestResults"></div>
+        </div>
+
         <div class="filter-bar">
           <select id="bookingFilter" onchange="renderBookingsPage()">
             <option value="all">ทั้งหมด</option>

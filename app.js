@@ -280,8 +280,6 @@ function renderDashboard() {
         <div class="car-mini-photo">${car.photo ? `<img src="${car.photo}" alt="" />` : vehicleTypeIcon(car.type)}</div>
       </div>`;
   }).join('');
-
-  runDashboardSearch();
 }
 
 // ── Cars Page ──────────────────────────────────────────────────────────
@@ -600,6 +598,7 @@ function renderBookingsPage() {
     </div>` : '<p class="empty-state" style="text-align:center;padding:2rem;">ไม่มีรายการ</p>';
 
   document.getElementById('bookingsTableContainer').innerHTML = html;
+  runBookingsSearch();
 }
 
 function openAddBookingModal() {
@@ -951,7 +950,7 @@ function computeAvailability({ start, startTime, end, type }) {
 }
 
 // prefix selects which set of form field IDs the "จอง" button prefills from
-// (e.g. 'suggest' → #suggestDate, 'dashSuggest' → #dashSuggestDate).
+// (e.g. 'suggest' → #suggestDate, 'bookSuggest' → #bookSuggestDate).
 function buildAvailabilityHtml(available, sameDayQueue, days, prefix) {
   if (!available.length && !sameDayQueue.length) {
     return `<div class="section-card"><div class="modal-body"><p class="empty-state">ไม่พบรถว่างในช่วงเวลานี้</p></div></div>`;
@@ -1016,20 +1015,20 @@ function runSuggest() {
   results.innerHTML = buildAvailabilityHtml(available, sameDayQueue, days, 'suggest');
 }
 
-// ── Dashboard quick search (replaces the old Gantt queue chart) ────────
-function runDashboardSearch() {
-  const start     = document.getElementById('dashSuggestDate').value;
-  const startTime = document.getElementById('dashSuggestTime').value;
-  const end       = document.getElementById('dashSuggestEndDate').value;
-  const type      = document.getElementById('dashSuggestType').value;
-  const results   = document.getElementById('dashSuggestResults');
+// ── Bookings page quick search (moved here from the dashboard) ─────────
+function runBookingsSearch() {
+  const start     = document.getElementById('bookSuggestDate').value;
+  const startTime = document.getElementById('bookSuggestTime').value;
+  const end       = document.getElementById('bookSuggestEndDate').value;
+  const type      = document.getElementById('bookSuggestType').value;
+  const results   = document.getElementById('bookSuggestResults');
   if (!results) return;
 
   const { error, days, available, sameDayQueue } = computeAvailability({ start, startTime, end, type });
   if (error === 'missing')   { results.innerHTML = '<p class="empty-state">กรอกวันรับ-คืนรถเพื่อค้นหารถว่าง</p>'; return; }
   if (error === 'bad-range') { results.innerHTML = '<p class="empty-state">กรุณาเลือกวันคืนหลังวันรับรถ</p>'; return; }
 
-  results.innerHTML = buildAvailabilityHtml(available, sameDayQueue, days, 'dashSuggest');
+  results.innerHTML = buildAvailabilityHtml(available, sameDayQueue, days, 'bookSuggest');
 }
 
 function prefillBooking(carId, prefix = 'suggest') {
