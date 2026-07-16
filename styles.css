@@ -552,104 +552,6 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
   box-shadow: 0 0 8px var(--blocked-glow);
 }
 
-/* ========== GANTT CHART (dashboard queue view) ========== */
-.gantt-wrap { padding: .75rem 1.25rem 1.25rem; overflow-x: auto; }
-.gantt-table { min-width: 620px; }
-.gantt-header-row, .gantt-row { display: flex; align-items: stretch; }
-.gantt-header-row { padding-bottom: .5rem; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: .35rem; }
-.gantt-carlabel-head, .gantt-carlabel {
-  width: 132px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  font-size: .78rem;
-  padding-right: .5rem;
-  color: var(--gray-500);
-  font-weight: 700;
-}
-.gantt-carlabel { color: var(--gray-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.gantt-day-head {
-  flex: 1;
-  text-align: center;
-  font-size: .72rem;
-  color: var(--gray-500);
-}
-.gantt-day-head .gantt-dow { font-weight: 700; }
-.gantt-day-head .gantt-date { font-size: .68rem; opacity: .8; }
-.gantt-day-head.gantt-today { color: var(--primary); }
-.gantt-day-head.gantt-today .gantt-date { color: var(--primary); font-weight: 700; }
-.gantt-row { min-height: 44px; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
-.gantt-row:last-child { border-bottom: none; }
-.gantt-track { position: relative; flex: 1; min-height: 38px; }
-.gantt-track-cols { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(7, 1fr); pointer-events: none; }
-.gantt-col { border-right: 1px solid rgba(255,255,255,0.05); }
-.gantt-col:last-child { border-right: none; }
-.gantt-track-disabled { display: flex; align-items: center; justify-content: center; }
-.gantt-bar {
-  position: absolute;
-  top: 3px;
-  height: 28px;
-  border-radius: 6px;
-  padding: 0 .5rem;
-  font-size: .72rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  overflow: hidden;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: transform .12s, box-shadow .12s;
-}
-.gantt-bar:hover { transform: translateY(-1px); z-index: 5; }
-.gantt-bar-active {
-  background: var(--rented-bg);
-  color: var(--rented);
-  border: 1px solid rgba(96,165,250,0.4);
-  box-shadow: 0 0 8px var(--rented-glow);
-}
-.gantt-bar-upcoming {
-  background: rgba(250,204,21,0.12);
-  color: var(--primary);
-  border: 1px solid rgba(250,204,21,0.35);
-  box-shadow: 0 0 8px var(--glow-primary-xs);
-}
-.gantt-bar-conflict {
-  background: var(--danger-bg);
-  color: var(--danger);
-  border: 1px solid rgba(248,113,113,0.6);
-  box-shadow: 0 0 10px var(--danger-glow);
-  animation: gantt-pulse 1.6s ease-in-out infinite;
-}
-@keyframes gantt-pulse {
-  0%, 100% { box-shadow: 0 0 10px var(--danger-glow); }
-  50% { box-shadow: 0 0 18px var(--danger-glow); }
-}
-
-/* Day (hourly) view */
-.gantt-day-link { cursor: pointer; }
-.gantt-day-link:hover .gantt-date { text-decoration: underline; }
-.gantt-hour-head { flex: 1; text-align: center; font-size: .66rem; color: var(--gray-500); }
-.gantt-event {
-  position: absolute;
-  top: 6px;
-  height: 26px;
-  min-width: 30px;
-  border-radius: 6px;
-  padding: 0 .4rem;
-  font-size: .7rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: .3rem;
-  white-space: nowrap;
-  cursor: pointer;
-  z-index: 2;
-}
-.gantt-event-deliver { background: var(--rented-bg); color: var(--rented); border: 1px solid rgba(96,165,250,0.4); }
-.gantt-event-return  { background: rgba(250,204,21,0.12); color: var(--primary); border: 1px solid rgba(250,204,21,0.35); }
-.gantt-gap-warn     { background: rgba(251,191,36,0.18); color: var(--maintenance); border: 1px dashed rgba(251,191,36,0.5); }
-.gantt-gap-critical { background: var(--danger-bg); color: var(--danger); border: 1px dashed rgba(248,113,113,0.6); }
-
 /* ========== RETURN LIST ========== */
 .return-list { padding: 0 1.25rem 1rem; }
 .return-item {
@@ -1259,6 +1161,7 @@ body.is-owner .owner-only { display: flex; }
   display: flex;
   align-items: stretch;
   height: 60px;
+  position: relative;
 }
 .bnav-item {
   flex: 1;
@@ -1272,7 +1175,7 @@ body.is-owner .owner-only { display: flex; }
   font-weight: 600;
   text-decoration: none;
   cursor: pointer;
-  transition: all .15s;
+  transition: color .2s;
   padding: .4rem .25rem;
   border: none;
   background: transparent;
@@ -1281,7 +1184,9 @@ body.is-owner .owner-only { display: flex; }
 }
 .bnav-item i {
   font-size: 1.25rem;
-  transition: all .2s;
+  transition: transform .32s cubic-bezier(.34,1.56,.64,1), filter .2s;
+  position: relative;
+  z-index: 2;
 }
 .bnav-item span { transition: all .15s; }
 .bnav-item:hover { color: rgba(255,255,255,.6); }
@@ -1290,16 +1195,50 @@ body.is-owner .owner-only { display: flex; }
 }
 .bnav-item.active i {
   filter: drop-shadow(0 0 8px rgba(250,204,21,0.9));
-  transform: translateY(-2px) scale(1.08);
+  transform: translateY(-20px) scale(1.05);
 }
-.bnav-item.active::before {
-  content: '';
+
+/* Sliding "bump" indicator — a raised circle that glides to whichever tab
+   is active, echoing the logo button's floating badge next to it. */
+.bnav-indicator {
   position: absolute;
-  top: 0; left: 20%; right: 20%;
-  height: 2px;
-  background: var(--primary);
-  border-radius: 0 0 4px 4px;
-  box-shadow: 0 0 10px rgba(250,204,21,0.8);
+  top: -16px;
+  width: 46px;
+  height: 46px;
+  margin-left: -23px;
+  border-radius: 50%;
+  background: #060606;
+  border: 2px solid var(--primary);
+  box-shadow: 0 0 14px rgba(250,204,21,0.5), 0 4px 10px rgba(0,0,0,0.5);
+  transition: left .32s cubic-bezier(.34,1.56,.64,1);
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+}
+.bnav-indicator.visible { opacity: 1; }
+
+.bnav-item.bnav-menu { justify-content: flex-end; padding-top: 0; }
+.bnav-logo-circle {
+  position: absolute;
+  top: -16px;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: #060606;
+  border: 2px solid var(--primary);
+  box-shadow: 0 0 14px rgba(250,204,21,0.5), 0 4px 10px rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  transition: all .15s;
+}
+.bnav-logo-circle img { width: 100%; height: 100%; object-fit: cover; }
+.bnav-item.bnav-menu span:last-child { margin-top: 22px; }
+.bnav-item.bnav-menu:hover .bnav-logo-circle,
+.bnav-item.bnav-menu:active .bnav-logo-circle {
+  box-shadow: 0 0 20px rgba(250,204,21,0.75), 0 4px 10px rgba(0,0,0,0.5);
+  transform: translateY(-2px);
 }
 
 /* ========== RESPONSIVE ========== */

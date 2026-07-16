@@ -146,6 +146,7 @@ function navigate(page) {
   // Bottom nav active state
   const bnav = document.querySelector(`.bnav-item[data-page="${page}"]`);
   if (bnav) bnav.classList.add('active');
+  updateBnavIndicator(bnav);
 
   document.getElementById('topbarTitle').textContent = PAGE_LABELS[page] || page;
   closeSidebar();
@@ -162,6 +163,26 @@ function renderCurrentPage() {
   if (currentPage === 'finance')     renderFinancePage();
   if (currentPage === 'customers')   renderCustomersPage();
 }
+
+// Slides the bottom-nav "bump" circle under whichever tab is active. Reads
+// the tab's actual position instead of assuming a fixed width, so it keeps
+// lining up correctly if a tab is added/removed or the screen is resized.
+function updateBnavIndicator(activeBnavItem) {
+  const indicator = document.getElementById('bnavIndicator');
+  if (!indicator) return;
+  if (!activeBnavItem) { indicator.classList.remove('visible'); return; }
+
+  const inner    = indicator.parentElement;
+  const itemRect = activeBnavItem.getBoundingClientRect();
+  const innerRect = inner.getBoundingClientRect();
+  indicator.style.left = `${itemRect.left - innerRect.left + itemRect.width / 2}px`;
+  indicator.classList.add('visible');
+}
+
+window.addEventListener('resize', () => {
+  const active = document.querySelector('.bnav-item.active');
+  updateBnavIndicator(active);
+});
 
 function goToCarsFiltered(status) {
   navigate('cars');
@@ -248,277 +269,19 @@ function renderDashboard() {
   const sortedCars = [...cars].sort((a, b) => (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99));
   const gridEl = document.getElementById('dashboardCarList');
   gridEl.innerHTML = sortedCars.map(car => {
-    const statusLabel = { available: 'ว่าง', rented: 'เช่าอยู่', maintenance: 'ซ่อมบำรุง', blocked: 'ปิดตา' }[car.status] || car.status;
+    const statusLabel = { available: 'ว่าง', rented: 'เช่าอยู่', maintenance: 'ซ่อมบำรุง', blocked: 'ปิดตา' }[car.status] || car.status || '-';
     return `
       <div class="car-mini-card status-${car.status}" onclick="openCarDetail('${car.id}')">
         <div class="car-mini-info">
           <div class="car-mini-plate">${vehicleTypeIcon(car.type)} ${car.plate}</div>
-          <div class="car-mini-model">${car.brand} ${car.model} · ${car.color}</div>
+          <div class="car-mini-model">${car.brand || '-'} ${car.model || '-'} · ${car.color || '-'}</div>
           <span class="car-mini-status pill pill-${car.status}">${statusLabel}</span>
         </div>
         <div class="car-mini-photo">${car.photo ? `<img src="${car.photo}" alt="" />` : vehicleTypeIcon(car.type)}</div>
       </div>`;
   }).join('');
 
-  renderGanttChart();
-}
-
-// ── Gantt chart (dashboard queue view) ──────────────────────────────────
-let ganttOffset = 0;
-let ganttDayView = null; // null = week view, else a 'YYYY-MM-DD' string = day (hourly) view
-
-function shiftGantt(days) { ganttOffset += days; renderGanttChart(); }
-function resetGantt()     { ganttOffset = 0;     renderGanttChart(); }
-
-function openGanttDay(dateStr)  { ganttDayView = dateStr; renderGanttChart(); }
-function backToGanttWeek()      { ganttDayView = null;    renderGanttChart(); }
-function shiftGanttDay(n)       { ganttDayView = addDaysStr(ganttDayView, n); renderGanttChart(); }
-
-function addDaysStr(dateStr, n) {
-  const d = new Date(dateStr);
-  d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
-}
-
-function timeToHourFloat(t) {
-  if (!t) return null;
-  const [h, m] = t.split(':').map(Number);
-  return h + m / 60;
-}
-
-// Interval-scheduling lane assignment: overlapping bookings get stacked into
-// separate lanes instead of drawn on top of each other, so a double-booking
-// mistake is visually obvious instead of hidden.
-function assignGanttLanes(bookings) {
-  const sorted = [...bookings].sort((a, b) => a.start.localeCompare(b.start));
-  const laneEnds = [];
-  const laneOf = {};
-  sorted.forEach(b => {
-    let lane = laneEnds.findIndex(end => end <= b.start);
-    if (lane === -1) { lane = laneEnds.length; laneEnds.push(b.end); }
-    else { laneEnds[lane] = b.end; }
-    laneOf[b.id] = lane;
-  });
-  return { laneOf, laneCount: laneEnds.length || 1 };
-}
-
-function renderGanttControls() {
-  const el = document.getElementById('ganttControls');
-  if (!el) return;
-  if (ganttDayView) {
-    el.innerHTML = `
-      <button class="btn btn-secondary btn-sm" onclick="backToGanttWeek()"><i class="fa-solid fa-arrow-left"></i> มุมมองสัปดาห์</button>
-      <button class="icon-btn" onclick="shiftGanttDay(-1)" title="วันก่อนหน้า"><i class="fa-solid fa-chevron-left"></i></button>
-      <span style="font-size:.85rem;color:var(--gray-700);font-weight:700;min-width:150px;text-align:center;">${formatDateThai(new Date(ganttDayView))}</span>
-      <button class="icon-btn" onclick="shiftGanttDay(1)" title="วันถัดไป"><i class="fa-solid fa-chevron-right"></i></button>`;
-  } else {
-    el.innerHTML = `
-      <button class="icon-btn" onclick="shiftGantt(-7)" title="7 วันก่อนหน้า"><i class="fa-solid fa-chevron-left"></i></button>
-      <button class="btn btn-secondary btn-sm" onclick="resetGantt()">วันนี้</button>
-      <button class="icon-btn" onclick="shiftGantt(7)" title="7 วันถัดไป"><i class="fa-solid fa-chevron-right"></i></button>`;
-  }
-}
-
-function renderGanttChart() {
-  renderGanttControls();
-  if (ganttDayView) renderGanttDayView(ganttDayView);
-  else renderGanttWeekView();
-}
-
-// Cars relevant to a specific day = have a pickup or return event that day.
-// Shows a small hourly timeline per event, with a highlighted gap when a
-// same-car return→next-pickup turnaround is tight enough to need attention.
-function renderGanttDayView(date) {
-  const wrap = document.getElementById('ganttChart');
-  if (!wrap) return;
-
-  const relevant = state.cars.filter(car =>
-    state.bookings.some(b => b.carId === car.id && b.status !== 'completed' && (b.start === date || b.end === date))
-  );
-
-  if (!relevant.length) {
-    wrap.innerHTML = `<p class="empty-state" style="padding:1.5rem;">ไม่มีรถรับ/คืนในวันนี้</p>`;
-    return;
-  }
-
-  const carEvents = relevant.map(car => {
-    const events = [];
-    state.bookings.forEach(b => {
-      if (b.carId !== car.id || b.status === 'completed') return;
-      if (b.end === date)   events.push({ type: 'return',  time: b.endTime   || null, booking: b });
-      if (b.start === date) events.push({ type: 'deliver', time: b.startTime || null, booking: b });
-    });
-    events.sort((a, b) => (timeToHourFloat(a.time) ?? 12) - (timeToHourFloat(b.time) ?? 12));
-    return { car, events };
-  });
-
-  let minHour = 6, maxHour = 22;
-  carEvents.forEach(({ events }) => events.forEach(e => {
-    const h = timeToHourFloat(e.time);
-    if (h !== null) { minHour = Math.min(minHour, Math.floor(h)); maxHour = Math.max(maxHour, Math.ceil(h)); }
-  }));
-  const HOURS = maxHour - minHour;
-
-  const hourHeaders = Array.from({ length: HOURS }, (_, i) => minHour + i)
-    .map(h => `<div class="gantt-hour-head">${h}:00</div>`).join('');
-
-  const trackCols = `<div class="gantt-track-cols" style="grid-template-columns:repeat(${HOURS},1fr);">` +
-    '<div class="gantt-col"></div>'.repeat(HOURS) + '</div>';
-
-  const rows = carEvents.map(({ car, events }) => {
-    const parts = [];
-    let skipNext = false;
-
-    events.forEach((e, i) => {
-      if (skipNext) { skipNext = false; return; }
-
-      const next = events[i + 1];
-      const isDifferentBooking = next && e.booking.id !== next.booking.id;
-
-      // Impossible ordering: this car was handed to a new customer (deliver)
-      // before a different booking's return — always a hard conflict, no
-      // matter the gap, since two customers can't hold the same car at once.
-      if (isDifferentBooking && e.type === 'deliver' && next.type === 'return') {
-        const h = timeToHourFloat(e.time);
-        const leftPct = h === null ? 1 : ((h - minHour) / HOURS) * 100;
-        const title = `${car.plate}\n⚠ ส่งมอบให้ ${e.booking.customer} ${e.time || ''} ก่อนรับคืนจาก ${next.booking.customer} ${next.time || ''}\nรถคันเดียวกันอยู่กับ 2 ลูกค้าพร้อมกัน ตรวจสอบด่วน`;
-        parts.push(`<div class="gantt-event gantt-gap-critical" style="left:${leftPct}%;" title="${title.replace(/"/g, '&quot;')}" onclick="openEditBookingModal('${e.booking.id}')">
-          <i class="fa-solid fa-triangle-exclamation"></i> ${e.time || '-'} ส่งมอบ ${e.booking.customer} ← ก่อนคืนจาก ${next.booking.customer} ${next.time || ''}
-        </div>`);
-        skipNext = true;
-        return;
-      }
-
-      // Tight same-day return→pickup turnaround: merge into one chip instead of
-      // two overlapping labels, since at this scale they'd collide anyway.
-      if (isDifferentBooking && e.type === 'return' && next.type === 'deliver') {
-        const gapMins = minutesBetween(date, e.time, date, next.time);
-        if (gapMins !== null && gapMins < 120) {
-          const h = timeToHourFloat(e.time);
-          const leftPct = h === null ? 1 : ((h - minHour) / HOURS) * 100;
-          const gapCls = gapMins < 0 ? 'gantt-gap-critical' : 'gantt-gap-warn';
-          const title = `${car.plate}\nคืน: ${e.booking.customer} ${e.time || ''}\nรับใหม่: ${next.booking.customer} ${next.time || ''}\n${formatPrepTime(gapMins)}`;
-          parts.push(`<div class="gantt-event ${gapCls}" style="left:${leftPct}%;" title="${title.replace(/"/g, '&quot;')}" onclick="openEditBookingModal('${e.booking.id}')">
-            <i class="fa-solid fa-triangle-exclamation"></i> ${e.time || '-'} ${e.booking.customer} → ${next.time || '-'} ${next.booking.customer} (${gapMins < 0 ? 'ชนเวลา' : gapMins + ' น.'})
-          </div>`);
-          skipNext = true;
-          return;
-        }
-      }
-
-      const h = timeToHourFloat(e.time);
-      const leftPct = h === null ? 1 : ((h - minHour) / HOURS) * 100;
-      const icon  = e.type === 'deliver' ? 'fa-truck-fast' : 'fa-rotate-left';
-      const label = e.type === 'deliver' ? 'ส่งมอบ' : 'รับคืน';
-      const timeLabel = e.time || 'ไม่ระบุเวลา';
-      const cls = e.type === 'deliver' ? 'gantt-event-deliver' : 'gantt-event-return';
-      const title = `${label} ${car.plate} · ${e.booking.customer} · ${timeLabel}`;
-      parts.push(`<div class="gantt-event ${cls}" style="left:${leftPct}%;" title="${title.replace(/"/g, '&quot;')}" onclick="openEditBookingModal('${e.booking.id}')">
-        <i class="fa-solid ${icon}"></i> ${timeLabel} ${e.booking.customer}
-      </div>`);
-    });
-
-    return `
-      <div class="gantt-row">
-        <div class="gantt-carlabel" title="${car.plate}">${vehicleTypeIcon(car.type)} ${car.plate}</div>
-        <div class="gantt-track">${trackCols}${parts.join('')}</div>
-      </div>`;
-  }).join('');
-
-  wrap.innerHTML = `
-    <div class="gantt-table" style="min-width:${Math.max(620, HOURS * 55 + 132)}px;">
-      <div class="gantt-header-row">
-        <div class="gantt-carlabel-head">รถ</div>
-        ${hourHeaders}
-      </div>
-      ${rows}
-    </div>`;
-}
-
-function renderGanttWeekView() {
-  const wrap = document.getElementById('ganttChart');
-  if (!wrap) return;
-
-  const WINDOW = 7;
-  const today       = todayStr();
-  const windowStart = addDaysStr(today, ganttOffset);
-  const windowEnd   = addDaysStr(windowStart, WINDOW); // exclusive
-  const days        = Array.from({ length: WINDOW }, (_, i) => addDaysStr(windowStart, i));
-  const DOW         = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
-
-  const headerCells = days.map(d => {
-    const dt = new Date(d);
-    return `<div class="gantt-day-head gantt-day-link ${d === today ? 'gantt-today' : ''}" onclick="openGanttDay('${d}')" title="ดูรายละเอียดรายชั่วโมงของวันนี้">
-      <div class="gantt-dow">${DOW[dt.getDay()]}</div>
-      <div class="gantt-date">${dt.getDate()}/${dt.getMonth() + 1}</div>
-    </div>`;
-  }).join('');
-
-  const trackCols = '<div class="gantt-track-cols">' + '<div class="gantt-col"></div>'.repeat(WINDOW) + '</div>';
-
-  const rows = state.cars.map(car => {
-    if (car.status === 'maintenance' || car.status === 'blocked') {
-      const label = car.status === 'maintenance' ? 'ซ่อมบำรุง' : 'ปิดตา';
-      return `
-        <div class="gantt-row">
-          <div class="gantt-carlabel" title="${car.plate}">${vehicleTypeIcon(car.type)} ${car.plate}</div>
-          <div class="gantt-track gantt-track-disabled">
-            ${trackCols}
-            <span class="pill pill-${car.status}" style="position:relative;">${label}</span>
-          </div>
-        </div>`;
-    }
-
-    const bookings = state.bookings.filter(b =>
-      b.carId === car.id && b.status !== 'completed' &&
-      b.start < windowEnd && b.end >= windowStart
-    );
-
-    const { laneOf, laneCount } = assignGanttLanes(bookings);
-    const conflictIds = new Set();
-    for (let i = 0; i < bookings.length; i++) {
-      for (let j = i + 1; j < bookings.length; j++) {
-        if (bookings[i].start < bookings[j].end && bookings[i].end > bookings[j].start) {
-          conflictIds.add(bookings[i].id);
-          conflictIds.add(bookings[j].id);
-        }
-      }
-    }
-
-    const bars = bookings.map(b => {
-      const clipStart = b.start < windowStart ? windowStart : b.start;
-      const clipEnd    = b.end > windowEnd ? windowEnd : b.end;
-      const startIdx   = daysBetween(windowStart, clipStart);
-      const endIdx     = Math.max(daysBetween(windowStart, clipEnd), startIdx + 0.4);
-      const leftPct    = (startIdx / WINDOW) * 100;
-      const widthPct   = ((endIdx - startIdx) / WINDOW) * 100;
-      const isConflict = conflictIds.has(b.id);
-      const statusClass = isConflict ? 'gantt-bar-conflict' : (b.status === 'active' ? 'gantt-bar-active' : 'gantt-bar-upcoming');
-      const title = `${car.plate} · ${b.customer}\n${b.start}${b.startTime ? ' ' + b.startTime : ''} → ${b.end}${b.endTime ? ' ' + b.endTime : ''}` +
-        (isConflict ? '\n⚠ ชนกับการจองอื่นของรถคันนี้' : '');
-      return `<div class="gantt-bar ${statusClass}"
-        style="left:${leftPct}%;width:${widthPct}%;top:${3 + laneOf[b.id] * 32}px;"
-        title="${title.replace(/"/g, '&quot;')}"
-        onclick="openEditBookingModal('${b.id}')">
-        ${isConflict ? '<i class="fa-solid fa-triangle-exclamation"></i>&nbsp;' : ''}${b.customer}
-      </div>`;
-    }).join('');
-
-    return `
-      <div class="gantt-row" style="min-height:${Math.max(44, laneCount * 32 + 12)}px;">
-        <div class="gantt-carlabel" title="${car.plate}">${vehicleTypeIcon(car.type)} ${car.plate}</div>
-        <div class="gantt-track">${trackCols}${bars}</div>
-      </div>`;
-  }).join('');
-
-  wrap.innerHTML = `
-    <div class="gantt-table">
-      <div class="gantt-header-row">
-        <div class="gantt-carlabel-head">รถ</div>
-        ${headerCells}
-      </div>
-      ${rows}
-    </div>`;
+  runDashboardSearch();
 }
 
 // ── Cars Page ──────────────────────────────────────────────────────────
@@ -553,9 +316,9 @@ function renderCarsPage() {
           ${cars.map(car => `
             <tr class="row-clickable" onclick="openCarDetail('${car.id}')">
               <td>${vehicleTypeIcon(car.type)} <strong>${car.plate}</strong></td>
-              <td>${car.brand} ${car.model} <span style="color:var(--gray-400);font-size:.78rem;">${car.year || ''} · ${car.color || ''}</span></td>
+              <td>${car.brand || '-'} ${car.model || '-'} <span style="color:var(--gray-400);font-size:.78rem;">${car.year || ''} · ${car.color || ''}</span></td>
               <td>
-                <span class="pill pill-${car.status}">${STATUS_LABEL[car.status] || car.status}</span>
+                <span class="pill pill-${car.status}">${STATUS_LABEL[car.status] || car.status || '-'}</span>
                 ${car.status === 'blocked' && car.blockedUntil ? `<br><span style="font-size:.72rem;color:var(--blocked);">ถึง ${car.blockedUntil}</span>` : ''}
                 ${car.status === 'blocked' && car.blockedReason ? `<br><span style="font-size:.72rem;color:var(--gray-500);">${car.blockedReason}</span>` : ''}
               </td>
@@ -746,10 +509,10 @@ function openCarDetail(id) {
   document.getElementById('carDetailTitle').innerHTML = `${vehicleTypeIcon(car.type)} ${car.plate}`;
   document.getElementById('carDetailBody').innerHTML = `
     <div style="margin-bottom:.75rem;">
-      <span class="pill pill-${car.status}">${STATUS_LABEL[car.status] || car.status}</span>
+      <span class="pill pill-${car.status}">${STATUS_LABEL[car.status] || car.status || '-'}</span>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem .75rem;font-size:.88rem;margin-bottom:1rem;">
-      <div><span style="color:var(--gray-500);">ยี่ห้อ/รุ่น</span><br><strong>${car.brand} ${car.model}</strong></div>
+      <div><span style="color:var(--gray-500);">ยี่ห้อ/รุ่น</span><br><strong>${car.brand || '-'} ${car.model || '-'}</strong></div>
       <div><span style="color:var(--gray-500);">ปี</span><br><strong>${car.year || '-'}</strong></div>
       <div><span style="color:var(--gray-500);">สี</span><br><strong>${car.color || '-'}</strong></div>
       <div><span style="color:var(--gray-500);">ประเภท</span><br><strong>${vehicleTypeIcon(car.type)} ${TYPE_LABEL[car.type] || car.type || '-'}</strong></div>
@@ -973,7 +736,7 @@ function openReturnModal(bookingId) {
 
   const days  = daysBetween(b.start, b.end);
   document.getElementById('returnSummary').innerHTML = `
-    <strong>${car.plate}</strong> ${car.brand} ${car.model}<br>
+    <strong>${car.plate}</strong> ${car.brand || '-'} ${car.model || '-'}<br>
     ลูกค้า: ${b.customer} · เบอร์: ${b.phone || '-'}<br>
     วันรับรถ: ${b.start} · กำหนดคืน: ${b.end} (${days} วัน)<br>
     เลขไมล์ตอนรับรถ: <strong>${((b.mileageOut ?? car.mileage) || 0).toLocaleString()} กม.</strong><br>
@@ -1154,26 +917,15 @@ function deleteMaintenance(id) {
   showToast('ลบรายการเรียบร้อย');
 }
 
-// ── Suggest Page ───────────────────────────────────────────────────────
-function runSuggest() {
-  const start    = document.getElementById('suggestDate').value;
-  const startTime = document.getElementById('suggestTime').value;
-  const startLoc  = document.getElementById('suggestLocation').value.trim();
-  const end      = document.getElementById('suggestEndDate').value;
-  const endTime   = document.getElementById('suggestEndTime').value;
-  const endLoc    = document.getElementById('suggestEndLocation').value.trim();
-  const type     = document.getElementById('suggestType').value;
-  const results  = document.getElementById('suggestResults');
-
-  if (!start || !end) { results.innerHTML = ''; return; }
-
+// ── Car availability search (shared by the Dashboard and the Suggest page) ──
+// Finds cars that are free for [start,end), plus cars busy elsewhere but due
+// back on the pickup day (same-day return queue), with the prep-time gap.
+function computeAvailability({ start, startTime, end, type }) {
+  if (!start || !end) return { error: 'missing' };
   const days = daysBetween(start, end);
-  if (days <= 0) {
-    results.innerHTML = '<p class="empty-state">กรุณาเลือกวันคืนหลังวันรับรถ</p>';
-    return;
-  }
+  if (days <= 0) return { error: 'bad-range' };
 
-  const available   = [];
+  const available    = [];
   const sameDayQueue = [];
 
   state.cars.forEach(car => {
@@ -1195,23 +947,27 @@ function runSuggest() {
   });
 
   sameDayQueue.sort((a, b) => (a.prepMins ?? Infinity) - (b.prepMins ?? Infinity));
+  return { error: null, days, available, sameDayQueue };
+}
 
+// prefix selects which set of form field IDs the "จอง" button prefills from
+// (e.g. 'suggest' → #suggestDate, 'dashSuggest' → #dashSuggestDate).
+function buildAvailabilityHtml(available, sameDayQueue, days, prefix) {
   if (!available.length && !sameDayQueue.length) {
-    results.innerHTML = `<div class="section-card"><div class="modal-body"><p class="empty-state">ไม่พบรถว่างในช่วงเวลานี้</p></div></div>`;
-    return;
+    return `<div class="section-card"><div class="modal-body"><p class="empty-state">ไม่พบรถว่างในช่วงเวลานี้</p></div></div>`;
   }
 
-  const carCardHtml = (car, tag, extraInfo, bookingId) => `
+  const carCardHtml = (car, tag, extraInfo) => `
     <div class="suggest-car-card">
       <div class="suggest-car-info">
         <div class="suggest-car-plate">${car.plate} ${tag}</div>
-        <div class="suggest-car-model">${car.brand} ${car.model} · ${car.color||'-'} · ปี ${car.year||'-'}</div>
+        <div class="suggest-car-model">${car.brand || '-'} ${car.model || '-'} · ${car.color||'-'} · ปี ${car.year||'-'}</div>
         ${extraInfo || ''}
       </div>
       <div style="text-align:right;">
         <div class="suggest-rate">${(car.dailyRate || 0).toLocaleString()} ฿/วัน</div>
         <div style="font-size:.78rem;color:var(--gray-400);">รวม ${((car.dailyRate || 0)*days).toLocaleString()} ฿</div>
-        <button class="btn btn-primary btn-sm" style="margin-top:.35rem;" onclick="prefillBooking('${car.id}')">
+        <button class="btn btn-primary btn-sm" style="margin-top:.35rem;" onclick="prefillBooking('${car.id}','${prefix}')">
           <i class="fa-solid fa-plus"></i> จอง
         </button>
       </div>
@@ -1242,18 +998,49 @@ function runSuggest() {
       )).join('')}
     </div>` : '';
 
-  results.innerHTML = availableSection + queueSection;
+  return availableSection + queueSection;
 }
 
-function prefillBooking(carId) {
+// ── Suggest Page ───────────────────────────────────────────────────────
+function runSuggest() {
+  const start     = document.getElementById('suggestDate').value;
+  const startTime = document.getElementById('suggestTime').value;
+  const end       = document.getElementById('suggestEndDate').value;
+  const type      = document.getElementById('suggestType').value;
+  const results   = document.getElementById('suggestResults');
+
+  const { error, days, available, sameDayQueue } = computeAvailability({ start, startTime, end, type });
+  if (error === 'missing')   { results.innerHTML = ''; return; }
+  if (error === 'bad-range') { results.innerHTML = '<p class="empty-state">กรุณาเลือกวันคืนหลังวันรับรถ</p>'; return; }
+
+  results.innerHTML = buildAvailabilityHtml(available, sameDayQueue, days, 'suggest');
+}
+
+// ── Dashboard quick search (replaces the old Gantt queue chart) ────────
+function runDashboardSearch() {
+  const start     = document.getElementById('dashSuggestDate').value;
+  const startTime = document.getElementById('dashSuggestTime').value;
+  const end       = document.getElementById('dashSuggestEndDate').value;
+  const type      = document.getElementById('dashSuggestType').value;
+  const results   = document.getElementById('dashSuggestResults');
+  if (!results) return;
+
+  const { error, days, available, sameDayQueue } = computeAvailability({ start, startTime, end, type });
+  if (error === 'missing')   { results.innerHTML = '<p class="empty-state">กรอกวันรับ-คืนรถเพื่อค้นหารถว่าง</p>'; return; }
+  if (error === 'bad-range') { results.innerHTML = '<p class="empty-state">กรุณาเลือกวันคืนหลังวันรับรถ</p>'; return; }
+
+  results.innerHTML = buildAvailabilityHtml(available, sameDayQueue, days, 'dashSuggest');
+}
+
+function prefillBooking(carId, prefix = 'suggest') {
   openAddBookingModal();
   document.getElementById('bookingCar').value             = carId;
-  document.getElementById('bookingStart').value           = document.getElementById('suggestDate').value;
-  document.getElementById('bookingStartTime').value       = document.getElementById('suggestTime').value;
-  document.getElementById('bookingPickupLocation').value  = document.getElementById('suggestLocation').value.trim();
-  document.getElementById('bookingEnd').value             = document.getElementById('suggestEndDate').value;
-  document.getElementById('bookingEndTime').value         = document.getElementById('suggestEndTime').value;
-  document.getElementById('bookingReturnLocation').value  = document.getElementById('suggestEndLocation').value.trim();
+  document.getElementById('bookingStart').value           = document.getElementById(`${prefix}Date`).value;
+  document.getElementById('bookingStartTime').value       = document.getElementById(`${prefix}Time`).value;
+  document.getElementById('bookingPickupLocation').value  = document.getElementById(`${prefix}Location`).value.trim();
+  document.getElementById('bookingEnd').value             = document.getElementById(`${prefix}EndDate`).value;
+  document.getElementById('bookingEndTime').value         = document.getElementById(`${prefix}EndTime`).value;
+  document.getElementById('bookingReturnLocation').value  = document.getElementById(`${prefix}EndLocation`).value.trim();
   calcBookingTotal();
 }
 
@@ -1392,7 +1179,7 @@ function openBlockCarModal(id) {
   document.getElementById('blockUntil').value  = '';
   document.getElementById('blockReason').value = '';
   document.getElementById('blockCarInfo').innerHTML =
-    `<i class="fa-solid fa-lock"></i> <strong>${car.plate}</strong> — ${car.brand} ${car.model} (${car.color || ''})`;
+    `<i class="fa-solid fa-lock"></i> <strong>${car.plate}</strong> — ${car.brand || '-'} ${car.model || '-'} (${car.color || ''})`;
   showModal('blockCarModal');
 }
 
