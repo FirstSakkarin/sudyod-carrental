@@ -483,7 +483,7 @@ function saveCar() {
   closeModal('carModal');
   renderCarsPage();
   renderDashboard();
-  pushToSheets();
+  pushToSheets(['cars']);
   showToast(id ? 'อัปเดตข้อมูลรถเรียบร้อย' : 'เพิ่มรถเรียบร้อย', 'success');
 }
 
@@ -493,7 +493,7 @@ function deleteCar(id) {
   saveToStorage();
   renderCarsPage();
   renderDashboard();
-  pushToSheets();
+  pushToSheets(['cars']);
   showToast('ลบรถเรียบร้อย');
 }
 
@@ -706,7 +706,7 @@ function saveBooking() {
   closeModal('bookingModal');
   renderBookingsPage();
   renderDashboard();
-  pushToSheets();
+  pushToSheets(['bookings', 'cars']);
   showToast(id ? 'อัปเดตการจองเรียบร้อย' : 'เพิ่มการจองเรียบร้อย', 'success');
 }
 
@@ -716,7 +716,7 @@ function deleteBooking(id) {
   saveToStorage();
   renderBookingsPage();
   renderDashboard();
-  pushToSheets();
+  pushToSheets(['bookings']);
   showToast('ลบการจองเรียบร้อย');
 }
 
@@ -804,7 +804,7 @@ function confirmReturn() {
   closeModal('returnModal');
   renderBookingsPage();
   renderDashboard();
-  pushToSheets();
+  pushToSheets(['bookings', 'cars']);
   const kmMsg = (kmDriven !== null && kmDriven >= 0) ? ` · ลูกค้าวิ่งไป ${kmDriven.toLocaleString()} กม.` : '';
   showToast(`บันทึกการคืนรถเรียบร้อย ✅${kmMsg}`, 'success');
 }
@@ -890,6 +890,7 @@ function saveMaintenance() {
   };
 
   const id = document.getElementById('maintenanceModalId').value;
+  let touchedCarNextService = false;
   if (id) {
     const idx = state.maintenance.findIndex(m => m.id === id);
     if (idx > -1) state.maintenance[idx] = { ...state.maintenance[idx], ...data };
@@ -898,14 +899,14 @@ function saveMaintenance() {
     // Update car next service mileage
     if (data.nextService) {
       const cIdx = state.cars.findIndex(c => c.id === carId);
-      if (cIdx > -1) state.cars[cIdx].nextService = data.nextService;
+      if (cIdx > -1) { state.cars[cIdx].nextService = data.nextService; touchedCarNextService = true; }
     }
   }
 
   saveToStorage();
   closeModal('maintenanceModal');
   renderMaintenancePage();
-  pushToSheets();
+  pushToSheets(touchedCarNextService ? ['maintenance', 'cars'] : ['maintenance']);
   showToast('บันทึกการซ่อมเรียบร้อย', 'success');
 }
 
@@ -914,6 +915,7 @@ function deleteMaintenance(id) {
   state.maintenance = state.maintenance.filter(m => m.id !== id);
   saveToStorage();
   renderMaintenancePage();
+  pushToSheets(['maintenance']);
   showToast('ลบรายการเรียบร้อย');
 }
 
@@ -1166,7 +1168,7 @@ function saveExpense() {
   saveToStorage();
   closeModal('expenseModal');
   renderFinancePage();
-  pushToSheets();
+  pushToSheets(['expenses']);
   showToast('บันทึกรายจ่ายเรียบร้อย', 'success');
 }
 
@@ -1196,7 +1198,7 @@ function saveBlockCar() {
   closeModal('blockCarModal');
   renderCarsPage();
   renderDashboard();
-  pushToSheets();
+  pushToSheets(['cars']);
   const car = state.cars[idx];
   showToast(`ปิดตา ${car.plate} เรียบร้อย${until ? ' ถึง ' + until : ''}`, 'success');
 }
@@ -1210,7 +1212,7 @@ function unblockCar(id) {
   saveToStorage();
   renderCarsPage();
   renderDashboard();
-  pushToSheets();
+  pushToSheets(['cars']);
   showToast(`เปิดตา ${state.cars[idx].plate} เรียบร้อย — สถานะ: ว่าง`, 'success');
 }
 
@@ -1526,11 +1528,33 @@ function stopSheetsPolling() {
   sheetsPollTimer = null;
 }
 
-// Push ข้อมูลไปยัง Sheets
-async function syncNow() {
+// Push ข้อมูลไปยัง Sheets — ก่อน push จะดึงข้อมูลล่าสุดจาก Sheet มาก่อนเสมอ
+// แล้วใช้ข้อมูลสดนั้นสำหรับทุก collection ที่เรา "ไม่ได้แก้" ในแอ็กชันนี้
+// (changedCollections) กัน push ทับข้อมูลที่เพิ่งแก้ตรงในชีตโดยตรง เช่น
+// ถ้ากำลังแก้ข้อมูลรถในชีตอยู่ แล้วมีคนเพิ่มการจองในแอปพอดี การเพิ่มจองจะ
+// push เฉพาะ bookings สดๆ ส่วน cars จะใช้ข้อมูลที่เพิ่งดึงมาจากชีต ไม่ใช่
+// ข้อมูล cars ที่ค้างอยู่ในเครื่องตั้งแต่โหลดหน้าล่าสุด
+async function syncNow(changedCollections = ['cars', 'bookings', 'maintenance', 'expenses']) {
   if (!state.sheetsUrl || state.syncing) return;
   state.syncing = true;
   setSyncStatus('syncing');
+
+  try {
+    const pullRes  = await fetch(state.sheetsUrl);
+    const pullJson = await pullRes.json();
+    if (pullJson.status === 'ok' && pullJson.data) {
+      const d = pullJson.data;
+      if (!changedCollections.includes('cars')        && d.cars?.length)        state.cars        = d.cars;
+      if (!changedCollections.includes('bookings')    && d.bookings?.length)    state.bookings    = d.bookings;
+      if (!changedCollections.includes('maintenance') && d.maintenance?.length) state.maintenance = d.maintenance;
+      if (!changedCollections.includes('expenses')    && d.expenses?.length)    state.expenses    = d.expenses;
+      saveToStorage();
+      renderCurrentPage();
+    }
+  } catch {
+    // ดึงข้อมูลก่อน push ไม่สำเร็จ — ยังคง push ข้อมูลในเครื่องต่อไปเหมือนเดิม
+  }
+
   try {
     const payload = {
       cars:        state.cars,
@@ -1552,7 +1576,7 @@ async function syncNow() {
   state.syncing = false;
 }
 
-function pushToSheets() { if (state.sheetsUrl) syncNow(); }
+function pushToSheets(changedCollections) { if (state.sheetsUrl) syncNow(changedCollections); }
 
 function refreshApp() {
   if (!state.sheetsUrl) {
