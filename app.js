@@ -1606,7 +1606,10 @@ function setSyncStatus(s) {
 // ── Helpers ────────────────────────────────────────────────────────────
 function getCarById(id) { return state.cars.find(c => c.id === id); }
 
-const TYPE_LABEL = { sedan: 'ซีดาน', suv: 'SUV', pickup: 'กระบะ', van: 'ตู้', motorcycle: 'มอเตอร์ไซค์' };
+const TYPE_LABEL = {
+  sedan: 'Sedan', hatchback: 'Hatchback', suv: 'SUV', mpv: 'MPV', ppv: 'PPV',
+  van: 'รถตู้', pickup: 'กระบะ', ev: 'EV', motorcycle: 'มอเตอร์ไซค์',
+};
 function vehicleTypeIcon(type) {
   return type === 'motorcycle'
     ? `<i class="fa-solid fa-motorcycle" style="color:var(--accent);" title="มอเตอร์ไซค์"></i>`
