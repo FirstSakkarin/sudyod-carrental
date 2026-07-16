@@ -774,7 +774,7 @@ function openCarDetail(id) {
 
 // ── Bookings Page ──────────────────────────────────────────────────────
 function renderBookingsPage() {
-  const filter = document.getElementById('bookingFilter')?.value || 'active';
+  const filter = document.getElementById('bookingFilter')?.value || 'all';
   const today  = todayStr();
 
   let bookings = state.bookings.filter(b => {
