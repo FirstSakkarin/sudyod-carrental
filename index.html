@@ -536,7 +536,8 @@
           </div>
           <div class="form-group">
             <label>เลขไมล์ตอนคืน (กม.)</label>
-            <input type="number" id="returnMileage" placeholder="เลขไมล์ตอนคืน" />
+            <input type="number" id="returnMileage" placeholder="เลขไมล์ตอนคืน" oninput="updateReturnKmPreview()" />
+            <div id="returnKmPreview" class="return-km-preview"></div>
           </div>
         </div>
         <div class="form-group">

@@ -765,7 +765,7 @@ function openCarDetail(id) {
       </div>` : ''}
     ${history.length ? `
       <div style="font-size:.82rem;color:var(--gray-500);margin-bottom:.35rem;">ประวัติการเช่าล่าสุด</div>
-      ${history.map(b => `<div style="font-size:.83rem;padding:.35rem 0;border-bottom:1px solid var(--gray-100);">${b.start} – ${b.end} · ${b.customer}</div>`).join('')}` : ''}
+      ${history.map(b => `<div style="font-size:.83rem;padding:.35rem 0;border-bottom:1px solid var(--gray-100);">${b.start} – ${b.end} · ${b.customer}${(b.kmDriven !== null && b.kmDriven !== undefined && b.kmDriven >= 0) ? ` · วิ่งไป ${b.kmDriven.toLocaleString()} กม.` : ''}</div>`).join('')}` : ''}
     ${car.note ? `<div style="margin-top:.75rem;font-size:.82rem;color:var(--gray-500);">หมายเหตุ: ${car.note}</div>` : ''}
   `;
   document.getElementById('carDetailEditBtn').onclick = () => openEditCarModal(id);
@@ -958,15 +958,46 @@ function openReturnModal(bookingId) {
   document.getElementById('returnMileage').value   = '';
   document.getElementById('returnExtra').value     = '0';
   document.getElementById('returnNote').value      = '';
+  document.getElementById('returnKmPreview').textContent = '';
+  document.getElementById('returnKmPreview').className   = 'return-km-preview';
 
   const days  = daysBetween(b.start, b.end);
   document.getElementById('returnSummary').innerHTML = `
     <strong>${car.plate}</strong> ${car.brand} ${car.model}<br>
     ลูกค้า: ${b.customer} · เบอร์: ${b.phone || '-'}<br>
     วันรับรถ: ${b.start} · กำหนดคืน: ${b.end} (${days} วัน)<br>
+    เลขไมล์ตอนรับรถ: <strong>${(b.mileageOut ?? car.mileage).toLocaleString()} กม.</strong><br>
     ยอดเช่า: <strong>${(b.total||0).toLocaleString()} ฿</strong>
   `;
   showModal('returnModal');
+}
+
+function returnMileageBaseline(b, car) {
+  return (b.mileageOut !== null && b.mileageOut !== undefined) ? b.mileageOut : (car ? car.mileage : null);
+}
+
+function updateReturnKmPreview() {
+  const bookingId = document.getElementById('returnBookingId').value;
+  const b   = state.bookings.find(x => x.id === bookingId);
+  const car = b ? getCarById(b.carId) : null;
+  const preview = document.getElementById('returnKmPreview');
+  const returnMile = +document.getElementById('returnMileage').value || null;
+  const baseline   = b ? returnMileageBaseline(b, car) : null;
+
+  if (!returnMile || baseline === null || baseline === undefined) {
+    preview.textContent = '';
+    preview.className   = 'return-km-preview';
+    return;
+  }
+
+  const km = returnMile - baseline;
+  if (km < 0) {
+    preview.textContent = `⚠ เลขไมล์น้อยกว่าตอนรับรถ (${baseline.toLocaleString()} กม.) กรุณาตรวจสอบ`;
+    preview.className   = 'return-km-preview warn';
+  } else {
+    preview.textContent = `ลูกค้าวิ่งไป ${km.toLocaleString()} กม.`;
+    preview.className   = 'return-km-preview ok';
+  }
 }
 
 function confirmReturn() {
@@ -979,11 +1010,15 @@ function confirmReturn() {
   const idx = state.bookings.findIndex(b => b.id === bookingId);
   if (idx < 0) return;
 
-  const b = state.bookings[idx];
+  const b   = state.bookings[idx];
+  const car = getCarById(b.carId);
   const days = daysBetween(b.start, returnDate);
   const finalTotal = (days * b.rate) + extra;
 
-  state.bookings[idx] = { ...b, status: 'completed', returnDate, returnMileage: returnMile, extra, finalTotal, returnNote };
+  const baseline = returnMileageBaseline(b, car);
+  const kmDriven = (returnMile !== null && baseline !== null && baseline !== undefined) ? (returnMile - baseline) : null;
+
+  state.bookings[idx] = { ...b, status: 'completed', returnDate, returnMileage: returnMile, kmDriven, extra, finalTotal, returnNote };
 
   // Update car mileage & status
   const carIdx = state.cars.findIndex(c => c.id === b.carId);
@@ -997,7 +1032,8 @@ function confirmReturn() {
   renderBookingsPage();
   renderDashboard();
   pushToSheets();
-  showToast('บันทึกการคืนรถเรียบร้อย ✅', 'success');
+  const kmMsg = (kmDriven !== null && kmDriven >= 0) ? ` · ลูกค้าวิ่งไป ${kmDriven.toLocaleString()} กม.` : '';
+  showToast(`บันทึกการคืนรถเรียบร้อย ✅${kmMsg}`, 'success');
 }
 
 // ── Maintenance Page ───────────────────────────────────────────────────

@@ -977,6 +977,15 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
   backdrop-filter: blur(8px);
 }
 
+.return-km-preview {
+  font-size: .8rem;
+  margin-top: .35rem;
+  color: var(--gray-500);
+  min-height: 1.1em;
+}
+.return-km-preview.ok      { color: var(--success); font-weight: 600; }
+.return-km-preview.warn    { color: var(--danger); font-weight: 600; }
+
 /* ========== SUGGEST PAGE ========== */
 .suggest-form { padding: 1rem 1.25rem; }
 #suggestResults .section-card { margin-top: 1rem; }
