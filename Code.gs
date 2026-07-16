@@ -1,7 +1,7 @@
 /**
  * Sudyod CarRental DB — Google Apps Script API
  *
- * Setup:
+ * FIRST-TIME SETUP (do this once only):
  * 1. Open Google Sheet "Sudyod CarRental DB"
  * 2. Extensions > Apps Script
  * 3. Paste this entire file, replacing existing code > Save
@@ -10,6 +10,17 @@
  *    - Execute as: Me
  *    - Who has access: Anyone
  * 5. Copy the Web App URL into the app settings (gear icon)
+ *
+ * UPDATING THE CODE LATER — do this every time after the first setup,
+ * and never repeat step 4 above (that creates a NEW url and breaks sync
+ * with the web app until someone notices and re-pastes it):
+ * 1. Paste the new code here, replacing the old code > Save (Ctrl/Cmd+S)
+ * 2. Deploy > Manage deployments
+ * 3. Click the pencil (edit) icon on the existing Active deployment
+ * 4. Version dropdown > "New version" (NOT "New deployment")
+ * 5. Click Deploy
+ * → The Web App URL stays exactly the same, so the app keeps working
+ *   without touching the settings again.
  */
 
 // Sheet tab names (English — avoids encoding issues)
