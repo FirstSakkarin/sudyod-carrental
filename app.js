@@ -71,7 +71,10 @@ function initApp() {
   document.getElementById('todayDateDesk').textContent = todayLabel;
   renderDashboard();
   navigate('dashboard');
-  if (state.sheetsUrl) loadFromSheets();
+  if (state.sheetsUrl) {
+    loadFromSheets();
+    startSheetsPolling();
+  }
 }
 
 function loadFromStorage() {
@@ -126,7 +129,10 @@ const PAGE_LABELS = {
   customers:   'ลูกค้า',
 };
 
+let currentPage = 'dashboard';
+
 function navigate(page) {
+  currentPage = page;
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(a => a.classList.remove('active'));
   document.querySelectorAll('.bnav-item').forEach(a => a.classList.remove('active'));
@@ -145,12 +151,16 @@ function navigate(page) {
   closeSidebar();
   document.getElementById('carsBackBtn').style.display = 'none';
 
-  if (page === 'dashboard')   renderDashboard();
-  if (page === 'cars')        renderCarsPage();
-  if (page === 'bookings')    renderBookingsPage();
-  if (page === 'maintenance') renderMaintenancePage();
-  if (page === 'finance')     renderFinancePage();
-  if (page === 'customers')   renderCustomersPage();
+  renderCurrentPage();
+}
+
+function renderCurrentPage() {
+  if (currentPage === 'dashboard')   renderDashboard();
+  if (currentPage === 'cars')        renderCarsPage();
+  if (currentPage === 'bookings')    renderBookingsPage();
+  if (currentPage === 'maintenance') renderMaintenancePage();
+  if (currentPage === 'finance')     renderFinancePage();
+  if (currentPage === 'customers')   renderCustomersPage();
 }
 
 function goToCarsFiltered(status) {
@@ -549,8 +559,8 @@ function renderCarsPage() {
                 ${car.status === 'blocked' && car.blockedUntil ? `<br><span style="font-size:.72rem;color:var(--blocked);">ถึง ${car.blockedUntil}</span>` : ''}
                 ${car.status === 'blocked' && car.blockedReason ? `<br><span style="font-size:.72rem;color:var(--gray-500);">${car.blockedReason}</span>` : ''}
               </td>
-              <td>${car.mileage.toLocaleString()} กม.</td>
-              <td>${car.dailyRate.toLocaleString()} ฿</td>
+              <td>${(car.mileage || 0).toLocaleString()} กม.</td>
+              <td>${(car.dailyRate || 0).toLocaleString()} ฿</td>
               <td>
                 <div class="actions">
                   <button class="btn btn-sm btn-outline btn-icon" onclick="event.stopPropagation(); openCarDetail('${car.id}')" title="รายละเอียด"><i class="fa-solid fa-eye"></i></button>
@@ -743,9 +753,9 @@ function openCarDetail(id) {
       <div><span style="color:var(--gray-500);">ปี</span><br><strong>${car.year || '-'}</strong></div>
       <div><span style="color:var(--gray-500);">สี</span><br><strong>${car.color || '-'}</strong></div>
       <div><span style="color:var(--gray-500);">ประเภท</span><br><strong>${vehicleTypeIcon(car.type)} ${TYPE_LABEL[car.type] || car.type || '-'}</strong></div>
-      <div><span style="color:var(--gray-500);">เลขไมล์</span><br><strong>${car.mileage.toLocaleString()} กม.</strong></div>
+      <div><span style="color:var(--gray-500);">เลขไมล์</span><br><strong>${(car.mileage || 0).toLocaleString()} กม.</strong></div>
       <div><span style="color:var(--gray-500);">ซ่อมถัดไป</span><br><strong>${car.nextService ? car.nextService.toLocaleString() + ' กม.' : '-'}</strong></div>
-      <div><span style="color:var(--gray-500);">ราคา/วัน</span><br><strong>${car.dailyRate.toLocaleString()} ฿</strong></div>
+      <div><span style="color:var(--gray-500);">ราคา/วัน</span><br><strong>${(car.dailyRate || 0).toLocaleString()} ฿</strong></div>
     </div>
     ${car.status === 'blocked' ? `
       <div style="background:var(--blocked-bg);border:1px solid rgba(167,139,250,0.2);border-radius:var(--radius-sm);padding:.75rem;font-size:.85rem;margin-bottom:.75rem;color:var(--blocked);">
@@ -966,7 +976,7 @@ function openReturnModal(bookingId) {
     <strong>${car.plate}</strong> ${car.brand} ${car.model}<br>
     ลูกค้า: ${b.customer} · เบอร์: ${b.phone || '-'}<br>
     วันรับรถ: ${b.start} · กำหนดคืน: ${b.end} (${days} วัน)<br>
-    เลขไมล์ตอนรับรถ: <strong>${(b.mileageOut ?? car.mileage).toLocaleString()} กม.</strong><br>
+    เลขไมล์ตอนรับรถ: <strong>${((b.mileageOut ?? car.mileage) || 0).toLocaleString()} กม.</strong><br>
     ยอดเช่า: <strong>${(b.total||0).toLocaleString()} ฿</strong>
   `;
   showModal('returnModal');
@@ -1199,8 +1209,8 @@ function runSuggest() {
         ${extraInfo || ''}
       </div>
       <div style="text-align:right;">
-        <div class="suggest-rate">${car.dailyRate.toLocaleString()} ฿/วัน</div>
-        <div style="font-size:.78rem;color:var(--gray-400);">รวม ${(car.dailyRate*days).toLocaleString()} ฿</div>
+        <div class="suggest-rate">${(car.dailyRate || 0).toLocaleString()} ฿/วัน</div>
+        <div style="font-size:.78rem;color:var(--gray-400);">รวม ${((car.dailyRate || 0)*days).toLocaleString()} ฿</div>
         <button class="btn btn-primary btn-sm" style="margin-top:.35rem;" onclick="prefillBooking('${car.id}')">
           <i class="fa-solid fa-plus"></i> จอง
         </button>
@@ -1660,8 +1670,10 @@ function saveSettings() {
   closeModal('settingsModal');
   if (state.sheetsUrl) {
     syncNow();
+    startSheetsPolling();
     showToast('บันทึกการตั้งค่าเรียบร้อย กำลัง sync...', 'success');
   } else {
+    stopSheetsPolling();
     showToast('ปิดการ sync กับ Google Sheets');
   }
 }
@@ -1681,10 +1693,10 @@ async function testSheetsConnection() {
   }
 }
 
-// โหลดข้อมูลจาก Sheets ตอนเปิดแอป
-async function loadFromSheets() {
+// โหลดข้อมูลจาก Sheets ตอนเปิดแอป (silent = true สำหรับ auto-refresh พื้นหลัง ไม่ขึ้น toast รบกวน)
+async function loadFromSheets(silent = false) {
   if (!state.sheetsUrl) return;
-  setSyncStatus('syncing');
+  if (!silent) setSyncStatus('syncing');
   try {
     const res  = await fetch(state.sheetsUrl);
     const json = await res.json();
@@ -1699,17 +1711,32 @@ async function loadFromSheets() {
         localStorage.setItem('vehicleCatalog', JSON.stringify(state.catalog));
       }
       saveToStorage();
-      renderDashboard();
+      renderCurrentPage();
       setSyncStatus('on');
-      showToast('โหลดข้อมูลจาก Google Sheets เรียบร้อย ✅', 'success');
-    } else {
+      if (!silent) showToast('โหลดข้อมูลจาก Google Sheets เรียบร้อย ✅', 'success');
+    } else if (!silent) {
       // Sheets ว่างอยู่ → push ข้อมูล local ขึ้นไป
       syncNow();
     }
   } catch {
     setSyncStatus('error');
-    showToast('โหลดข้อมูลจาก Sheets ไม่ได้ ใช้ข้อมูล local แทน', '');
+    if (!silent) showToast('โหลดข้อมูลจาก Sheets ไม่ได้ ใช้ข้อมูล local แทน', '');
   }
+}
+
+// Auto-refresh: ดึงข้อมูลจาก Sheets ทุก 15 วินาที เผื่อมีคนแก้ข้อมูลตรงในชีต
+let sheetsPollTimer = null;
+function startSheetsPolling() {
+  stopSheetsPolling();
+  if (!state.sheetsUrl) return;
+  sheetsPollTimer = setInterval(() => {
+    if (!state.sheetsUrl || state.syncing) return;
+    loadFromSheets(true);
+  }, 15000);
+}
+function stopSheetsPolling() {
+  if (sheetsPollTimer) clearInterval(sheetsPollTimer);
+  sheetsPollTimer = null;
 }
 
 // Push ข้อมูลไปยัง Sheets
