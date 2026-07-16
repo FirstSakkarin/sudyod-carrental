@@ -71,6 +71,7 @@ function initApp() {
   document.getElementById('todayDateDesk').textContent = todayLabel;
   renderDashboard();
   navigate('dashboard');
+  initCustomPickers();
   if (state.sheetsUrl) {
     loadFromSheets();
     startSheetsPolling();
@@ -1635,6 +1636,161 @@ function formatDateThai(d) {
   const DAYS = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัส','ศุกร์','เสาร์'];
   const MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
   return `${DAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear() + 543}`;
+}
+
+// ── Custom date/time pickers ────────────────────────────────────────────
+// Native <input type="date"/"time"> popups are OS-rendered and can't be
+// restyled with CSS, so every date/time field is made read-only and wired
+// to one shared, theme-matching popup instead (value + change event stay
+// identical, so all existing onchange handlers keep working untouched).
+const PICKER_DOW   = ['อา','จ','อ','พ','พฤ','ศ','ส'];
+const PICKER_MONTH = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+const PICKER_MINUTES = ['00', '15', '30', '45'];
+
+let pickerActiveInput = null;
+let pickerViewDate    = new Date();
+let pickerTempTime    = { h: '00', m: '00' };
+
+function initCustomPickers() {
+  document.querySelectorAll('input[type="date"]').forEach(el => {
+    el.readOnly = true;
+    el.addEventListener('click', (e) => { e.stopPropagation(); openDatePicker(el); });
+  });
+  document.querySelectorAll('input[type="time"]').forEach(el => {
+    el.readOnly = true;
+    el.addEventListener('click', (e) => { e.stopPropagation(); openTimePicker(el); });
+  });
+  document.querySelectorAll('.picker-popup').forEach(el => {
+    el.addEventListener('click', (e) => e.stopPropagation());
+  });
+  document.addEventListener('click', closePickers);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePickers(); });
+  window.addEventListener('scroll', closePickers, true);
+  window.addEventListener('resize', closePickers);
+}
+
+function closePickers() {
+  document.getElementById('datePickerPopup')?.classList.remove('open');
+  document.getElementById('timePickerPopup')?.classList.remove('open');
+  pickerActiveInput = null;
+}
+
+function positionPickerPopup(popup, inputEl) {
+  const rect = inputEl.getBoundingClientRect();
+  const width = popup.offsetWidth || 280;
+  let left = rect.left;
+  if (left + width > window.innerWidth - 8) left = window.innerWidth - width - 8;
+  popup.style.left = `${Math.max(8, left)}px`;
+  popup.style.top  = `${rect.bottom + 6}px`;
+}
+
+function openDatePicker(inputEl) {
+  pickerActiveInput = inputEl;
+  const base = inputEl.value ? new Date(inputEl.value + 'T00:00:00') : new Date();
+  pickerViewDate = new Date(base.getFullYear(), base.getMonth(), 1);
+  document.getElementById('timePickerPopup').classList.remove('open');
+  renderDatePicker();
+  const popup = document.getElementById('datePickerPopup');
+  popup.classList.add('open');
+  positionPickerPopup(popup, inputEl);
+}
+
+function shiftPickerMonth(n) {
+  pickerViewDate.setMonth(pickerViewDate.getMonth() + n);
+  renderDatePicker();
+}
+
+function renderDatePicker() {
+  const popup = document.getElementById('datePickerPopup');
+  const year  = pickerViewDate.getFullYear();
+  const month = pickerViewDate.getMonth();
+  const firstDow     = new Date(year, month, 1).getDay();
+  const daysInMonth  = new Date(year, month + 1, 0).getDate();
+  const today        = todayStr();
+  const selected     = pickerActiveInput?.value || '';
+
+  const cells = [];
+  for (let i = 0; i < firstDow; i++) cells.push('<span></span>');
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const cls = ['picker-day'];
+    if (dateStr === today)    cls.push('picker-today');
+    if (dateStr === selected) cls.push('picker-selected');
+    cells.push(`<span class="${cls.join(' ')}" onclick="pickDate('${dateStr}')">${d}</span>`);
+  }
+
+  popup.innerHTML = `
+    <div class="picker-header">
+      <button type="button" onclick="shiftPickerMonth(-1)"><i class="fa-solid fa-chevron-left"></i></button>
+      <span>${PICKER_MONTH[month]} ${year + 543}</span>
+      <button type="button" onclick="shiftPickerMonth(1)"><i class="fa-solid fa-chevron-right"></i></button>
+    </div>
+    <div class="picker-dow">${PICKER_DOW.map(d => `<span>${d}</span>`).join('')}</div>
+    <div class="picker-days">${cells.join('')}</div>
+    <div class="picker-footer">
+      <button type="button" class="btn btn-sm btn-secondary" onclick="pickDate('')">ล้าง</button>
+      <button type="button" class="btn btn-sm btn-secondary" onclick="pickDate(todayStr())">วันนี้</button>
+    </div>`;
+}
+
+function pickDate(dateStr) {
+  if (!pickerActiveInput) return;
+  pickerActiveInput.value = dateStr;
+  pickerActiveInput.dispatchEvent(new Event('change', { bubbles: true }));
+  closePickers();
+}
+
+function openTimePicker(inputEl) {
+  pickerActiveInput = inputEl;
+  const [h, m] = (inputEl.value || '').split(':');
+  pickerTempTime = {
+    h: h && /^\d{2}$/.test(h) ? h : '00',
+    m: PICKER_MINUTES.includes(m) ? m : '00',
+  };
+  document.getElementById('datePickerPopup').classList.remove('open');
+  renderTimePicker();
+  const popup = document.getElementById('timePickerPopup');
+  popup.classList.add('open');
+  positionPickerPopup(popup, inputEl);
+  popup.querySelector('.picker-selected')?.scrollIntoView({ block: 'center' });
+}
+
+function selectPickerHour(h)   { pickerTempTime.h = h; renderTimePicker(); }
+function selectPickerMinute(m) { pickerTempTime.m = m; renderTimePicker(); }
+
+function confirmPickerTime() {
+  if (!pickerActiveInput) return;
+  pickerActiveInput.value = `${pickerTempTime.h}:${pickerTempTime.m}`;
+  pickerActiveInput.dispatchEvent(new Event('change', { bubbles: true }));
+  closePickers();
+}
+
+function pickTimeNow() {
+  const now = new Date();
+  const nearestMinute = PICKER_MINUTES.reduce((best, m) =>
+    Math.abs(+m - now.getMinutes()) < Math.abs(+best - now.getMinutes()) ? m : best
+  );
+  pickerTempTime = { h: String(now.getHours()).padStart(2, '0'), m: nearestMinute };
+  confirmPickerTime();
+}
+
+function renderTimePicker() {
+  const popup = document.getElementById('timePickerPopup');
+  const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+
+  popup.innerHTML = `
+    <div class="picker-time-cols">
+      <div class="picker-time-col">
+        ${hours.map(h => `<span class="picker-time-item ${h === pickerTempTime.h ? 'picker-selected' : ''}" onclick="selectPickerHour('${h}')">${h}</span>`).join('')}
+      </div>
+      <div class="picker-time-col">
+        ${PICKER_MINUTES.map(m => `<span class="picker-time-item ${m === pickerTempTime.m ? 'picker-selected' : ''}" onclick="selectPickerMinute('${m}')">${m}</span>`).join('')}
+      </div>
+    </div>
+    <div class="picker-footer">
+      <button type="button" class="btn btn-sm btn-secondary" onclick="pickTimeNow()">ตอนนี้</button>
+      <button type="button" class="btn btn-sm btn-primary" onclick="confirmPickerTime()">ตกลง</button>
+    </div>`;
 }
 
 function showModal(id)  { document.getElementById(id).style.display = 'flex'; }
