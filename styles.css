@@ -1291,7 +1291,7 @@ body.is-owner .owner-only { display: flex; }
 }
 .bnav-item.active i {
   filter: drop-shadow(0 0 8px rgba(250,204,21,0.9));
-  transform: translateY(-20px) scale(1.05);
+  transform: translateY(-14px) scale(1.05);
 }
 
 /* Sliding "bump" indicator — a raised circle that glides to whichever tab
