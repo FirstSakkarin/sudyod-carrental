@@ -255,14 +255,25 @@ function renderDashboard() {
 
 // ── Gantt chart (dashboard queue view) ──────────────────────────────────
 let ganttOffset = 0;
+let ganttDayView = null; // null = week view, else a 'YYYY-MM-DD' string = day (hourly) view
 
 function shiftGantt(days) { ganttOffset += days; renderGanttChart(); }
 function resetGantt()     { ganttOffset = 0;     renderGanttChart(); }
+
+function openGanttDay(dateStr)  { ganttDayView = dateStr; renderGanttChart(); }
+function backToGanttWeek()      { ganttDayView = null;    renderGanttChart(); }
+function shiftGanttDay(n)       { ganttDayView = addDaysStr(ganttDayView, n); renderGanttChart(); }
 
 function addDaysStr(dateStr, n) {
   const d = new Date(dateStr);
   d.setDate(d.getDate() + n);
   return d.toISOString().slice(0, 10);
+}
+
+function timeToHourFloat(t) {
+  if (!t) return null;
+  const [h, m] = t.split(':').map(Number);
+  return h + m / 60;
 }
 
 // Interval-scheduling lane assignment: overlapping bookings get stacked into
@@ -281,7 +292,140 @@ function assignGanttLanes(bookings) {
   return { laneOf, laneCount: laneEnds.length || 1 };
 }
 
+function renderGanttControls() {
+  const el = document.getElementById('ganttControls');
+  if (!el) return;
+  if (ganttDayView) {
+    el.innerHTML = `
+      <button class="btn btn-secondary btn-sm" onclick="backToGanttWeek()"><i class="fa-solid fa-arrow-left"></i> มุมมองสัปดาห์</button>
+      <button class="icon-btn" onclick="shiftGanttDay(-1)" title="วันก่อนหน้า"><i class="fa-solid fa-chevron-left"></i></button>
+      <span style="font-size:.85rem;color:var(--gray-700);font-weight:700;min-width:150px;text-align:center;">${formatDateThai(new Date(ganttDayView))}</span>
+      <button class="icon-btn" onclick="shiftGanttDay(1)" title="วันถัดไป"><i class="fa-solid fa-chevron-right"></i></button>`;
+  } else {
+    el.innerHTML = `
+      <button class="icon-btn" onclick="shiftGantt(-7)" title="7 วันก่อนหน้า"><i class="fa-solid fa-chevron-left"></i></button>
+      <button class="btn btn-secondary btn-sm" onclick="resetGantt()">วันนี้</button>
+      <button class="icon-btn" onclick="shiftGantt(7)" title="7 วันถัดไป"><i class="fa-solid fa-chevron-right"></i></button>`;
+  }
+}
+
 function renderGanttChart() {
+  renderGanttControls();
+  if (ganttDayView) renderGanttDayView(ganttDayView);
+  else renderGanttWeekView();
+}
+
+// Cars relevant to a specific day = have a pickup or return event that day.
+// Shows a small hourly timeline per event, with a highlighted gap when a
+// same-car return→next-pickup turnaround is tight enough to need attention.
+function renderGanttDayView(date) {
+  const wrap = document.getElementById('ganttChart');
+  if (!wrap) return;
+
+  const relevant = state.cars.filter(car =>
+    state.bookings.some(b => b.carId === car.id && b.status !== 'completed' && (b.start === date || b.end === date))
+  );
+
+  if (!relevant.length) {
+    wrap.innerHTML = `<p class="empty-state" style="padding:1.5rem;">ไม่มีรถรับ/คืนในวันนี้</p>`;
+    return;
+  }
+
+  const carEvents = relevant.map(car => {
+    const events = [];
+    state.bookings.forEach(b => {
+      if (b.carId !== car.id || b.status === 'completed') return;
+      if (b.end === date)   events.push({ type: 'return',  time: b.endTime   || null, booking: b });
+      if (b.start === date) events.push({ type: 'deliver', time: b.startTime || null, booking: b });
+    });
+    events.sort((a, b) => (timeToHourFloat(a.time) ?? 12) - (timeToHourFloat(b.time) ?? 12));
+    return { car, events };
+  });
+
+  let minHour = 6, maxHour = 22;
+  carEvents.forEach(({ events }) => events.forEach(e => {
+    const h = timeToHourFloat(e.time);
+    if (h !== null) { minHour = Math.min(minHour, Math.floor(h)); maxHour = Math.max(maxHour, Math.ceil(h)); }
+  }));
+  const HOURS = maxHour - minHour;
+
+  const hourHeaders = Array.from({ length: HOURS }, (_, i) => minHour + i)
+    .map(h => `<div class="gantt-hour-head">${h}:00</div>`).join('');
+
+  const trackCols = `<div class="gantt-track-cols" style="grid-template-columns:repeat(${HOURS},1fr);">` +
+    '<div class="gantt-col"></div>'.repeat(HOURS) + '</div>';
+
+  const rows = carEvents.map(({ car, events }) => {
+    const parts = [];
+    let skipNext = false;
+
+    events.forEach((e, i) => {
+      if (skipNext) { skipNext = false; return; }
+
+      const next = events[i + 1];
+      const isDifferentBooking = next && e.booking.id !== next.booking.id;
+
+      // Impossible ordering: this car was handed to a new customer (deliver)
+      // before a different booking's return — always a hard conflict, no
+      // matter the gap, since two customers can't hold the same car at once.
+      if (isDifferentBooking && e.type === 'deliver' && next.type === 'return') {
+        const h = timeToHourFloat(e.time);
+        const leftPct = h === null ? 1 : ((h - minHour) / HOURS) * 100;
+        const title = `${car.plate}\n⚠ ส่งมอบให้ ${e.booking.customer} ${e.time || ''} ก่อนรับคืนจาก ${next.booking.customer} ${next.time || ''}\nรถคันเดียวกันอยู่กับ 2 ลูกค้าพร้อมกัน ตรวจสอบด่วน`;
+        parts.push(`<div class="gantt-event gantt-gap-critical" style="left:${leftPct}%;" title="${title.replace(/"/g, '&quot;')}" onclick="openEditBookingModal('${e.booking.id}')">
+          <i class="fa-solid fa-triangle-exclamation"></i> ${e.time || '-'} ส่งมอบ ${e.booking.customer} ← ก่อนคืนจาก ${next.booking.customer} ${next.time || ''}
+        </div>`);
+        skipNext = true;
+        return;
+      }
+
+      // Tight same-day return→pickup turnaround: merge into one chip instead of
+      // two overlapping labels, since at this scale they'd collide anyway.
+      if (isDifferentBooking && e.type === 'return' && next.type === 'deliver') {
+        const gapMins = minutesBetween(date, e.time, date, next.time);
+        if (gapMins !== null && gapMins < 120) {
+          const h = timeToHourFloat(e.time);
+          const leftPct = h === null ? 1 : ((h - minHour) / HOURS) * 100;
+          const gapCls = gapMins < 0 ? 'gantt-gap-critical' : 'gantt-gap-warn';
+          const title = `${car.plate}\nคืน: ${e.booking.customer} ${e.time || ''}\nรับใหม่: ${next.booking.customer} ${next.time || ''}\n${formatPrepTime(gapMins)}`;
+          parts.push(`<div class="gantt-event ${gapCls}" style="left:${leftPct}%;" title="${title.replace(/"/g, '&quot;')}" onclick="openEditBookingModal('${e.booking.id}')">
+            <i class="fa-solid fa-triangle-exclamation"></i> ${e.time || '-'} ${e.booking.customer} → ${next.time || '-'} ${next.booking.customer} (${gapMins < 0 ? 'ชนเวลา' : gapMins + ' น.'})
+          </div>`);
+          skipNext = true;
+          return;
+        }
+      }
+
+      const h = timeToHourFloat(e.time);
+      const leftPct = h === null ? 1 : ((h - minHour) / HOURS) * 100;
+      const icon  = e.type === 'deliver' ? 'fa-truck-fast' : 'fa-rotate-left';
+      const label = e.type === 'deliver' ? 'ส่งมอบ' : 'รับคืน';
+      const timeLabel = e.time || 'ไม่ระบุเวลา';
+      const cls = e.type === 'deliver' ? 'gantt-event-deliver' : 'gantt-event-return';
+      const title = `${label} ${car.plate} · ${e.booking.customer} · ${timeLabel}`;
+      parts.push(`<div class="gantt-event ${cls}" style="left:${leftPct}%;" title="${title.replace(/"/g, '&quot;')}" onclick="openEditBookingModal('${e.booking.id}')">
+        <i class="fa-solid ${icon}"></i> ${timeLabel} ${e.booking.customer}
+      </div>`);
+    });
+
+    return `
+      <div class="gantt-row">
+        <div class="gantt-carlabel" title="${car.plate}">${vehicleTypeIcon(car.type)} ${car.plate}</div>
+        <div class="gantt-track">${trackCols}${parts.join('')}</div>
+      </div>`;
+  }).join('');
+
+  wrap.innerHTML = `
+    <div class="gantt-table" style="min-width:${Math.max(620, HOURS * 55 + 132)}px;">
+      <div class="gantt-header-row">
+        <div class="gantt-carlabel-head">รถ</div>
+        ${hourHeaders}
+      </div>
+      ${rows}
+    </div>`;
+}
+
+function renderGanttWeekView() {
   const wrap = document.getElementById('ganttChart');
   if (!wrap) return;
 
@@ -294,7 +438,7 @@ function renderGanttChart() {
 
   const headerCells = days.map(d => {
     const dt = new Date(d);
-    return `<div class="gantt-day-head ${d === today ? 'gantt-today' : ''}">
+    return `<div class="gantt-day-head gantt-day-link ${d === today ? 'gantt-today' : ''}" onclick="openGanttDay('${d}')" title="ดูรายละเอียดรายชั่วโมงของวันนี้">
       <div class="gantt-dow">${DOW[dt.getDay()]}</div>
       <div class="gantt-date">${dt.getDate()}/${dt.getMonth() + 1}</div>
     </div>`;

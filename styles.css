@@ -625,6 +625,31 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
   50% { box-shadow: 0 0 18px var(--danger-glow); }
 }
 
+/* Day (hourly) view */
+.gantt-day-link { cursor: pointer; }
+.gantt-day-link:hover .gantt-date { text-decoration: underline; }
+.gantt-hour-head { flex: 1; text-align: center; font-size: .66rem; color: var(--gray-500); }
+.gantt-event {
+  position: absolute;
+  top: 6px;
+  height: 26px;
+  min-width: 30px;
+  border-radius: 6px;
+  padding: 0 .4rem;
+  font-size: .7rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: .3rem;
+  white-space: nowrap;
+  cursor: pointer;
+  z-index: 2;
+}
+.gantt-event-deliver { background: var(--rented-bg); color: var(--rented); border: 1px solid rgba(96,165,250,0.4); }
+.gantt-event-return  { background: rgba(250,204,21,0.12); color: var(--primary); border: 1px solid rgba(250,204,21,0.35); }
+.gantt-gap-warn     { background: rgba(251,191,36,0.18); color: var(--maintenance); border: 1px dashed rgba(251,191,36,0.5); }
+.gantt-gap-critical { background: var(--danger-bg); color: var(--danger); border: 1px dashed rgba(248,113,113,0.6); }
+
 /* ========== RETURN LIST ========== */
 .return-list { padding: 0 1.25rem 1rem; }
 .return-item {
