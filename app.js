@@ -69,6 +69,11 @@ document.addEventListener('DOMContentLoaded', () => {
   initApp();
 });
 
+// The viewport meta tag's user-scalable=no isn't always honored by iOS
+// Safari in standalone/home-screen mode, so pinch-zoom is blocked here too.
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('touchmove', e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+
 // ── Init ───────────────────────────────────────────────────────────────
 function initApp() {
   loadFromStorage();
