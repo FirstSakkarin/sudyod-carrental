@@ -246,6 +246,19 @@ function arrayToSheet(ss, name, data, headers) {
   var resetRows = Math.max(sheet.getMaxRows(), (data ? data.length : 0) + 1);
   sheet.getRange(1, 1, resetRows, headers.length).setNumberFormat('General');
 
+  // Time-of-day strings like "14:30" look like a time value to Sheets' input
+  // parser and get silently auto-converted to a Date/Time serial on write,
+  // no matter what format the cell had beforehand. That serial then loses
+  // its time component when read back (sheetToArray formats Dates as
+  // yyyy-MM-dd), corrupting the value. Force these columns to Plain Text so
+  // the string is stored literally and never auto-parsed.
+  var TEXT_COLUMNS = ['startTime', 'endTime', 'returnTime'];
+  headers.forEach(function(h, i) {
+    if (TEXT_COLUMNS.indexOf(h) !== -1) {
+      sheet.getRange(1, i + 1, resetRows, 1).setNumberFormat('@');
+    }
+  });
+
   if (!data || data.length === 0) {
     var r = sheet.getRange(1, 1, 1, headers.length);
     r.setValues([headers]);
