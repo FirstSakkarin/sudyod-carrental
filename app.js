@@ -346,20 +346,28 @@ function renderDashboard() {
   }
 
   // Car mini grid
-  const STATUS_ORDER = { available: 0, rented: 1, maintenance: 2, blocked: 3 };
-  const sortedCars = [...cars].sort((a, b) => (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99));
-  const gridEl = document.getElementById('dashboardCarList');
-  gridEl.innerHTML = sortedCars.map(car => {
-    const statusLabel = { available: 'ว่าง', rented: 'เช่าอยู่', maintenance: 'ซ่อมบำรุง', blocked: 'งดให้บริการ' }[car.status] || car.status || '-';
-    return `
-      <div class="car-mini-card status-${car.status}" style="--car-color:${CAR_COLOR_HEX[car.color] || 'rgba(255,255,255,0.12)'}" onclick="openCarDetail('${car.id}')">
-        <div class="car-mini-photo">${car.photo ? `<img src="${car.photo}" alt="" />` : vehicleTypeIcon(car.type, car.color)}</div>
-        <div class="car-mini-plate">${car.plate}</div>
-        <div class="car-mini-model">${car.brand || '-'} ${car.model || '-'}${car.color ? ' - ' + car.color : ''}</div>
-        ${car.ownerName ? `<div class="car-mini-owner">${car.ownerName}</div>` : ''}
-        <div class="car-mini-status-big">${statusLabel}</div>
-      </div>`;
-  }).join('');
+  document.getElementById('dashboardCarList').innerHTML =
+    sortCarsByStatus(cars).map(carMiniCardHtml).join('');
+}
+
+// Shared status-tinted glass card, used by the dashboard grid and the
+// Cars page grid.
+const CAR_STATUS_ORDER = { available: 0, rented: 1, maintenance: 2, blocked: 3 };
+
+function sortCarsByStatus(cars) {
+  return [...cars].sort((a, b) => (CAR_STATUS_ORDER[a.status] ?? 99) - (CAR_STATUS_ORDER[b.status] ?? 99));
+}
+
+function carMiniCardHtml(car) {
+  const statusLabel = { available: 'ว่าง', rented: 'เช่าอยู่', maintenance: 'ซ่อมบำรุง', blocked: 'งดให้บริการ' }[car.status] || car.status || '-';
+  return `
+    <div class="car-mini-card status-${car.status}" style="--car-color:${CAR_COLOR_HEX[car.color] || 'rgba(255,255,255,0.12)'}" onclick="openCarDetail('${car.id}')">
+      <div class="car-mini-photo">${car.photo ? `<img src="${car.photo}" alt="" />` : vehicleTypeIcon(car.type, car.color)}</div>
+      <div class="car-mini-plate">${car.plate}</div>
+      <div class="car-mini-model">${car.brand || '-'} ${car.model || '-'}${car.color ? ' - ' + car.color : ''}</div>
+      ${car.ownerName ? `<div class="car-mini-owner">${car.ownerName}</div>` : ''}
+      <div class="car-mini-status-big">${statusLabel}</div>
+    </div>`;
 }
 
 // ── Cars Page ──────────────────────────────────────────────────────────
@@ -375,51 +383,9 @@ function renderCarsPage() {
 
   document.getElementById('carsCount').textContent = `${cars.length} คัน`;
 
-  const STATUS_LABEL = { available: 'ว่าง', rented: 'เช่าอยู่', maintenance: 'ซ่อมบำรุง', blocked: 'ปิดตา' };
-
-  const html = cars.length ? `
-    <div class="table-wrap">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>ทะเบียน</th>
-            <th>ยี่ห้อ / รุ่น</th>
-            <th>สถานะ</th>
-            <th>เลขไมล์</th>
-            <th>ราคา/วัน</th>
-            <th>จัดการ</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${cars.map(car => `
-            <tr class="row-clickable" onclick="openCarDetail('${car.id}')">
-              <td>${vehicleTypeIcon(car.type)} <strong>${car.plate}</strong></td>
-              <td>${car.brand || '-'} ${car.model || '-'} <span style="color:var(--gray-400);font-size:.78rem;">${car.year || ''} · ${car.color || ''}</span></td>
-              <td>
-                <span class="pill pill-${car.status}">${STATUS_LABEL[car.status] || car.status || '-'}</span>
-                ${car.status === 'blocked' && car.blockedUntil ? `<br><span style="font-size:.72rem;color:var(--blocked);">ถึง ${car.blockedUntil}</span>` : ''}
-                ${car.status === 'blocked' && car.blockedReason ? `<br><span style="font-size:.72rem;color:var(--gray-500);">${car.blockedReason}</span>` : ''}
-              </td>
-              <td>${(car.mileage || 0).toLocaleString()} กม.</td>
-              <td>${(car.dailyRate || 0).toLocaleString()} ฿</td>
-              <td>
-                <div class="actions">
-                  <button class="btn btn-sm btn-outline btn-icon" onclick="event.stopPropagation(); openCarDetail('${car.id}')" title="รายละเอียด"><i class="fa-solid fa-eye"></i></button>
-                  ${car.status === 'blocked'
-                    ? `<button class="btn btn-sm btn-icon" onclick="event.stopPropagation(); unblockCar('${car.id}')" title="เปิดตา"
-                        style="background:var(--blocked-bg);color:var(--blocked);border:1px solid rgba(167,139,250,0.25);">
-                        <i class="fa-solid fa-lock-open"></i></button>`
-                    : `<button class="btn btn-sm btn-icon" onclick="event.stopPropagation(); openBlockCarModal('${car.id}')" title="ปิดตา"
-                        style="background:var(--blocked-bg);color:var(--blocked);border:1px solid rgba(167,139,250,0.25);">
-                        <i class="fa-solid fa-lock"></i></button>`}
-                  <button class="btn btn-sm btn-warning btn-icon" onclick="event.stopPropagation(); openEditCarModal('${car.id}')" title="แก้ไข"><i class="fa-solid fa-pen"></i></button>
-                  <button class="btn btn-sm btn-danger btn-icon" onclick="event.stopPropagation(); deleteCar('${car.id}')" title="ลบ"><i class="fa-solid fa-trash"></i></button>
-                </div>
-              </td>
-            </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>` : '<p class="empty-state" style="text-align:center;padding:2rem;">ไม่พบรถ</p>';
+  const html = cars.length
+    ? `<div class="section-card"><div class="car-grid">${sortCarsByStatus(cars).map(carMiniCardHtml).join('')}</div></div>`
+    : '<p class="empty-state" style="text-align:center;padding:2rem;">ไม่พบรถ</p>';
 
   document.getElementById('carsTableContainer').innerHTML = html;
 }
@@ -649,7 +615,16 @@ function openCarDetail(id) {
       ${history.map(b => `<div style="font-size:.83rem;padding:.35rem 0;border-bottom:1px solid var(--gray-100);">${b.start} – ${b.end} · ${b.customer}${(b.kmDriven !== null && b.kmDriven !== undefined && b.kmDriven >= 0) ? ` · วิ่งไป ${b.kmDriven.toLocaleString()} กม.` : ''}</div>`).join('')}` : ''}
     ${car.note ? `<div style="margin-top:.75rem;font-size:.82rem;color:var(--gray-500);">หมายเหตุ: ${car.note}</div>` : ''}
   `;
-  document.getElementById('carDetailEditBtn').onclick = () => openEditCarModal(id);
+  document.getElementById('carDetailEditBtn').onclick   = () => openEditCarModal(id);
+  document.getElementById('carDetailDeleteBtn').onclick = () => { closeModal('carDetailModal'); deleteCar(id); };
+  const blockBtn = document.getElementById('carDetailBlockBtn');
+  if (car.status === 'blocked') {
+    blockBtn.innerHTML = '<i class="fa-solid fa-lock-open"></i> เปิดตา';
+    blockBtn.onclick = () => { unblockCar(id); closeModal('carDetailModal'); };
+  } else {
+    blockBtn.innerHTML = '<i class="fa-solid fa-lock"></i> ปิดตา';
+    blockBtn.onclick = () => { closeModal('carDetailModal'); openBlockCarModal(id); };
+  }
   showModal('carDetailModal');
 }
 

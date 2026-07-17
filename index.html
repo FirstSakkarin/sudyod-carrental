@@ -498,6 +498,13 @@
       <div class="modal-body" id="carDetailBody"></div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeModal('carDetailModal')">ปิด</button>
+        <button class="btn btn-danger" id="carDetailDeleteBtn">
+          <i class="fa-solid fa-trash"></i> ลบ
+        </button>
+        <button class="btn" id="carDetailBlockBtn"
+          style="background:var(--blocked-bg);color:var(--blocked);border:1px solid rgba(167,139,250,0.25);">
+          <i class="fa-solid fa-lock"></i> ปิดตา
+        </button>
         <button class="btn btn-warning" id="carDetailEditBtn">
           <i class="fa-solid fa-pen"></i> แก้ไข
         </button>
