@@ -2,6 +2,13 @@
    SUDYOD CARRENTAL — App Logic
    ==================================== */
 
+// Built-in fallback so every device syncs automatically without the owner
+// having to paste the URL into Settings manually — a device whose
+// localStorage never got the URL saved (or had it evicted, e.g. iOS
+// Safari's storage eviction) would otherwise silently run fully offline
+// with no real data and no obvious way to tell why.
+const DEFAULT_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbyDZtpn0WkPwryHBsAPrSLQ_N4P4bLsKic0yZwy78RC00t96TrGQYcu82MZybLd-Ej6tQ/exec';
+
 // ── State ──────────────────────────────────────────────────────────────
 let state = {
   user: null,           // { username, role }
@@ -65,7 +72,11 @@ document.addEventListener('DOMContentLoaded', () => {
 // ── Init ───────────────────────────────────────────────────────────────
 function initApp() {
   loadFromStorage();
-  state.sheetsUrl = localStorage.getItem('sheetsUrl') || '';
+  // null (key never set / storage evicted) falls back to the default; an
+  // explicitly-saved empty string (owner turned sync off on purpose in
+  // Settings) is respected and stays offline.
+  const savedSheetsUrl = localStorage.getItem('sheetsUrl');
+  state.sheetsUrl = savedSheetsUrl !== null ? savedSheetsUrl : DEFAULT_SHEETS_URL;
   const todayLabel = formatDateThai(new Date());
   document.getElementById('topbarDate').textContent   = todayLabel;
   document.getElementById('todayDateDesk').textContent = todayLabel;
