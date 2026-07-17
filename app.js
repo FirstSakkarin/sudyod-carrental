@@ -295,7 +295,7 @@ function renderDashboard() {
           <div class="car-mini-model">${car.brand || '-'} ${car.model || '-'} · ${car.color || '-'}</div>
           <span class="car-mini-status pill pill-${car.status}">${statusLabel}</span>
         </div>
-        <div class="car-mini-photo">${car.photo ? `<img src="${car.photo}" alt="" />` : vehicleTypeIcon(car.type)}</div>
+        <div class="car-mini-photo">${car.photo ? `<img src="${car.photo}" alt="" />` : vehicleTypeIcon(car.type)}${carColorDot(car.color)}</div>
       </div>`;
   }).join('');
 }
@@ -364,6 +364,21 @@ function renderCarsPage() {
 
 // Car modals
 const CAR_COLORS = ['ขาว', 'ดำ', 'เงิน', 'เทา', 'แดง', 'น้ำเงิน', 'ฟ้า', 'เขียว', 'เหลือง', 'ส้ม', 'น้ำตาล', 'ทอง', 'บรอนซ์', 'ม่วง', 'ชมพู'];
+
+// Thai color name -> swatch hex, used for the small color dot on car cards
+// so a car's real-world color is recognizable at a glance without reading text.
+const CAR_COLOR_HEX = {
+  'ขาว': '#f8fafc', 'ดำ': '#18181b', 'เงิน': '#cbd5e1', 'เทา': '#6b7280',
+  'แดง': '#ef4444', 'น้ำเงิน': '#2563eb', 'ฟ้า': '#38bdf8', 'เขียว': '#16a34a',
+  'เหลือง': '#eab308', 'ส้ม': '#f97316', 'น้ำตาล': '#78350f', 'ทอง': '#ca8a04',
+  'บรอนซ์': '#92714a', 'ม่วง': '#9333ea', 'ชมพู': '#ec4899',
+};
+
+function carColorDot(color) {
+  const hex = CAR_COLOR_HEX[color];
+  if (!hex) return '';
+  return `<span class="car-color-dot" style="background:${hex};" title="สี${color}"></span>`;
+}
 
 function populateYearSelect(selectedYear) {
   const thisYear = new Date().getFullYear();

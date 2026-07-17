@@ -492,10 +492,11 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
 }
 .car-mini-info { min-width: 0; flex: 1; }
 .car-mini-photo {
+  position: relative;
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  overflow: hidden;
+  overflow: visible;
   flex-shrink: 0;
   border: 2px solid rgba(255,255,255,0.12);
   background: rgba(255,255,255,0.05);
@@ -505,7 +506,17 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
   color: rgba(255,255,255,0.35);
   font-size: 1.1rem;
 }
-.car-mini-photo img { width: 100%; height: 100%; object-fit: cover; }
+.car-mini-photo img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.car-color-dot {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 2px solid var(--gray-50, #0a0a0a);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+}
 .car-photo-preview {
   width: 64px;
   height: 64px;
