@@ -239,6 +239,12 @@ function arrayToSheet(ss, name, data, headers) {
   var sheet = ss.getSheetByName(name);
   if (!sheet) sheet = ss.insertSheet(name);
   sheet.clearContents();
+  // clearContents() doesn't reset cell formatting, so a stray format left
+  // over from a manual edit (e.g. a "rate" cell accidentally formatted as
+  // a Date) would keep reinterpreting freshly-written numbers as dates on
+  // every future sync. Reset to General so numbers always read back as numbers.
+  var resetRows = Math.max(sheet.getMaxRows(), (data ? data.length : 0) + 1);
+  sheet.getRange(1, 1, resetRows, headers.length).setNumberFormat('General');
 
   if (!data || data.length === 0) {
     var r = sheet.getRange(1, 1, 1, headers.length);
