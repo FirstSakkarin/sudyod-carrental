@@ -1442,8 +1442,11 @@ body.is-owner .owner-only { display: flex; }
   .form-row-3 { grid-template-columns: 1fr; }
   .today-grid { grid-template-columns: 1fr; }
   .page-header { flex-direction: column; align-items: flex-start; }
-  .data-table th:nth-child(n+4),
-  .data-table td:nth-child(n+4) { display: none; }
+  /* Hide less-critical middle columns to fit narrow screens, but never the
+     last column — every table's last column is its "จัดการ" action buttons
+     (edit/delete/view), so hiding it would make rows unmanageable on mobile. */
+  .data-table th:nth-child(n+4):not(:last-child),
+  .data-table td:nth-child(n+4):not(:last-child) { display: none; }
   .quick-actions-grid { grid-template-columns: repeat(4, 1fr); gap: .5rem; }
 
   /* Car grid: 2 equal columns, card contents stacked and centered so they

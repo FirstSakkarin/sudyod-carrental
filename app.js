@@ -1194,7 +1194,7 @@ function renderFinancePage() {
   if (selectedMonth) incomeList = incomeList.filter(b => (b.returnDate||b.end).startsWith(selectedMonth));
 
   // Filter expenses
-  let expenseList = [...state.expenses, ...state.maintenance.map(m => ({ ...m, expenseType: 'maintenance', amount: m.cost }))];
+  let expenseList = [...state.expenses, ...state.maintenance.map(m => ({ ...m, expenseType: 'maintenance', amount: m.cost, isMaintenance: true }))];
   if (selectedCar)   expenseList = expenseList.filter(e => e.carId === selectedCar);
   if (selectedMonth) expenseList = expenseList.filter(e => e.date.startsWith(selectedMonth));
 
@@ -1225,7 +1225,11 @@ function renderFinancePage() {
     }),
     ...expenseList.map(e => {
       const car = getCarById(e.carId);
-      return { date: e.date, label: `${e.expenseType||e.type||'รายจ่าย'} ${car ? car.plate : ''}`, income: 0, expense: e.amount||e.cost||0 };
+      const typeLabel = EXPENSE_TYPE_LABEL[e.expenseType] || e.expenseType || e.type || 'รายจ่าย';
+      return {
+        date: e.date, label: `${typeLabel} ${car ? car.plate : ''}`, income: 0, expense: e.amount||e.cost||0,
+        id: e.id, isMaintenance: !!e.isMaintenance,
+      };
     }),
   ].sort((a,b) => b.date.localeCompare(a.date));
 
@@ -1233,7 +1237,7 @@ function renderFinancePage() {
     <div class="table-wrap" style="margin-top:1rem;">
       <table class="data-table">
         <thead>
-          <tr><th>วันที่</th><th>รายการ</th><th>รายรับ</th><th>รายจ่าย</th></tr>
+          <tr><th>วันที่</th><th>รายการ</th><th>รายรับ</th><th>รายจ่าย</th><th>จัดการ</th></tr>
         </thead>
         <tbody>
           ${rows.map(r => `
@@ -1242,6 +1246,12 @@ function renderFinancePage() {
               <td>${r.label}</td>
               <td class="finance-income">${r.income ? r.income.toLocaleString()+' ฿' : '-'}</td>
               <td class="finance-expense">${r.expense ? r.expense.toLocaleString()+' ฿' : '-'}</td>
+              <td>${!r.id ? '' : r.isMaintenance ? `
+                <button class="btn btn-sm btn-danger btn-icon" onclick="deleteMaintenance('${r.id}')" title="ลบ (จัดการรายละเอียดที่หน้าซ่อมบำรุง)"><i class="fa-solid fa-trash"></i></button>
+              ` : `
+                <button class="btn btn-sm btn-secondary btn-icon" onclick="openEditExpenseModal('${r.id}')"><i class="fa-solid fa-pen"></i></button>
+                <button class="btn btn-sm btn-danger btn-icon" onclick="deleteExpense('${r.id}')"><i class="fa-solid fa-trash"></i></button>
+              `}</td>
             </tr>`).join('')}
         </tbody>
       </table>
@@ -1250,12 +1260,36 @@ function renderFinancePage() {
 
 function openAddExpenseModal() {
   populateCarSelect('expenseCar', false);
+  document.getElementById('expenseModalTitle').textContent = 'บันทึกรายจ่าย';
   document.getElementById('expenseModalId').value = '';
   document.getElementById('expenseDate').value    = todayStr();
   document.getElementById('expenseType').value    = 'insurance';
   document.getElementById('expenseAmount').value  = '';
   document.getElementById('expenseDetail').value  = '';
   showModal('expenseModal');
+}
+
+function openEditExpenseModal(id) {
+  const e = state.expenses.find(x => x.id === id);
+  if (!e) return;
+  populateCarSelect('expenseCar', false);
+  document.getElementById('expenseModalTitle').textContent = 'แก้ไขรายจ่าย';
+  document.getElementById('expenseModalId').value = e.id;
+  document.getElementById('expenseCar').value     = e.carId;
+  document.getElementById('expenseDate').value    = e.date;
+  document.getElementById('expenseType').value    = e.expenseType;
+  document.getElementById('expenseAmount').value  = e.amount;
+  document.getElementById('expenseDetail').value  = e.detail || '';
+  showModal('expenseModal');
+}
+
+function deleteExpense(id) {
+  if (!confirm('ต้องการลบรายการนี้?')) return;
+  state.expenses = state.expenses.filter(e => e.id !== id);
+  saveToStorage();
+  renderFinancePage();
+  pushToSheets(['expenses']);
+  showToast('ลบรายการเรียบร้อย');
 }
 
 function saveExpense() {
@@ -1722,6 +1756,10 @@ function getCarById(id) { return state.cars.find(c => c.id === id); }
 const TYPE_LABEL = {
   sedan: 'Sedan', hatchback: 'Hatchback', suv: 'SUV', mpv: 'MPV', ppv: 'PPV',
   van: 'รถตู้', pickup: 'กระบะ', ev: 'EV', motorcycle: 'มอเตอร์ไซค์',
+};
+const EXPENSE_TYPE_LABEL = {
+  insurance: 'ประกันภัย', tax: 'ภาษีรถ', fuel: 'น้ำมัน',
+  maintenance: 'ซ่อมบำรุง', cleaning: 'ทำความสะอาด', other: 'อื่นๆ',
 };
 function vehicleTypeIcon(type, color) {
   const hex = color && CAR_COLOR_HEX[color];
