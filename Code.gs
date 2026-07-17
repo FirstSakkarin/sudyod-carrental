@@ -27,16 +27,21 @@ const SHEET_NAMES = {
   bookings:    'Bookings',
   maintenance: 'Maintenance',
   expenses:    'Expenses',
-  catalog:     'VehicleCatalog'
+  catalog:     'VehicleCatalog',
+  tombstones:  'Tombstones'
 };
 
-// Column headers — must match app.js data structure exactly
+// Column headers — must match app.js data structure exactly.
+// 'updatedAt' is the per-row sync timestamp: the web app merges record-by-record
+// and keeps whichever copy (Sheet or app) has the newer updatedAt, so a manual
+// edit here is never overwritten by an older snapshot from a device.
 const HEADERS = {
-  cars:        ['id','plate','brand','model','type','year','color','mileage','nextService','dailyRate','status','note','blockedUntil','blockedReason'],
-  bookings:    ['id','carId','customer','phone','start','startTime','pickupLocation','end','endTime','returnLocation','mileageOut','rate','otFee','total','status','note','returnDate','returnTime','returnMileage','kmDriven','extra','finalTotal','returnNote'],
-  maintenance: ['id','carId','date','type','mileage','cost','nextService','detail'],
-  expenses:    ['id','carId','date','expenseType','amount','detail'],
-  catalog:     ['type','brand','model']
+  cars:        ['id','plate','brand','model','type','year','color','mileage','nextService','dailyRate','status','ownerName','note','blockedUntil','blockedReason','updatedAt'],
+  bookings:    ['id','carId','customer','phone','start','startTime','pickupLocation','end','endTime','returnLocation','mileageOut','rate','otFee','total','status','note','returnDate','returnTime','returnMileage','kmDriven','extra','finalTotal','returnNote','updatedAt'],
+  maintenance: ['id','carId','date','type','mileage','cost','nextService','detail','updatedAt'],
+  expenses:    ['id','carId','date','expenseType','amount','detail','updatedAt'],
+  catalog:     ['type','brand','model'],
+  tombstones:  ['collection','id','updatedAt']
 };
 
 /* ─────────────────────────────────────────
@@ -65,6 +70,9 @@ function handleGet() {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     ensureSheets(ss);
+    // Catch rows deleted by hand in the Sheet (onEdit can't see row deletions)
+    // and turn them into tombstones before we hand data back to the app.
+    reconcileDeletions_(ss);
     return {
       status: 'ok',
       data: {
@@ -72,7 +80,8 @@ function handleGet() {
         bookings:    sheetToArray(ss, SHEET_NAMES.bookings,    HEADERS.bookings),
         maintenance: sheetToArray(ss, SHEET_NAMES.maintenance, HEADERS.maintenance),
         expenses:    sheetToArray(ss, SHEET_NAMES.expenses,    HEADERS.expenses),
-        catalog:     sheetToArray(ss, SHEET_NAMES.catalog,     HEADERS.catalog)
+        catalog:     sheetToArray(ss, SHEET_NAMES.catalog,     HEADERS.catalog),
+        tombstones:  tombstonesToObject_(sheetToArray(ss, SHEET_NAMES.tombstones, HEADERS.tombstones))
       },
       timestamp: new Date().toISOString()
     };
@@ -94,6 +103,12 @@ function handlePost(e) {
     if (body.bookings    !== undefined) arrayToSheet(ss, SHEET_NAMES.bookings,    body.bookings,    HEADERS.bookings);
     if (body.maintenance !== undefined) arrayToSheet(ss, SHEET_NAMES.maintenance, body.maintenance, HEADERS.maintenance);
     if (body.expenses    !== undefined) arrayToSheet(ss, SHEET_NAMES.expenses,    body.expenses,    HEADERS.expenses);
+    if (body.tombstones  !== undefined) arrayToSheet(ss, SHEET_NAMES.tombstones,  tombstonesToRows_(body.tombstones), HEADERS.tombstones);
+
+    // The app just wrote the authoritative full set, so refresh the id snapshot
+    // to match. This way the next read only flags rows a HUMAN removes from the
+    // Sheet afterwards — not the ids this push legitimately dropped.
+    writeIdSnapshot_(ss, collectIds_(ss));
 
     return { status: 'ok', timestamp: new Date().toISOString() };
   } catch(err) {
@@ -211,24 +226,211 @@ function applyCarsDropdowns_(sheet, data, headers) {
 function onEdit(e) {
   try {
     var sheet = e.range.getSheet();
-    if (sheet.getName() !== SHEET_NAMES.cars) return;
+    var name  = sheet.getName();
+    var dataSheets = [SHEET_NAMES.cars, SHEET_NAMES.bookings, SHEET_NAMES.maintenance, SHEET_NAMES.expenses];
+    if (dataSheets.indexOf(name) === -1) return;
     var row = e.range.getRow();
     if (row === 1) return;
-    var col = e.range.getColumn(); // A=1 id, B=2 plate, C=3 brand, D=4 model, E=5 type
-    if (col !== 3 && col !== 5) return;
 
-    var vehicleCatalog = getVehicleCatalog_(sheet.getParent());
-    var type    = sheet.getRange(row, 5).getValue();
-    var brand   = sheet.getRange(row, 3).getValue();
-    var catalog = catalogForType_(vehicleCatalog, type);
+    // Stamp updatedAt on the row that was just edited by hand, so the web app's
+    // record-level merge sees this as the newest version and keeps it instead
+    // of overwriting it with an older copy from a device. This is the core fix
+    // for "edit in the Sheet, then the app pushes an old version over it".
+    stampUpdatedAt_(sheet, name, row, e.range.getColumn());
 
-    if (col === 5) {
-      setListValidation_(sheet.getRange(row, 3), Object.keys(catalog));
+    // Cars-only: keep the brand/model dropdowns in step with type/brand.
+    if (name === SHEET_NAMES.cars) {
+      var col = e.range.getColumn(); // A=1 id, B=2 plate, C=3 brand, D=4 model, E=5 type
+      if (col === 3 || col === 5) {
+        var vehicleCatalog = getVehicleCatalog_(sheet.getParent());
+        var type    = sheet.getRange(row, 5).getValue();
+        var brand   = sheet.getRange(row, 3).getValue();
+        var catalog = catalogForType_(vehicleCatalog, type);
+        if (col === 5) setListValidation_(sheet.getRange(row, 3), Object.keys(catalog));
+        setListValidation_(sheet.getRange(row, 4), catalog[brand] || []);
+      }
     }
-    setListValidation_(sheet.getRange(row, 4), catalog[brand] || []);
   } catch (err) {
     // ignore — never block manual edits
   }
+}
+
+// Maps a sheet tab name back to its HEADERS key ('Cars' -> 'cars').
+function keyForSheetName_(name) {
+  var keys = Object.keys(SHEET_NAMES);
+  for (var i = 0; i < keys.length; i++) {
+    if (SHEET_NAMES[keys[i]] === name) return keys[i];
+  }
+  return null;
+}
+
+// Writes the current time (ISO) into the row's updatedAt cell. Skips the write
+// if the edit WAS the updatedAt cell itself, so hand-tweaking that column
+// doesn't fight the app. Stored as plain text so Sheets never reinterprets the
+// ISO string as a date.
+function stampUpdatedAt_(sheet, name, row, editedCol) {
+  var key = keyForSheetName_(name);
+  if (!key) return;
+  var headers = HEADERS[key];
+  var idx = headers.indexOf('updatedAt');
+  if (idx === -1) return;
+  if (editedCol === idx + 1) return;
+  var cell = sheet.getRange(row, idx + 1);
+  cell.setNumberFormat('@');
+  cell.setValue(new Date().toISOString());
+}
+
+// Sheet rows [{collection,id,updatedAt}] -> nested object the app expects:
+// { cars: {id: ts}, bookings: {...}, maintenance: {...}, expenses: {...} }
+function tombstonesToObject_(rows) {
+  var out = { cars: {}, bookings: {}, maintenance: {}, expenses: {} };
+  (rows || []).forEach(function (r) {
+    if (!r.collection || !r.id) return;
+    if (!out[r.collection]) out[r.collection] = {};
+    out[r.collection][r.id] = r.updatedAt || '';
+  });
+  return out;
+}
+
+// Inverse of tombstonesToObject_: nested object -> flat rows for the sheet.
+function tombstonesToRows_(obj) {
+  var rows = [];
+  Object.keys(obj || {}).forEach(function (coll) {
+    var m = obj[coll] || {};
+    Object.keys(m).forEach(function (id) {
+      rows.push({ collection: coll, id: id, updatedAt: m[id] });
+    });
+  });
+  return rows;
+}
+
+/* ─────────────────────────────────────────
+   Manual-row-deletion detection
+
+   Apps Script's simple onEdit trigger does NOT fire when a whole row is
+   deleted, so a row a human deletes directly in the Sheet would otherwise be
+   silently resurrected by the web app on the next merge (the app still has its
+   own copy). To catch it, we keep a snapshot of the ids that existed in each
+   data sheet (hidden "_IdSnapshot" tab) and, on every read the app makes,
+   compare it against what's actually there now. Any id that vanished becomes a
+   tombstone — exactly as if the row had been deleted from inside the app.
+───────────────────────────────────────── */
+var ID_SNAPSHOT_SHEET = '_IdSnapshot';
+var TOMBSTONE_COLLECTIONS = ['cars', 'bookings', 'maintenance', 'expenses'];
+
+// Current id set of one sheet: { id: true, ... } (id is always column 1).
+function idsInSheet_(ss, name) {
+  var sheet = ss.getSheetByName(name);
+  var out = {};
+  if (!sheet) return out;
+  var last = sheet.getLastRow();
+  if (last < 2) return out;
+  var vals = sheet.getRange(2, 1, last - 1, 1).getValues();
+  vals.forEach(function (r) {
+    var id = r[0];
+    if (id !== '' && id !== null && id !== undefined) out[String(id)] = true;
+  });
+  return out;
+}
+
+// { cars:{id:true}, bookings:{...}, ... } across all data sheets.
+function collectIds_(ss) {
+  var out = {};
+  TOMBSTONE_COLLECTIONS.forEach(function (coll) {
+    out[coll] = idsInSheet_(ss, SHEET_NAMES[coll]);
+  });
+  return out;
+}
+
+function getIdSnapshotSheet_(ss) {
+  var sh = ss.getSheetByName(ID_SNAPSHOT_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(ID_SNAPSHOT_SHEET);
+    sh.getRange(1, 1, 1, 2).setValues([['collection', 'id']]);
+    sh.hideSheet();
+  }
+  return sh;
+}
+
+function readIdSnapshot_(ss) {
+  var sh = getIdSnapshotSheet_(ss);
+  var out = {};
+  var last = sh.getLastRow();
+  if (last < 2) return out;
+  var vals = sh.getRange(2, 1, last - 1, 2).getValues();
+  vals.forEach(function (r) {
+    var coll = r[0], id = r[1];
+    if (!coll || id === '' || id === null || id === undefined) return;
+    if (!out[coll]) out[coll] = {};
+    out[coll][String(id)] = true;
+  });
+  return out;
+}
+
+function writeIdSnapshot_(ss, snapObj) {
+  var sh = getIdSnapshotSheet_(ss);
+  sh.clearContents();
+  var rows = [['collection', 'id']];
+  Object.keys(snapObj).forEach(function (coll) {
+    Object.keys(snapObj[coll]).forEach(function (id) { rows.push([coll, id]); });
+  });
+  sh.getRange(1, 1, rows.length, 2).setValues(rows);
+}
+
+function snapshotDiffers_(a, b) {
+  for (var i = 0; i < TOMBSTONE_COLLECTIONS.length; i++) {
+    var c = TOMBSTONE_COLLECTIONS[i];
+    var ak = Object.keys((a && a[c]) || {});
+    var bk = Object.keys((b && b[c]) || {});
+    if (ak.length !== bk.length) return true;
+    for (var j = 0; j < bk.length; j++) {
+      if (!(a[c] && a[c][bk[j]])) return true;
+    }
+  }
+  return false;
+}
+
+// Ids already tombstoned, so we don't append duplicate tombstone rows.
+function currentTombstoneIds_(ss) {
+  var rows = sheetToArray(ss, SHEET_NAMES.tombstones, HEADERS.tombstones);
+  var out = {};
+  rows.forEach(function (r) {
+    if (!r.collection || !r.id) return;
+    if (!out[r.collection]) out[r.collection] = {};
+    out[r.collection][String(r.id)] = true;
+  });
+  return out;
+}
+
+function appendTombstoneRows_(ss, rows) {
+  var sh = ss.getSheetByName(SHEET_NAMES.tombstones);
+  if (!sh) { ensureSheets(ss); sh = ss.getSheetByName(SHEET_NAMES.tombstones); }
+  var start = Math.max(sh.getLastRow() + 1, 2);
+  sh.getRange(start, 1, rows.length, 3).setValues(rows);
+  sh.getRange(start, 3, rows.length, 1).setNumberFormat('@'); // updatedAt as text
+}
+
+function reconcileDeletions_(ss) {
+  var current  = collectIds_(ss);
+  var snap     = readIdSnapshot_(ss);
+  var existing = currentTombstoneIds_(ss);
+  var now      = new Date().toISOString();
+  var toAppend = [];
+
+  TOMBSTONE_COLLECTIONS.forEach(function (coll) {
+    var prev = snap[coll] || {};
+    var cur  = current[coll] || {};
+    var et   = existing[coll] || {};
+    Object.keys(prev).forEach(function (id) {
+      // Was there last time, gone now, and not already tombstoned -> deleted by hand.
+      if (!cur[id] && !et[id]) toAppend.push([coll, id, now]);
+    });
+  });
+
+  if (toAppend.length) appendTombstoneRows_(ss, toAppend);
+  // Only rewrite the snapshot when it actually changed, so steady-state reads
+  // (nothing added/removed) stay read-only and cheap.
+  if (snapshotDiffers_(snap, current)) writeIdSnapshot_(ss, current);
 }
 
 /* ─────────────────────────────────────────
@@ -298,7 +500,7 @@ function arrayToSheet(ss, name, data, headers) {
   // its time component when read back (sheetToArray formats Dates as
   // yyyy-MM-dd), corrupting the value. Force these columns to Plain Text so
   // the string is stored literally and never auto-parsed.
-  var TEXT_COLUMNS = ['startTime', 'endTime', 'returnTime'];
+  var TEXT_COLUMNS = ['startTime', 'endTime', 'returnTime', 'updatedAt'];
   headers.forEach(function(h, i) {
     if (TEXT_COLUMNS.indexOf(h) !== -1) {
       sheet.getRange(1, i + 1, resetRows, 1).setNumberFormat('@');

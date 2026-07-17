@@ -534,6 +534,8 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
 .car-photo-preview img { width: 100%; height: 100%; object-fit: cover; }
 .car-mini-plate { font-weight: 700; font-size: .9rem; color: var(--gray-900); }
 .car-mini-model { font-size: .78rem; color: var(--gray-500); margin-top: .1rem; }
+.car-mini-owner { font-size: .74rem; color: var(--gray-500); margin-top: .1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.car-mini-owner i { font-size: .65rem; opacity: .7; }
 .car-mini-status {
   margin-top: .5rem;
   display: inline-block;
@@ -1464,6 +1466,7 @@ body.is-owner .owner-only { display: flex; }
   .car-mini-info { width: 100%; }
   .car-mini-plate { font-size: .82rem; line-height: 1.3; }
   .car-mini-model { font-size: .72rem; }
+  .car-mini-owner { font-size: .68rem; }
   .car-mini-status { margin-top: .35rem; }
 }
 

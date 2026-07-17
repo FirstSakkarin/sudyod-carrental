@@ -20,7 +20,63 @@ let state = {
   sheetsUrl: '',
   syncing: false,
   catalog: null,        // { car: {brand: [models]}, motorcycle: {...} } — synced from the "VehicleCatalog" sheet
+  // Tombstones: { cars: {id: updatedAt}, bookings: {...}, ... } — records the
+  // user deleted, so a delete survives a merge instead of being resurrected by
+  // the other side's still-present copy. Newest timestamp wins (record vs tomb).
+  tombstones: { cars: {}, bookings: {}, maintenance: {}, expenses: {} },
+  // Guard: never push to the sheet until at least one successful pull has
+  // completed this session, so an old/local snapshot can't clobber the sheet
+  // before we've even seen what's in it.
+  loadedFromSheets: false,
 };
+
+// ── Sync helpers ────────────────────────────────────────────────────────
+const SYNC_COLLECTIONS = ['cars', 'bookings', 'maintenance', 'expenses'];
+function nowISO() { return new Date().toISOString(); }
+// Stamp a record as "just changed here" so record-level merge knows this copy
+// is newer than whatever is on the other side.
+function touch(rec) { if (rec) rec.updatedAt = nowISO(); return rec; }
+function markDeleted(collection, id) {
+  if (!state.tombstones[collection]) state.tombstones[collection] = {};
+  state.tombstones[collection][id] = nowISO();
+}
+
+// Record-level merge: union local + remote by id, newest updatedAt wins per
+// record, then hide anything a tombstone deleted more recently than its last
+// edit. This is what stops an old web snapshot from overwriting fresh Sheet
+// edits — each row is compared on its own timestamp, not the whole collection.
+function mergeById(local, remote, collection) {
+  const map = {};
+  (local || []).forEach(r => { if (r && r.id != null) map[r.id] = r; });
+  (remote || []).forEach(r => {
+    if (!r || r.id == null) return;
+    const cur = map[r.id];
+    if (!cur) { map[r.id] = r; return; }
+    map[r.id] = ((r.updatedAt || '') >= (cur.updatedAt || '')) ? r : cur;
+  });
+  const tomb = state.tombstones[collection] || {};
+  return Object.values(map).filter(r => {
+    const t = tomb[r.id];
+    if (!t) return true;
+    // Record edited AFTER it was deleted → it was re-created; keep it and drop
+    // the stale tombstone. Otherwise the deletion stands.
+    if ((r.updatedAt || '') > t) { delete tomb[r.id]; return true; }
+    return false;
+  });
+}
+
+// Merge the two tombstone registries (local + whatever the sheet carried),
+// keeping the newest deletion time for each id.
+function mergeTombstones(remote) {
+  if (!remote) return;
+  SYNC_COLLECTIONS.forEach(coll => {
+    const rt = remote[coll] || {};
+    const lt = state.tombstones[coll] || (state.tombstones[coll] = {});
+    Object.keys(rt).forEach(id => {
+      if (!lt[id] || rt[id] > lt[id]) lt[id] = rt[id];
+    });
+  });
+}
 
 // ── Vehicle catalog (type → brand → models) ─────────────────────────────
 // Fallback used only until the first successful sync from the Google Sheet's
@@ -82,6 +138,10 @@ function initApp() {
   // Settings) is respected and stays offline.
   const savedSheetsUrl = localStorage.getItem('sheetsUrl');
   state.sheetsUrl = savedSheetsUrl !== null ? savedSheetsUrl : DEFAULT_SHEETS_URL;
+  // Only seed demo data when running fully offline (no Sheet configured). When
+  // a Sheet IS configured, an empty local store must stay empty until the first
+  // pull — otherwise sample cars could be pushed up and clobber real data.
+  if (!state.sheetsUrl && !state.cars.length) seedSampleData();
   const todayLabel = formatDateThai(new Date());
   document.getElementById('topbarDate').textContent   = todayLabel;
   document.getElementById('todayDateDesk').textContent = todayLabel;
@@ -102,7 +162,9 @@ function loadFromStorage() {
   state.expenses      = JSON.parse(localStorage.getItem('expenses')      || '[]');
   state.customerTags  = JSON.parse(localStorage.getItem('customerTags')  || '{}');
   state.catalog       = JSON.parse(localStorage.getItem('vehicleCatalog') || 'null');
-  if (!state.cars.length) seedSampleData();
+  const savedTombstones = JSON.parse(localStorage.getItem('tombstones') || 'null');
+  if (savedTombstones) state.tombstones = savedTombstones;
+  SYNC_COLLECTIONS.forEach(c => { if (!state.tombstones[c]) state.tombstones[c] = {}; });
 }
 
 function saveToStorage() {
@@ -111,6 +173,7 @@ function saveToStorage() {
   localStorage.setItem('maintenance',  JSON.stringify(state.maintenance));
   localStorage.setItem('expenses',     JSON.stringify(state.expenses));
   localStorage.setItem('customerTags', JSON.stringify(state.customerTags));
+  localStorage.setItem('tombstones',   JSON.stringify(state.tombstones));
 }
 
 // ── Sample Data ────────────────────────────────────────────────────────
@@ -293,6 +356,7 @@ function renderDashboard() {
         <div class="car-mini-info">
           <div class="car-mini-plate">${vehicleTypeIcon(car.type, car.color)} ${car.plate}</div>
           <div class="car-mini-model">${car.brand || '-'} ${car.model || '-'} · ${car.color || '-'}</div>
+          ${car.ownerName ? `<div class="car-mini-owner"><i class="fa-solid fa-user"></i> ${car.ownerName}</div>` : ''}
           <span class="car-mini-status pill pill-${car.status}">${statusLabel}</span>
         </div>
         <div class="car-mini-photo">${car.photo ? `<img src="${car.photo}" alt="" />` : vehicleTypeIcon(car.type, car.color)}${carColorDot(car.color)}</div>
@@ -306,7 +370,7 @@ function renderCarsPage() {
   const status = document.getElementById('carStatusFilter')?.value || '';
 
   let cars = state.cars.filter(c => {
-    const matchQ = !q || `${c.plate} ${c.brand} ${c.model} ${c.color || ''}`.toLowerCase().includes(q);
+    const matchQ = !q || `${c.plate} ${c.brand} ${c.model} ${c.color || ''} ${c.ownerName || ''}`.toLowerCase().includes(q);
     const matchS = !status || c.status === status;
     return matchQ && matchS;
   });
@@ -470,6 +534,7 @@ function openAddCarModal() {
   document.getElementById('carNextService').value = '';
   document.getElementById('carDailyRate').value = '';
   document.getElementById('carStatus').value    = 'available';
+  document.getElementById('carOwnerName').value = '';
   document.getElementById('carNote').value      = '';
   showModal('carModal');
 }
@@ -494,6 +559,7 @@ function openEditCarModal(id) {
   document.getElementById('carNextService').value        = car.nextService || '';
   document.getElementById('carDailyRate').value          = car.dailyRate;
   document.getElementById('carStatus').value             = car.status;
+  document.getElementById('carOwnerName').value          = car.ownerName || '';
   document.getElementById('carNote').value               = car.note || '';
   closeModal('carDetailModal');
   showModal('carModal');
@@ -515,8 +581,10 @@ function saveCar() {
     nextService: +document.getElementById('carNextService').value || null,
     dailyRate:   +document.getElementById('carDailyRate').value || 0,
     status:      document.getElementById('carStatus').value,
+    ownerName:   document.getElementById('carOwnerName').value.trim(),
     note:        document.getElementById('carNote').value.trim(),
     photo:       document.getElementById('carPhotoData').value || null,
+    updatedAt:   nowISO(),
   };
 
   if (id) {
@@ -537,6 +605,7 @@ function saveCar() {
 function deleteCar(id) {
   if (!confirm('ต้องการลบรถคันนี้?')) return;
   state.cars = state.cars.filter(c => c.id !== id);
+  markDeleted('cars', id);
   saveToStorage();
   renderCarsPage();
   renderDashboard();
@@ -565,6 +634,7 @@ function openCarDetail(id) {
       <div><span style="color:var(--gray-500);">เลขไมล์</span><br><strong>${(car.mileage || 0).toLocaleString()} กม.</strong></div>
       <div><span style="color:var(--gray-500);">ซ่อมถัดไป</span><br><strong>${car.nextService ? car.nextService.toLocaleString() + ' กม.' : '-'}</strong></div>
       <div><span style="color:var(--gray-500);">ราคา/วัน</span><br><strong>${(car.dailyRate || 0).toLocaleString()} ฿</strong></div>
+      <div><span style="color:var(--gray-500);">เจ้าของรถ</span><br><strong>${car.ownerName || '-'}</strong></div>
     </div>
     ${car.status === 'blocked' ? `
       <div style="background:var(--blocked-bg);border:1px solid rgba(167,139,250,0.2);border-radius:var(--radius-sm);padding:.75rem;font-size:.85rem;margin-bottom:.75rem;color:var(--blocked);">
@@ -800,6 +870,7 @@ function saveBooking() {
     mileageOut,
     note:         document.getElementById('bookingNote').value.trim(),
     extra: 0, returnMileage: null,
+    updatedAt: nowISO(),
   };
 
   let touchedCar = false;
@@ -823,6 +894,7 @@ function saveBooking() {
 function deleteBooking(id) {
   if (!confirm('ต้องการลบการจองนี้?')) return;
   state.bookings = state.bookings.filter(b => b.id !== id);
+  markDeleted('bookings', id);
   saveToStorage();
   renderBookingsPage();
   renderDashboard();
@@ -904,13 +976,14 @@ function confirmReturn() {
   const baseline = returnMileageBaseline(b, car);
   const kmDriven = (returnMile !== null && baseline !== null && baseline !== undefined) ? (returnMile - baseline) : null;
 
-  state.bookings[idx] = { ...b, status: 'completed', returnDate, returnTime, returnMileage: returnMile, kmDriven, extra, finalTotal, returnNote };
+  state.bookings[idx] = { ...b, status: 'completed', returnDate, returnTime, returnMileage: returnMile, kmDriven, extra, finalTotal, returnNote, updatedAt: nowISO() };
 
   // Update car mileage & status
   const carIdx = state.cars.findIndex(c => c.id === b.carId);
   if (carIdx > -1) {
     state.cars[carIdx].status  = 'available';
     if (returnMile) state.cars[carIdx].mileage = returnMile;
+    touch(state.cars[carIdx]);
   }
 
   saveToStorage();
@@ -1000,6 +1073,7 @@ function saveMaintenance() {
     mileage:     +document.getElementById('maintenanceMileage').value || null,
     nextService: +document.getElementById('maintenanceNextService').value || null,
     detail:      document.getElementById('maintenanceDetail').value.trim(),
+    updatedAt:   nowISO(),
   };
 
   const id = document.getElementById('maintenanceModalId').value;
@@ -1012,7 +1086,7 @@ function saveMaintenance() {
     // Update car next service mileage
     if (data.nextService) {
       const cIdx = state.cars.findIndex(c => c.id === carId);
-      if (cIdx > -1) { state.cars[cIdx].nextService = data.nextService; touchedCarNextService = true; }
+      if (cIdx > -1) { state.cars[cIdx].nextService = data.nextService; touch(state.cars[cIdx]); touchedCarNextService = true; }
     }
   }
 
@@ -1026,6 +1100,7 @@ function saveMaintenance() {
 function deleteMaintenance(id) {
   if (!confirm('ต้องการลบรายการนี้?')) return;
   state.maintenance = state.maintenance.filter(m => m.id !== id);
+  markDeleted('maintenance', id);
   saveToStorage();
   renderMaintenancePage();
   pushToSheets(['maintenance']);
@@ -1286,6 +1361,7 @@ function openEditExpenseModal(id) {
 function deleteExpense(id) {
   if (!confirm('ต้องการลบรายการนี้?')) return;
   state.expenses = state.expenses.filter(e => e.id !== id);
+  markDeleted('expenses', id);
   saveToStorage();
   renderFinancePage();
   pushToSheets(['expenses']);
@@ -1302,6 +1378,7 @@ function saveExpense() {
     carId, date, amount,
     expenseType: document.getElementById('expenseType').value,
     detail:      document.getElementById('expenseDetail').value.trim(),
+    updatedAt:   nowISO(),
   };
 
   const id = document.getElementById('expenseModalId').value;
@@ -1341,6 +1418,7 @@ function saveBlockCar() {
   state.cars[idx].status       = 'blocked';
   state.cars[idx].blockedUntil = until || null;
   state.cars[idx].blockedReason = reason || null;
+  touch(state.cars[idx]);
   saveToStorage();
   closeModal('blockCarModal');
   renderCarsPage();
@@ -1356,6 +1434,7 @@ function unblockCar(id) {
   state.cars[idx].status        = 'available';
   state.cars[idx].blockedUntil  = null;
   state.cars[idx].blockedReason = null;
+  touch(state.cars[idx]);
   saveToStorage();
   renderCarsPage();
   renderDashboard();
@@ -1638,21 +1717,31 @@ async function loadFromSheets(silent = false) {
     const json = await res.json();
     if (json.status === 'ok' && json.data) {
       const d = json.data;
-      if (d.cars?.length)        state.cars        = d.cars;
-      if (d.bookings?.length)    state.bookings    = d.bookings;
-      if (d.maintenance?.length) state.maintenance = d.maintenance;
-      if (d.expenses?.length)    state.expenses    = d.expenses;
+      // Record-level merge, NOT blind replace. Empty collections in the sheet
+      // no longer silently keep stale local rows, and a row freshly edited in
+      // the sheet (newer updatedAt) wins over the local copy instead of the
+      // whole collection being clobbered one way or the other.
+      mergeTombstones(d.tombstones);
+      state.cars        = mergeById(state.cars,        d.cars,        'cars');
+      state.bookings    = mergeById(state.bookings,    d.bookings,    'bookings');
+      state.maintenance = mergeById(state.maintenance, d.maintenance, 'maintenance');
+      state.expenses    = mergeById(state.expenses,    d.expenses,    'expenses');
       if (d.catalog?.length) {
         state.catalog = buildVehicleCatalog(d.catalog);
         localStorage.setItem('vehicleCatalog', JSON.stringify(state.catalog));
       }
+      state.loadedFromSheets = true;
       saveToStorage();
       renderCurrentPage();
       setSyncStatus('on');
       if (!silent) showToast('โหลดข้อมูลจาก Google Sheets เรียบร้อย ✅', 'success');
-    } else if (!silent) {
-      // Sheets ว่างอยู่ → push ข้อมูล local ขึ้นไป
-      syncNow();
+    } else {
+      // We got a response but not a valid data payload. Treat it as an ERROR,
+      // never as "the sheet is empty" — the old code pushed local data up here,
+      // which is exactly how a transient read glitch overwrote the sheet with
+      // an old snapshot. Just surface the error and leave the sheet untouched.
+      setSyncStatus('error');
+      if (!silent) showToast('อ่านข้อมูลจาก Sheets ไม่ได้ (ตอบกลับไม่ถูกต้อง)', 'error');
     }
   } catch {
     setSyncStatus('error');
@@ -1675,31 +1764,46 @@ function stopSheetsPolling() {
   sheetsPollTimer = null;
 }
 
-// Push ข้อมูลไปยัง Sheets — ก่อน push จะดึงข้อมูลล่าสุดจาก Sheet มาก่อนเสมอ
-// แล้วใช้ข้อมูลสดนั้นสำหรับทุก collection ที่เรา "ไม่ได้แก้" ในแอ็กชันนี้
-// (changedCollections) กัน push ทับข้อมูลที่เพิ่งแก้ตรงในชีตโดยตรง เช่น
-// ถ้ากำลังแก้ข้อมูลรถในชีตอยู่ แล้วมีคนเพิ่มการจองในแอปพอดี การเพิ่มจองจะ
-// push เฉพาะ bookings สดๆ ส่วน cars จะใช้ข้อมูลที่เพิ่งดึงมาจากชีต ไม่ใช่
-// ข้อมูล cars ที่ค้างอยู่ในเครื่องตั้งแต่โหลดหน้าล่าสุด
-async function syncNow(changedCollections = ['cars', 'bookings', 'maintenance', 'expenses']) {
+// Push ข้อมูลไปยัง Sheets แบบปลอดภัย: ดึงข้อมูลล่าสุดจาก Sheet มา merge ทีละ
+// record ก่อนเสมอ (เทียบ updatedAt เก็บอันที่ใหม่กว่า) แล้วจึงค่อย push กลับ
+// ถ้าดึงข้อมูลก่อน push ไม่สำเร็จ จะ "ไม่ push" เด็ดขาด เพื่อกันไม่ให้ข้อมูล
+// เวอร์ชั่นเก่าในเครื่องเขียนทับข้อมูลที่เพิ่งแก้ในชีต
+async function syncNow() {
   if (!state.sheetsUrl || state.syncing) return;
   state.syncing = true;
   setSyncStatus('syncing');
 
+  // 1) Always pull first and MERGE record-by-record. Because merge keeps the
+  //    newest version of every individual row, we no longer need to guess which
+  //    collections "changed" — a fresh Sheet edit survives, a fresh app edit
+  //    survives, and neither clobbers the other wholesale.
+  let pulledOk = false;
   try {
     const pullRes  = await fetch(state.sheetsUrl);
     const pullJson = await pullRes.json();
     if (pullJson.status === 'ok' && pullJson.data) {
       const d = pullJson.data;
-      if (!changedCollections.includes('cars')        && d.cars?.length)        state.cars        = d.cars;
-      if (!changedCollections.includes('bookings')    && d.bookings?.length)    state.bookings    = d.bookings;
-      if (!changedCollections.includes('maintenance') && d.maintenance?.length) state.maintenance = d.maintenance;
-      if (!changedCollections.includes('expenses')    && d.expenses?.length)    state.expenses    = d.expenses;
+      mergeTombstones(d.tombstones);
+      state.cars        = mergeById(state.cars,        d.cars,        'cars');
+      state.bookings    = mergeById(state.bookings,    d.bookings,    'bookings');
+      state.maintenance = mergeById(state.maintenance, d.maintenance, 'maintenance');
+      state.expenses    = mergeById(state.expenses,    d.expenses,    'expenses');
+      state.loadedFromSheets = true;
+      pulledOk = true;
       saveToStorage();
       renderCurrentPage();
     }
   } catch {
-    // ดึงข้อมูลก่อน push ไม่สำเร็จ — ยังคง push ข้อมูลในเครื่องต่อไปเหมือนเดิม
+    // fall through to the guard below
+  }
+
+  // 2) NEVER push a snapshot we couldn't reconcile against the live sheet.
+  //    If the pre-push read failed, pushing local data blindly is precisely the
+  //    "old version overwrites new" bug — so we bail out and just report error.
+  if (!pulledOk) {
+    setSyncStatus('error');
+    state.syncing = false;
+    return;
   }
 
   try {
@@ -1708,6 +1812,7 @@ async function syncNow(changedCollections = ['cars', 'bookings', 'maintenance', 
       bookings:    state.bookings,
       maintenance: state.maintenance,
       expenses:    state.expenses,
+      tombstones:  state.tombstones,
     };
     const res  = await fetch(state.sheetsUrl, {
       method: 'POST',
@@ -1723,7 +1828,9 @@ async function syncNow(changedCollections = ['cars', 'bookings', 'maintenance', 
   state.syncing = false;
 }
 
-function pushToSheets(changedCollections) { if (state.sheetsUrl) syncNow(changedCollections); }
+// changedCollections is no longer needed (merge handles every collection), but
+// the param is kept so existing call sites don't have to change.
+function pushToSheets(_changedCollections) { if (state.sheetsUrl) syncNow(); }
 
 function refreshApp() {
   if (!state.sheetsUrl) {
@@ -1774,7 +1881,7 @@ function vehicleTypeIcon(type, color) {
 
 function updateCarStatus(carId, status) {
   const idx = state.cars.findIndex(c => c.id === carId);
-  if (idx > -1) state.cars[idx].status = status;
+  if (idx > -1) { state.cars[idx].status = status; touch(state.cars[idx]); }
 }
 
 function populateCarSelect(selectId, availableOnly) {
