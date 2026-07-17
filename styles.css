@@ -904,7 +904,15 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
 .form-group select option { background: #111; color: var(--gray-800); }
 .form-group textarea { resize: vertical; }
 
-input[type="date"], input[type="time"] { cursor: pointer; }
+/* Date/time fields (converted to readonly text driven by the custom
+   pickers — see initCustomPickers). Uniform width + no OS styling. */
+input[type="date"], input[type="time"], .dt-field {
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+}
+.dt-field { caret-color: transparent; user-select: none; }
 input[type="date"]::-webkit-calendar-picker-indicator,
 input[type="time"]::-webkit-calendar-picker-indicator {
   opacity: .6;
@@ -983,6 +991,8 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   flex: 1;
   max-height: 200px;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
   gap: 2px;

@@ -2040,12 +2040,26 @@ let pickerViewDate    = new Date();
 let pickerTempTime    = { h: '00', m: '00' };
 
 function initCustomPickers() {
+  // Convert every date/time input to a plain readonly text field driven
+  // solely by the custom popups. readOnly alone is NOT enough on mobile:
+  // iOS/Android still open the OS calendar/time wheel on focus, so the user
+  // saw both pickers stacked. Native date/time fields also keep an intrinsic
+  // width on iOS (ignoring width:100%), which misaligned the form columns —
+  // text fields obey the normal layout.
   document.querySelectorAll('input[type="date"]').forEach(el => {
+    el.type = 'text';
     el.readOnly = true;
+    el.setAttribute('inputmode', 'none');
+    if (!el.placeholder) el.placeholder = 'เลือกวันที่';
+    el.classList.add('dt-field');
     el.addEventListener('click', (e) => { e.stopPropagation(); openDatePicker(el); });
   });
   document.querySelectorAll('input[type="time"]').forEach(el => {
+    el.type = 'text';
     el.readOnly = true;
+    el.setAttribute('inputmode', 'none');
+    if (!el.placeholder) el.placeholder = 'เลือกเวลา';
+    el.classList.add('dt-field');
     el.addEventListener('click', (e) => { e.stopPropagation(); openTimePicker(el); });
   });
   document.querySelectorAll('.picker-popup').forEach(el => {
@@ -2053,7 +2067,13 @@ function initCustomPickers() {
   });
   document.addEventListener('click', closePickers);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePickers(); });
-  window.addEventListener('scroll', closePickers, true);
+  // Close when the page behind scrolls, but not when the scroll happens
+  // inside a popup itself (the time picker's hour/minute lists scroll).
+  window.addEventListener('scroll', (e) => {
+    if (document.getElementById('datePickerPopup')?.contains(e.target) ||
+        document.getElementById('timePickerPopup')?.contains(e.target)) return;
+    closePickers();
+  }, true);
   window.addEventListener('resize', closePickers);
 }
 
