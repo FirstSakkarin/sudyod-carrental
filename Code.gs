@@ -1,27 +1,25 @@
-/**
- * Sudyod CarRental DB — Google Apps Script API
- *
- * FIRST-TIME SETUP (do this once only):
- * 1. Open Google Sheet "Sudyod CarRental DB"
- * 2. Extensions > Apps Script
- * 3. Paste this entire file, replacing existing code > Save
- * 4. Deploy > New deployment
- *    - Type: Web app
- *    - Execute as: Me
- *    - Who has access: Anyone
- * 5. Copy the Web App URL into the app settings (gear icon)
- *
- * UPDATING THE CODE LATER — do this every time after the first setup,
- * and never repeat step 4 above (that creates a NEW url and breaks sync
- * with the web app until someone notices and re-pastes it):
- * 1. Paste the new code here, replacing the old code > Save (Ctrl/Cmd+S)
- * 2. Deploy > Manage deployments
- * 3. Click the pencil (edit) icon on the existing Active deployment
- * 4. Version dropdown > "New version" (NOT "New deployment")
- * 5. Click Deploy
- * → The Web App URL stays exactly the same, so the app keeps working
- *   without touching the settings again.
- */
+// Sudyod CarRental DB -- Google Apps Script API
+//
+// FIRST-TIME SETUP (do this once only):
+// 1. Open Google Sheet "Sudyod CarRental DB"
+// 2. Extensions > Apps Script
+// 3. Paste this entire file, replacing existing code > Save
+// 4. Deploy > New deployment
+//    - Type: Web app
+//    - Execute as: Me
+//    - Who has access: Anyone
+// 5. Copy the Web App URL into the app settings (gear icon)
+//
+// UPDATING THE CODE LATER -- do this every time after the first setup,
+// and never repeat step 4 above (that creates a NEW url and breaks sync
+// with the web app until someone notices and re-pastes it):
+// 1. Paste the new code here, replacing the old code > Save (Ctrl/Cmd+S)
+// 2. Deploy > Manage deployments
+// 3. Click the pencil (edit) icon on the existing Active deployment
+// 4. Version dropdown > "New version" (NOT "New deployment")
+// 5. Click Deploy
+// -> The Web App URL stays exactly the same, so the app keeps working
+//    without touching the settings again.
 
 // Sheet tab names (English — avoids encoding issues)
 const SHEET_NAMES = {
@@ -167,6 +165,46 @@ function setListValidation_(range, values) {
   }
 }
 
+// type/year/color options — must match app.js's TYPE_LABEL keys and
+// CAR_COLORS list so the Sheet's dropdowns never flag values the app itself
+// writes as "invalid".
+var CAR_TYPE_KEYS = ['sedan', 'hatchback', 'suv', 'mpv', 'ppv', 'van', 'pickup', 'ev', 'motorcycle'];
+var CAR_COLOR_BASE = ['ขาว', 'ดำ', 'เงิน', 'เทา', 'แดง', 'น้ำเงิน', 'ฟ้า', 'เขียว', 'เหลือง', 'ส้ม', 'น้ำตาล', 'ทอง', 'บรอนซ์', 'ม่วง', 'ชมพู'];
+
+// Reapplies dropdown validation for type/brand/model/year/color on the Cars
+// sheet after every full rewrite (arrayToSheet). onEdit only fires for
+// manual UI edits, never for this API-driven write, so without this call
+// the columns would carry no fresh validation of their own — or worse,
+// stale validation left over from before clearContents() (see arrayToSheet).
+function applyCarsDropdowns_(sheet, data, headers) {
+  var col = {};
+  headers.forEach(function(h, i) { col[h] = i + 1; });
+
+  var thisYear = new Date().getFullYear();
+  var years = [];
+  for (var y = thisYear + 1; y >= 2005; y--) years.push(y);
+
+  var usedColors = [];
+  data.forEach(function(c) {
+    if (c.color && CAR_COLOR_BASE.indexOf(c.color) === -1 && usedColors.indexOf(c.color) === -1) {
+      usedColors.push(c.color);
+    }
+  });
+  var colors = CAR_COLOR_BASE.concat(usedColors);
+
+  setListValidation_(sheet.getRange(2, col.type, data.length, 1), CAR_TYPE_KEYS);
+  setListValidation_(sheet.getRange(2, col.year, data.length, 1), years);
+  setListValidation_(sheet.getRange(2, col.color, data.length, 1), colors);
+
+  var vehicleCatalog = getVehicleCatalog_(sheet.getParent());
+  data.forEach(function(c, i) {
+    var row = i + 2;
+    var catalog = catalogForType_(vehicleCatalog, c.type);
+    setListValidation_(sheet.getRange(row, col.brand, 1, 1), Object.keys(catalog));
+    setListValidation_(sheet.getRange(row, col.model, 1, 1), catalog[c.brand] || []);
+  });
+}
+
 // Simple trigger: keeps the brand/model dropdowns on the Cars sheet in sync
 // with the row's type/brand. Wrapped in try/catch so a trigger error never
 // blocks manual sheet editing.
@@ -244,7 +282,15 @@ function arrayToSheet(ss, name, data, headers) {
   // a Date) would keep reinterpreting freshly-written numbers as dates on
   // every future sync. Reset to General so numbers always read back as numbers.
   var resetRows = Math.max(sheet.getMaxRows(), (data ? data.length : 0) + 1);
-  sheet.getRange(1, 1, resetRows, headers.length).setNumberFormat('General');
+  var resetRange = sheet.getRange(1, 1, resetRows, headers.length);
+  resetRange.setNumberFormat('General');
+  // clearContents() also leaves old dropdown validation rules attached to
+  // their cell positions. Since every sync rewrites all rows in a fresh
+  // order/count, those stale per-row rules end up attached to completely
+  // different cars than before and flag their new values as "Invalid
+  // input" even though nothing is actually wrong. Clear them all here;
+  // applyCarsDropdowns_ below reapplies fresh ones that match the new data.
+  resetRange.clearDataValidations();
 
   // Time-of-day strings like "14:30" look like a time value to Sheets' input
   // parser and get silently auto-converted to a Date/Time serial on write,
@@ -280,6 +326,8 @@ function arrayToSheet(ss, name, data, headers) {
   headers.forEach(function(_, i) {
     try { sheet.autoResizeColumn(i + 1); } catch(e) {}
   });
+
+  if (name === SHEET_NAMES.cars) applyCarsDropdowns_(sheet, data, headers);
 }
 
 function styleHeader(range) {

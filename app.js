@@ -363,9 +363,26 @@ function renderCarsPage() {
 }
 
 // Car modals
-function populateCarColorList() {
-  const unique = [...new Set(state.cars.map(c => c.color).filter(Boolean))].sort();
-  document.getElementById('carColorList').innerHTML = unique.map(v => `<option value="${v}"></option>`).join('');
+const CAR_COLORS = ['ขาว', 'ดำ', 'เงิน', 'เทา', 'แดง', 'น้ำเงิน', 'ฟ้า', 'เขียว', 'เหลือง', 'ส้ม', 'น้ำตาล', 'ทอง', 'บรอนซ์', 'ม่วง', 'ชมพู'];
+
+function populateYearSelect(selectedYear) {
+  const thisYear = new Date().getFullYear();
+  const years = [];
+  for (let y = thisYear + 1; y >= 2005; y--) years.push(y);
+  const extra  = selectedYear && !years.includes(+selectedYear) ? [+selectedYear] : [];
+  const yearEl = document.getElementById('carYear');
+  yearEl.innerHTML = '<option value="">— เลือกปี —</option>' +
+    [...years, ...extra].map(y => `<option value="${y}">${y}</option>`).join('');
+  yearEl.value = selectedYear || '';
+}
+
+function populateColorSelect(selectedColor) {
+  const used   = [...new Set(state.cars.map(c => c.color).filter(Boolean))];
+  const extra  = used.filter(c => !CAR_COLORS.includes(c));
+  const colorEl = document.getElementById('carColor');
+  colorEl.innerHTML = '<option value="">— เลือกสี —</option>' +
+    [...CAR_COLORS, ...extra].map(c => `<option value="${c}">${c}</option>`).join('');
+  colorEl.value = selectedColor || '';
 }
 
 function populateBrandSelect(selectedBrand) {
@@ -423,7 +440,6 @@ function handleCarPhotoUpload(event) {
 }
 
 function openAddCarModal() {
-  populateCarColorList();
   document.getElementById('carModalTitle').textContent = 'เพิ่มรถ';
   document.getElementById('carModalId').value   = '';
   document.getElementById('carPhotoData').value = '';
@@ -433,8 +449,8 @@ function openAddCarModal() {
   document.getElementById('carType').value      = 'sedan';
   populateBrandSelect();
   populateModelSelect();
-  document.getElementById('carYear').value      = '';
-  document.getElementById('carColor').value     = '';
+  populateYearSelect();
+  populateColorSelect();
   document.getElementById('carMileage').value   = '';
   document.getElementById('carNextService').value = '';
   document.getElementById('carDailyRate').value = '';
@@ -446,7 +462,6 @@ function openAddCarModal() {
 function openEditCarModal(id) {
   const car = getCarById(id);
   if (!car) return;
-  populateCarColorList();
   document.getElementById('carModalTitle').textContent    = 'แก้ไขข้อมูลรถ';
   document.getElementById('carModalId').value            = car.id;
   document.getElementById('carPhotoData').value          = car.photo || '';
@@ -458,8 +473,8 @@ function openEditCarModal(id) {
   document.getElementById('carType').value               = car.type || 'sedan';
   populateBrandSelect(car.brand);
   populateModelSelect(car.model);
-  document.getElementById('carYear').value               = car.year || '';
-  document.getElementById('carColor').value              = car.color || '';
+  populateYearSelect(car.year);
+  populateColorSelect(car.color);
   document.getElementById('carMileage').value            = car.mileage;
   document.getElementById('carNextService').value        = car.nextService || '';
   document.getElementById('carDailyRate').value          = car.dailyRate;
