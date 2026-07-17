@@ -472,51 +472,56 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
   padding: 1rem 1.25rem;
 }
 .car-mini-card {
+  position: relative;
+  overflow: hidden;
   border-radius: var(--radius-sm);
-  padding: .75rem;
+  padding: 1rem .75rem .9rem;
   border: 1px solid rgba(255,255,255,0.07);
   background: rgba(255,255,255,0.03);
   backdrop-filter: blur(10px);
   cursor: pointer;
   transition: all .18s;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: .6rem;
+  text-align: center;
+  gap: .25rem;
 }
+/* Car-color gradient: fills the top half of the card and fades into the
+   card background, so the car's real-world color reads at a glance. */
+.car-mini-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 52%;
+  background: linear-gradient(to bottom, var(--car-color, rgba(255,255,255,0.12)), transparent);
+  opacity: .85;
+  pointer-events: none;
+}
+.car-mini-card > * { position: relative; z-index: 1; }
 .car-mini-card:hover {
   transform: translateY(-2px);
   border-color: rgba(250,204,21,0.25);
   box-shadow: 0 4px 20px rgba(250,204,21,0.1), 0 0 0 1px rgba(250,204,21,0.08);
   background: rgba(250,204,21,0.04);
 }
-.car-mini-info { min-width: 0; flex: 1; }
 .car-mini-photo {
-  position: relative;
-  width: 48px;
-  height: 48px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
-  overflow: visible;
+  overflow: hidden;
   flex-shrink: 0;
-  border: 2px solid rgba(255,255,255,0.12);
-  background: rgba(255,255,255,0.05);
+  border: 2px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.08);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(255,255,255,0.35);
-  font-size: 1.1rem;
+  color: rgba(255,255,255,0.4);
+  font-size: 1.4rem;
+  margin-bottom: .4rem;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.25);
 }
 .car-mini-photo img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
-.car-color-dot {
-  position: absolute;
-  bottom: -2px;
-  right: -2px;
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  border: 2px solid var(--gray-50, #0a0a0a);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
-}
 .car-photo-preview {
   width: 64px;
   height: 64px;
@@ -532,18 +537,12 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
   font-size: 1.4rem;
 }
 .car-photo-preview img { width: 100%; height: 100%; object-fit: cover; }
-.car-mini-plate { font-weight: 700; font-size: .9rem; color: var(--gray-900); }
-.car-mini-model { font-size: .78rem; color: var(--gray-500); margin-top: .1rem; }
-.car-mini-owner { font-size: .74rem; color: var(--gray-500); margin-top: .1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.car-mini-owner i { font-size: .65rem; opacity: .7; }
-.car-mini-status {
-  margin-top: .5rem;
-  display: inline-block;
-  font-size: .7rem;
-  font-weight: 700;
-  padding: .15rem .55rem;
-  border-radius: 999px;
-}
+.car-mini-plate { font-weight: 700; font-size: .95rem; color: var(--gray-900); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.car-mini-model { font-size: .8rem; color: var(--gray-700); }
+.car-mini-owner { font-size: .76rem; color: #60a5fa; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Big status word at the bottom of the card; its color comes from the
+   card's .status-* class (which sets `color` on the card itself). */
+.car-mini-status-big { margin-top: .35rem; font-weight: 800; font-size: 1.05rem; line-height: 1; }
 .status-available {
   background: var(--available-bg);
   color: var(--available);
@@ -1451,23 +1450,14 @@ body.is-owner .owner-only { display: flex; }
   .data-table td:nth-child(n+4):not(:last-child) { display: none; }
   .quick-actions-grid { grid-template-columns: repeat(4, 1fr); gap: .5rem; }
 
-  /* Car grid: 2 equal columns, card contents stacked and centered so they
-     stay readable at the narrower card width instead of squeezing the
-     photo circle and text side by side. */
+  /* Car grid: 2 equal columns with compact type sizes for the narrow cards. */
   .car-grid { grid-template-columns: repeat(2, 1fr); gap: .6rem; padding: .75rem; }
-  .car-mini-card {
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    padding: .85rem .6rem;
-    gap: .35rem;
-  }
-  .car-mini-photo { order: -1; width: 56px; height: 56px; font-size: 1.3rem; }
-  .car-mini-info { width: 100%; }
+  .car-mini-card { padding: .85rem .5rem .8rem; }
+  .car-mini-photo { width: 56px; height: 56px; font-size: 1.3rem; }
   .car-mini-plate { font-size: .82rem; line-height: 1.3; }
   .car-mini-model { font-size: .72rem; }
   .car-mini-owner { font-size: .68rem; }
-  .car-mini-status { margin-top: .35rem; }
+  .car-mini-status-big { font-size: .95rem; }
 }
 
 @media (max-width: 480px) {
