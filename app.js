@@ -151,7 +151,10 @@ function initApp() {
   initCustomPickers();
   enhanceAllSelects();
   if (state.sheetsUrl) {
-    loadFromSheets();
+    // If the last session left unsynced local changes (e.g. entered while
+    // offline), start with a full sync (pull+merge+push) instead of a pull.
+    if (localStorage.getItem('pendingPush')) syncNow();
+    else loadFromSheets();
     startSheetsPolling();
   }
 }
@@ -1824,7 +1827,10 @@ function startSheetsPolling() {
   if (!state.sheetsUrl) return;
   sheetsPollTimer = setInterval(() => {
     if (!state.sheetsUrl || state.syncing) return;
-    loadFromSheets(true);
+    // Unsynced local changes pending (offline entry)? Do a full sync so they
+    // reach the sheet; otherwise just pull.
+    if (localStorage.getItem('pendingPush')) syncNow();
+    else loadFromSheets(true);
   }, 15000);
 }
 function stopSheetsPolling() {
@@ -1890,8 +1896,13 @@ async function syncNow() {
       // No Content-Type header = avoids CORS preflight with Google Apps Script
     });
     const json = await res.json();
-    if (json.status === 'ok') setSyncStatus('on');
-    else setSyncStatus('error');
+    if (json.status === 'ok') {
+      // Everything local is now on the sheet — nothing pending anymore.
+      localStorage.removeItem('pendingPush');
+      setSyncStatus('on');
+    } else {
+      setSyncStatus('error');
+    }
   } catch {
     setSyncStatus('error');
   }
@@ -1900,7 +1911,20 @@ async function syncNow() {
 
 // changedCollections is no longer needed (merge handles every collection), but
 // the param is kept so existing call sites don't have to change.
-function pushToSheets(_changedCollections) { if (state.sheetsUrl) syncNow(); }
+function pushToSheets(_changedCollections) {
+  // Persist "there are unsynced local changes" BEFORE trying to sync: if the
+  // device is offline the attempt fails silently, and this flag is what makes
+  // the data push itself later — on reconnect ('online' event), on the next
+  // 15s poll tick, or on the next app start. Cleared only by a successful push.
+  localStorage.setItem('pendingPush', '1');
+  if (state.sheetsUrl) syncNow();
+}
+
+// The moment connectivity returns, push any offline-entered data up instead
+// of waiting for the user's next action.
+window.addEventListener('online', () => {
+  if (state.sheetsUrl && localStorage.getItem('pendingPush')) syncNow();
+});
 
 function refreshApp() {
   if (!state.sheetsUrl) {
