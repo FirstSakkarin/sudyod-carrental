@@ -350,7 +350,7 @@ function renderDashboard() {
   const sortedCars = [...cars].sort((a, b) => (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99));
   const gridEl = document.getElementById('dashboardCarList');
   gridEl.innerHTML = sortedCars.map(car => {
-    const statusLabel = { available: 'ว่าง', rented: 'เช่าอยู่', maintenance: 'ซ่อมบำรุง', blocked: 'ปิดตา' }[car.status] || car.status || '-';
+    const statusLabel = { available: 'ว่าง', rented: 'เช่าอยู่', maintenance: 'ซ่อมบำรุง', blocked: 'งดให้บริการ' }[car.status] || car.status || '-';
     return `
       <div class="car-mini-card status-${car.status}" style="--car-color:${CAR_COLOR_HEX[car.color] || 'rgba(255,255,255,0.12)'}" onclick="openCarDetail('${car.id}')">
         <div class="car-mini-photo">${car.photo ? `<img src="${car.photo}" alt="" />` : vehicleTypeIcon(car.type, car.color)}</div>

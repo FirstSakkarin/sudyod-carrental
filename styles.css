@@ -540,9 +540,16 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
 .car-mini-plate { font-weight: 700; font-size: .95rem; color: var(--gray-900); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .car-mini-model { font-size: .8rem; color: var(--gray-700); }
 .car-mini-owner { font-size: .76rem; color: #60a5fa; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Big status word at the bottom of the card; its color comes from the
-   card's .status-* class (which sets `color` on the card itself). */
+/* Big status word at the bottom of the card, colored per status. */
 .car-mini-status-big { margin-top: .35rem; font-weight: 800; font-size: 1.05rem; line-height: 1; }
+.car-mini-card.status-available   .car-mini-status-big { color: #a4f935; animation: statusBlink 2.2s ease-in-out infinite; }
+.car-mini-card.status-rented      .car-mini-status-big { color: #ff4024; }
+.car-mini-card.status-maintenance .car-mini-status-big { color: #feca25; }
+.car-mini-card.status-blocked     .car-mini-status-big { color: #bfbfbf; }
+@keyframes statusBlink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .4; }
+}
 .status-available {
   background: var(--available-bg);
   color: var(--available);
