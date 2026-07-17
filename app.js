@@ -2038,6 +2038,10 @@ const PICKER_MINUTES = ['00', '15', '30', '45'];
 let pickerActiveInput = null;
 let pickerViewDate    = new Date();
 let pickerTempTime    = { h: '00', m: '00' };
+// When a picker was opened — the tap that opens it can itself fire
+// scroll/resize on mobile (focus scroll-into-view, keyboard dismissing),
+// which must not instantly close what the user just opened.
+let pickerOpenedAt    = 0;
 
 function initCustomPickers() {
   // Convert every date/time input to a plain readonly text field driven
@@ -2052,6 +2056,10 @@ function initCustomPickers() {
     el.setAttribute('inputmode', 'none');
     if (!el.placeholder) el.placeholder = 'เลือกวันที่';
     el.classList.add('dt-field');
+    // Block focus entirely (click still fires): no focus means iOS never
+    // scrolls the field into view or shows a caret — the tap only opens
+    // the popup, nothing else moves.
+    el.addEventListener('mousedown', (e) => e.preventDefault());
     el.addEventListener('click', (e) => { e.stopPropagation(); openDatePicker(el); });
   });
   document.querySelectorAll('input[type="time"]').forEach(el => {
@@ -2060,6 +2068,7 @@ function initCustomPickers() {
     el.setAttribute('inputmode', 'none');
     if (!el.placeholder) el.placeholder = 'เลือกเวลา';
     el.classList.add('dt-field');
+    el.addEventListener('mousedown', (e) => e.preventDefault());
     el.addEventListener('click', (e) => { e.stopPropagation(); openTimePicker(el); });
   });
   document.querySelectorAll('.picker-popup').forEach(el => {
@@ -2068,13 +2077,18 @@ function initCustomPickers() {
   document.addEventListener('click', closePickers);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePickers(); });
   // Close when the page behind scrolls, but not when the scroll happens
-  // inside a popup itself (the time picker's hour/minute lists scroll).
+  // inside a popup itself (the time picker's hour/minute lists scroll),
+  // and not in the instant after opening (see pickerOpenedAt).
   window.addEventListener('scroll', (e) => {
+    if (Date.now() - pickerOpenedAt < 450) return;
     if (document.getElementById('datePickerPopup')?.contains(e.target) ||
         document.getElementById('timePickerPopup')?.contains(e.target)) return;
     closePickers();
   }, true);
-  window.addEventListener('resize', closePickers);
+  window.addEventListener('resize', () => {
+    if (Date.now() - pickerOpenedAt < 450) return;
+    closePickers();
+  });
 }
 
 function closePickers() {
@@ -2089,10 +2103,20 @@ function positionPickerPopup(popup, inputEl) {
   let left = rect.left;
   if (left + width > window.innerWidth - 8) left = window.innerWidth - width - 8;
   popup.style.left = `${Math.max(8, left)}px`;
-  popup.style.top  = `${rect.bottom + 6}px`;
+  // Flip above the field when there's no room below, so the popup never
+  // opens off-screen (off-screen forced the user to scroll = instant close).
+  const height = popup.offsetHeight || 320;
+  const spaceBelow = window.innerHeight - rect.bottom - 14;
+  popup.style.top = (spaceBelow >= height || spaceBelow >= rect.top - 14)
+    ? `${rect.bottom + 6}px`
+    : `${Math.max(8, rect.top - 6 - height)}px`;
 }
 
 function openDatePicker(inputEl) {
+  // Dismiss the keyboard if another field was being typed in; the guard
+  // window absorbs the resize event the closing keyboard fires.
+  if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+  pickerOpenedAt = Date.now();
   pickerActiveInput = inputEl;
   const base = inputEl.value ? new Date(inputEl.value + 'T00:00:00') : new Date();
   pickerViewDate = new Date(base.getFullYear(), base.getMonth(), 1);
@@ -2149,6 +2173,8 @@ function pickDate(dateStr) {
 }
 
 function openTimePicker(inputEl) {
+  if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+  pickerOpenedAt = Date.now();
   pickerActiveInput = inputEl;
   const [h, m] = (inputEl.value || '').split(':');
   pickerTempTime = {
@@ -2216,6 +2242,9 @@ function renderTimePicker() {
 // clipping a panel that lived inside one of those instead of escaping to
 // the viewport like it's supposed to.
 let customSelectActive = null;
+// Same guard as the date/time pickers: the tap that opens the panel can
+// fire scroll/resize (keyboard dismissing) that must not close it instantly.
+let customSelectOpenedAt = 0;
 
 function enhanceAllSelects() {
   document.querySelectorAll('select').forEach(enhanceSelect);
@@ -2265,6 +2294,8 @@ function syncSelectLabel(select) {
 }
 
 function openCustomSelect(select, trigger) {
+  if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+  customSelectOpenedAt = Date.now();
   const panel = document.getElementById('customSelectPanel');
   panel.innerHTML = Array.from(select.options).map((opt, i) => `
     <div class="custom-select-option ${opt.disabled ? 'disabled' : ''} ${i === select.selectedIndex ? 'selected' : ''}"
@@ -2318,11 +2349,15 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAllCu
 // from inside the panel itself, otherwise scrolling a long option list
 // (years, brands...) instantly closes the dropdown.
 window.addEventListener('scroll', (e) => {
+  if (Date.now() - customSelectOpenedAt < 450) return;
   const panel = document.getElementById('customSelectPanel');
   if (panel && (e.target === panel || panel.contains(e.target))) return;
   closeAllCustomSelects();
 }, true);
-window.addEventListener('resize', closeAllCustomSelects);
+window.addEventListener('resize', () => {
+  if (Date.now() - customSelectOpenedAt < 450) return;
+  closeAllCustomSelects();
+});
 
 // Catches every `select.value = ...` assignment app-wide (e.g. modals
 // prefilling a field, goToCarsFiltered() setting the status filter) so the
