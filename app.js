@@ -291,11 +291,11 @@ function renderDashboard() {
     return `
       <div class="car-mini-card status-${car.status}" onclick="openCarDetail('${car.id}')">
         <div class="car-mini-info">
-          <div class="car-mini-plate">${vehicleTypeIcon(car.type)} ${car.plate}</div>
+          <div class="car-mini-plate">${vehicleTypeIcon(car.type, car.color)} ${car.plate}</div>
           <div class="car-mini-model">${car.brand || '-'} ${car.model || '-'} · ${car.color || '-'}</div>
           <span class="car-mini-status pill pill-${car.status}">${statusLabel}</span>
         </div>
-        <div class="car-mini-photo">${car.photo ? `<img src="${car.photo}" alt="" />` : vehicleTypeIcon(car.type)}${carColorDot(car.color)}</div>
+        <div class="car-mini-photo">${car.photo ? `<img src="${car.photo}" alt="" />` : vehicleTypeIcon(car.type, car.color)}${carColorDot(car.color)}</div>
       </div>`;
   }).join('');
 }
@@ -1723,10 +1723,15 @@ const TYPE_LABEL = {
   sedan: 'Sedan', hatchback: 'Hatchback', suv: 'SUV', mpv: 'MPV', ppv: 'PPV',
   van: 'รถตู้', pickup: 'กระบะ', ev: 'EV', motorcycle: 'มอเตอร์ไซค์',
 };
-function vehicleTypeIcon(type) {
+function vehicleTypeIcon(type, color) {
+  const hex = color && CAR_COLOR_HEX[color];
+  // Dark car colors (black, brown, navy, ...) would otherwise vanish against
+  // the icon's own dark circle background, so give colored icons a faint
+  // light halo — invisible on the default gray/orange icons.
+  const glow = hex ? 'filter:drop-shadow(0 0 1px rgba(255,255,255,.6));' : '';
   return type === 'motorcycle'
-    ? `<i class="fa-solid fa-motorcycle" style="color:var(--accent);" title="มอเตอร์ไซค์"></i>`
-    : `<i class="fa-solid fa-car" style="color:var(--gray-400);" title="รถยนต์"></i>`;
+    ? `<i class="fa-solid fa-motorcycle" style="color:${hex || 'var(--accent)'};${glow}" title="มอเตอร์ไซค์"></i>`
+    : `<i class="fa-solid fa-car" style="color:${hex || 'var(--gray-400)'};${glow}" title="รถยนต์"></i>`;
 }
 
 function updateCarStatus(carId, status) {
