@@ -27,6 +27,7 @@ const SHEET_NAMES = {
   bookings:    'Bookings',
   maintenance: 'Maintenance',
   expenses:    'Expenses',
+  extraIncome: 'ExtraIncome',
   catalog:     'VehicleCatalog',
   tombstones:  'Tombstones'
 };
@@ -40,6 +41,7 @@ const HEADERS = {
   bookings:    ['id','carId','customer','phone','start','startTime','pickupLocation','end','endTime','returnLocation','mileageOut','rate','otFee','total','status','note','returnDate','returnTime','returnMileage','kmDriven','extra','finalTotal','returnNote','updatedAt'],
   maintenance: ['id','carId','date','type','mileage','cost','nextService','detail','updatedAt'],
   expenses:    ['id','carId','date','expenseType','amount','detail','updatedAt'],
+  extraIncome: ['id','carId','date','incomeType','amount','detail','updatedAt'],
   catalog:     ['type','brand','model'],
   tombstones:  ['collection','id','updatedAt']
 };
@@ -80,6 +82,7 @@ function handleGet() {
         bookings:    sheetToArray(ss, SHEET_NAMES.bookings,    HEADERS.bookings),
         maintenance: sheetToArray(ss, SHEET_NAMES.maintenance, HEADERS.maintenance),
         expenses:    sheetToArray(ss, SHEET_NAMES.expenses,    HEADERS.expenses),
+        extraIncome: sheetToArray(ss, SHEET_NAMES.extraIncome, HEADERS.extraIncome),
         catalog:     sheetToArray(ss, SHEET_NAMES.catalog,     HEADERS.catalog),
         tombstones:  tombstonesToObject_(sheetToArray(ss, SHEET_NAMES.tombstones, HEADERS.tombstones))
       },
@@ -103,6 +106,7 @@ function handlePost(e) {
     if (body.bookings    !== undefined) arrayToSheet(ss, SHEET_NAMES.bookings,    body.bookings,    HEADERS.bookings);
     if (body.maintenance !== undefined) arrayToSheet(ss, SHEET_NAMES.maintenance, body.maintenance, HEADERS.maintenance);
     if (body.expenses    !== undefined) arrayToSheet(ss, SHEET_NAMES.expenses,    body.expenses,    HEADERS.expenses);
+    if (body.extraIncome !== undefined) arrayToSheet(ss, SHEET_NAMES.extraIncome, body.extraIncome, HEADERS.extraIncome);
     if (body.tombstones  !== undefined) arrayToSheet(ss, SHEET_NAMES.tombstones,  tombstonesToRows_(body.tombstones), HEADERS.tombstones);
 
     // The app just wrote the authoritative full set, so refresh the id snapshot
@@ -227,7 +231,7 @@ function onEdit(e) {
   try {
     var sheet = e.range.getSheet();
     var name  = sheet.getName();
-    var dataSheets = [SHEET_NAMES.cars, SHEET_NAMES.bookings, SHEET_NAMES.maintenance, SHEET_NAMES.expenses];
+    var dataSheets = [SHEET_NAMES.cars, SHEET_NAMES.bookings, SHEET_NAMES.maintenance, SHEET_NAMES.expenses, SHEET_NAMES.extraIncome];
     if (dataSheets.indexOf(name) === -1) return;
     var row = e.range.getRow();
     if (row === 1) return;
@@ -283,7 +287,7 @@ function stampUpdatedAt_(sheet, name, row, editedCol) {
 // Sheet rows [{collection,id,updatedAt}] -> nested object the app expects:
 // { cars: {id: ts}, bookings: {...}, maintenance: {...}, expenses: {...} }
 function tombstonesToObject_(rows) {
-  var out = { cars: {}, bookings: {}, maintenance: {}, expenses: {} };
+  var out = { cars: {}, bookings: {}, maintenance: {}, expenses: {}, extraIncome: {} };
   (rows || []).forEach(function (r) {
     if (!r.collection || !r.id) return;
     if (!out[r.collection]) out[r.collection] = {};
@@ -316,7 +320,7 @@ function tombstonesToRows_(obj) {
    tombstone — exactly as if the row had been deleted from inside the app.
 ───────────────────────────────────────── */
 var ID_SNAPSHOT_SHEET = '_IdSnapshot';
-var TOMBSTONE_COLLECTIONS = ['cars', 'bookings', 'maintenance', 'expenses'];
+var TOMBSTONE_COLLECTIONS = ['cars', 'bookings', 'maintenance', 'expenses', 'extraIncome'];
 
 // Current id set of one sheet: { id: true, ... } (id is always column 1).
 function idsInSheet_(ss, name) {

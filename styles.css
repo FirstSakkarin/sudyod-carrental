@@ -375,6 +375,16 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
 }
 .stat-card > * { position: relative; z-index: 1; }
 .stat-card:hover { transform: translateY(-3px); }
+.stat-sub { font-size: .68rem; opacity: .75; margin-top: .15rem; }
+/* Tappable phone numbers (tel: links) */
+.tel-link { color: #60a5fa; text-decoration: none; border-bottom: 1px dotted rgba(96,165,250,0.45); white-space: nowrap; }
+.tel-link i { font-size: .72em; opacity: .75; }
+.tel-link:hover { color: #93c5fd; border-bottom-color: #93c5fd; }
+/* Tappable locations (Google Maps navigation links) */
+.map-link { color: #34d399; text-decoration: none; border-bottom: 1px dotted rgba(52,211,153,0.45); }
+.map-link i { font-size: .78em; opacity: .8; }
+.map-link:hover { color: #6ee7b7; border-bottom-color: #6ee7b7; }
+.return-location { font-size: .76rem; color: var(--gray-500); margin-top: .15rem; }
 
 /* Stat boxes share the car cards' liquid-glass palette: translucent
    status-tinted gradient + tinted border and glow, white text on top. */
@@ -1035,6 +1045,12 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   z-index: 500;
   max-height: 260px;
   overflow-y: auto;
+  /* Keep touch scrolling inside the panel: without overscroll containment,
+     reaching the list's edge chains the scroll to the page/modal behind,
+     which the close-on-scroll listener then treats as "clicked away". */
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   background: rgba(10,10,10,0.96);
   backdrop-filter: blur(24px) saturate(1.6);
   -webkit-backdrop-filter: blur(24px) saturate(1.6);

@@ -16,6 +16,7 @@ let state = {
   bookings: [],
   maintenance: [],
   expenses: [],
+  extraIncome: [],      // รายได้เสริม: ล้างรถ, เปลี่ยนของเหลว, ส่งต่อคิวรถ ฯลฯ
   customerTags: {},     // { 'name||phone': 'vip' | 'regular' | 'new' | '' }
   sheetsUrl: '',
   syncing: false,
@@ -23,7 +24,7 @@ let state = {
   // Tombstones: { cars: {id: updatedAt}, bookings: {...}, ... } — records the
   // user deleted, so a delete survives a merge instead of being resurrected by
   // the other side's still-present copy. Newest timestamp wins (record vs tomb).
-  tombstones: { cars: {}, bookings: {}, maintenance: {}, expenses: {} },
+  tombstones: { cars: {}, bookings: {}, maintenance: {}, expenses: {}, extraIncome: {} },
   // Guard: never push to the sheet until at least one successful pull has
   // completed this session, so an old/local snapshot can't clobber the sheet
   // before we've even seen what's in it.
@@ -31,7 +32,7 @@ let state = {
 };
 
 // ── Sync helpers ────────────────────────────────────────────────────────
-const SYNC_COLLECTIONS = ['cars', 'bookings', 'maintenance', 'expenses'];
+const SYNC_COLLECTIONS = ['cars', 'bookings', 'maintenance', 'expenses', 'extraIncome'];
 function nowISO() { return new Date().toISOString(); }
 // Stamp a record as "just changed here" so record-level merge knows this copy
 // is newer than whatever is on the other side.
@@ -160,6 +161,7 @@ function loadFromStorage() {
   state.bookings      = JSON.parse(localStorage.getItem('bookings')      || '[]');
   state.maintenance   = JSON.parse(localStorage.getItem('maintenance')   || '[]');
   state.expenses      = JSON.parse(localStorage.getItem('expenses')      || '[]');
+  state.extraIncome   = JSON.parse(localStorage.getItem('extraIncome')   || '[]');
   state.customerTags  = JSON.parse(localStorage.getItem('customerTags')  || '{}');
   state.catalog       = JSON.parse(localStorage.getItem('vehicleCatalog') || 'null');
   const savedTombstones = JSON.parse(localStorage.getItem('tombstones') || 'null');
@@ -172,6 +174,7 @@ function saveToStorage() {
   localStorage.setItem('bookings',     JSON.stringify(state.bookings));
   localStorage.setItem('maintenance',  JSON.stringify(state.maintenance));
   localStorage.setItem('expenses',     JSON.stringify(state.expenses));
+  localStorage.setItem('extraIncome',  JSON.stringify(state.extraIncome));
   localStorage.setItem('customerTags', JSON.stringify(state.customerTags));
   localStorage.setItem('tombstones',   JSON.stringify(state.tombstones));
 }
@@ -313,7 +316,8 @@ function renderDashboard() {
         <div class="return-item">
           <div class="return-item-info">
             <div class="return-plate">${car ? car.plate : '-'} <span style="font-weight:400;color:var(--gray-500);font-size:.8rem;">${car ? car.brand + ' ' + car.model : ''}</span></div>
-            <div class="return-customer">${b.customer} · ${b.phone || '-'}</div>
+            <div class="return-customer">${b.customer} · ${telLink(b.phone)}</div>
+            ${b.pickupLocation ? `<div class="return-location">ส่งที่: ${mapLink(b.pickupLocation)}</div>` : ''}
           </div>
           <div>
             <span class="return-tag">${b.startTime || 'ไม่ระบุเวลา'}</span>
@@ -335,7 +339,8 @@ function renderDashboard() {
         <div class="return-item">
           <div class="return-item-info">
             <div class="return-plate">${car ? car.plate : '-'} <span style="font-weight:400;color:var(--gray-500);font-size:.8rem;">${car ? car.brand + ' ' + car.model : ''}</span></div>
-            <div class="return-customer">${b.customer} · ${b.phone || '-'}</div>
+            <div class="return-customer">${b.customer} · ${telLink(b.phone)}</div>
+            ${b.returnLocation ? `<div class="return-location">รับคืนที่: ${mapLink(b.returnLocation)}</div>` : ''}
           </div>
           <div>
             <span class="return-tag">คืนวันนี้</span>
@@ -665,8 +670,9 @@ function renderBookingsPage() {
             return `
               <tr class="row-clickable" onclick="openEditBookingModal('${b.id}')">
                 <td><strong>${car ? car.plate : '-'}</strong><br><span style="font-size:.78rem;color:var(--gray-400);">${car ? car.brand+' '+car.model : ''}</span></td>
-                <td>${b.customer}<br><span style="font-size:.78rem;color:var(--gray-400);">${b.phone || '-'}</span></td>
-                <td>${b.start}<br>– ${b.end}${isOverdue ? ' <span class="pill pill-overdue" style="font-size:.68rem;">เกินกำหนด</span>' : ''}</td>
+                <td>${b.customer}<br><span style="font-size:.78rem;">${telLink(b.phone)}</span></td>
+                <td>${b.start}<br>– ${b.end}${isOverdue ? ' <span class="pill pill-overdue" style="font-size:.68rem;">เกินกำหนด</span>' : ''}
+                  ${b.pickupLocation || b.returnLocation ? `<br><span style="font-size:.72rem;">${b.pickupLocation ? 'รับ: ' + mapLink(b.pickupLocation) : ''}${b.pickupLocation && b.returnLocation ? ' · ' : ''}${b.returnLocation ? 'คืน: ' + mapLink(b.returnLocation) : ''}</span>` : ''}</td>
                 <td><strong>${(b.status === 'completed' ? (b.finalTotal || b.total || 0) : (b.total || 0)).toLocaleString()} ฿</strong></td>
                 <td><span class="pill pill-${STATUS_PILL[b.status]||'completed'}">${STATUS_LABEL[b.status]||b.status}</span></td>
                 <td>
@@ -887,8 +893,9 @@ function openReturnModal(bookingId) {
   const days  = daysBetween(b.start, b.end);
   document.getElementById('returnSummary').innerHTML = `
     <strong>${car.plate}</strong> ${car.brand || '-'} ${car.model || '-'}<br>
-    ลูกค้า: ${b.customer} · เบอร์: ${b.phone || '-'}<br>
+    ลูกค้า: ${b.customer} · เบอร์: ${telLink(b.phone)}<br>
     วันรับรถ: ${b.start}${b.startTime ? ' ' + b.startTime : ''} · กำหนดคืน: ${b.end}${b.endTime ? ' ' + b.endTime : ''} (${days} วัน)<br>
+    ${b.returnLocation ? `สถานที่คืนรถ: ${mapLink(b.returnLocation)}<br>` : ''}
     เลขไมล์ตอนรับรถ: <strong>${((b.mileageOut ?? car.mileage) || 0).toLocaleString()} กม.</strong><br>
     ยอดเช่า: <strong>${(b.total||0).toLocaleString()} ฿</strong>${b.otFee ? ` (รวม OT ${b.otFee.toLocaleString()} ฿)` : ''}
   `;
@@ -1221,6 +1228,7 @@ function renderFinancePage() {
   const months = [...new Set([
     ...state.bookings.filter(b => b.status === 'completed').map(b => b.returnDate?.slice(0,7) || b.end.slice(0,7)),
     ...state.expenses.map(e => e.date.slice(0,7)),
+    ...state.extraIncome.map(x => (x.date || '').slice(0,7)).filter(Boolean),
   ])].sort().reverse();
   if (monthFilter && monthFilter.options.length <= 1) {
     months.forEach(m => {
@@ -1235,19 +1243,30 @@ function renderFinancePage() {
   if (selectedCar) incomeList = incomeList.filter(b => b.carId === selectedCar);
   if (selectedMonth) incomeList = incomeList.filter(b => (b.returnDate||b.end).startsWith(selectedMonth));
 
+  // Filter extra income (รายได้เสริม — counted into total income, shown tagged)
+  let extraList = state.extraIncome;
+  if (selectedCar)   extraList = extraList.filter(x => x.carId === selectedCar);
+  if (selectedMonth) extraList = extraList.filter(x => (x.date || '').startsWith(selectedMonth));
+
   // Filter expenses
   let expenseList = [...state.expenses, ...state.maintenance.map(m => ({ ...m, expenseType: 'maintenance', amount: m.cost, isMaintenance: true }))];
   if (selectedCar)   expenseList = expenseList.filter(e => e.carId === selectedCar);
   if (selectedMonth) expenseList = expenseList.filter(e => e.date.startsWith(selectedMonth));
 
-  const totalIncome  = incomeList.reduce((s,b) => s + (b.finalTotal || b.total || 0), 0);
+  const rentalIncome = incomeList.reduce((s,b) => s + (b.finalTotal || b.total || 0), 0);
+  const extraIncome  = extraList.reduce((s,x) => s + (x.amount || 0), 0);
+  const totalIncome  = rentalIncome + extraIncome;
   const totalExpense = expenseList.reduce((s,e) => s + (e.amount || e.cost || 0), 0);
   const net = totalIncome - totalExpense;
 
   document.getElementById('financeSummaryCards').innerHTML = `
     <div class="stat-card stat-available">
       <div class="stat-icon"><i class="fa-solid fa-arrow-trend-up"></i></div>
-      <div class="stat-info"><div class="stat-num">${totalIncome.toLocaleString()}</div><div class="stat-label">รายรับ (฿)</div></div>
+      <div class="stat-info">
+        <div class="stat-num">${totalIncome.toLocaleString()}</div>
+        <div class="stat-label">รายรับ (฿)</div>
+        ${extraIncome ? `<div class="stat-sub">ค่าเช่า ${rentalIncome.toLocaleString()} · เสริม ${extraIncome.toLocaleString()}</div>` : ''}
+      </div>
     </div>
     <div class="stat-card stat-maintenance">
       <div class="stat-icon"><i class="fa-solid fa-arrow-trend-down"></i></div>
@@ -1264,6 +1283,15 @@ function renderFinancePage() {
     ...incomeList.map(b => {
       const car = getCarById(b.carId);
       return { date: b.returnDate||b.end, label: `เช่ารถ ${car ? car.plate : '-'} (${b.customer})`, income: b.finalTotal||b.total||0, expense: 0 };
+    }),
+    ...extraList.map(x => {
+      const car = getCarById(x.carId);
+      const typeLabel = INCOME_TYPE_LABEL[x.incomeType] || x.incomeType || 'รายได้เสริม';
+      return {
+        date: x.date,
+        label: `${EXTRA_INCOME_TAG} ${typeLabel}${car ? ' ' + car.plate : ''}${x.detail ? ` <span style="color:var(--gray-500);font-size:.8rem;">· ${x.detail}</span>` : ''}`,
+        income: x.amount || 0, expense: 0, id: x.id, isExtra: true,
+      };
     }),
     ...expenseList.map(e => {
       const car = getCarById(e.carId);
@@ -1290,6 +1318,9 @@ function renderFinancePage() {
               <td class="finance-expense">${r.expense ? r.expense.toLocaleString()+' ฿' : '-'}</td>
               <td>${!r.id ? '' : r.isMaintenance ? `
                 <button class="btn btn-sm btn-danger btn-icon" onclick="deleteMaintenance('${r.id}')" title="ลบ (จัดการรายละเอียดที่หน้าซ่อมบำรุง)"><i class="fa-solid fa-trash"></i></button>
+              ` : r.isExtra ? `
+                <button class="btn btn-sm btn-secondary btn-icon" onclick="openEditExtraIncomeModal('${r.id}')"><i class="fa-solid fa-pen"></i></button>
+                <button class="btn btn-sm btn-danger btn-icon" onclick="deleteExtraIncome('${r.id}')"><i class="fa-solid fa-trash"></i></button>
               ` : `
                 <button class="btn btn-sm btn-secondary btn-icon" onclick="openEditExpenseModal('${r.id}')"><i class="fa-solid fa-pen"></i></button>
                 <button class="btn btn-sm btn-danger btn-icon" onclick="deleteExpense('${r.id}')"><i class="fa-solid fa-trash"></i></button>
@@ -1361,6 +1392,75 @@ function saveExpense() {
   renderFinancePage();
   pushToSheets(['expenses']);
   showToast('บันทึกรายจ่ายเรียบร้อย', 'success');
+}
+
+// ── Extra income (รายได้เสริม) ─────────────────────────────────────────
+// Counted into total income on the finance page but kept as its own
+// collection/sheet so each entry stays visibly tagged as side income.
+
+function openAddExtraIncomeModal() {
+  populateCarSelect('extraIncomeCar', false);
+  document.getElementById('extraIncomeCar').options[0].textContent = '— ไม่ระบุรถ —';
+  document.getElementById('extraIncomeModalTitle').textContent = 'บันทึกรายได้เสริม';
+  document.getElementById('extraIncomeModalId').value = '';
+  document.getElementById('extraIncomeType').value    = 'carwash';
+  document.getElementById('extraIncomeAmount').value  = '';
+  document.getElementById('extraIncomeDate').value    = todayStr();
+  document.getElementById('extraIncomeDetail').value  = '';
+  showModal('extraIncomeModal');
+}
+
+function openEditExtraIncomeModal(id) {
+  const x = state.extraIncome.find(r => r.id === id);
+  if (!x) return;
+  populateCarSelect('extraIncomeCar', false);
+  document.getElementById('extraIncomeCar').options[0].textContent = '— ไม่ระบุรถ —';
+  document.getElementById('extraIncomeModalTitle').textContent = 'แก้ไขรายได้เสริม';
+  document.getElementById('extraIncomeModalId').value = x.id;
+  document.getElementById('extraIncomeType').value    = x.incomeType || 'other';
+  document.getElementById('extraIncomeAmount').value  = x.amount;
+  document.getElementById('extraIncomeDate').value    = x.date;
+  document.getElementById('extraIncomeCar').value     = x.carId || '';
+  document.getElementById('extraIncomeDetail').value  = x.detail || '';
+  showModal('extraIncomeModal');
+}
+
+function deleteExtraIncome(id) {
+  if (!confirm('ต้องการลบรายการนี้?')) return;
+  state.extraIncome = state.extraIncome.filter(x => x.id !== id);
+  markDeleted('extraIncome', id);
+  saveToStorage();
+  renderFinancePage();
+  pushToSheets(['extraIncome']);
+  showToast('ลบรายการเรียบร้อย');
+}
+
+function saveExtraIncome() {
+  const date   = document.getElementById('extraIncomeDate').value;
+  const amount = +document.getElementById('extraIncomeAmount').value || 0;
+  if (!date || !amount) { showToast('กรุณากรอกวันที่และจำนวนเงิน', 'error'); return; }
+
+  const data = {
+    carId:      document.getElementById('extraIncomeCar').value || null,
+    date, amount,
+    incomeType: document.getElementById('extraIncomeType').value,
+    detail:     document.getElementById('extraIncomeDetail').value.trim(),
+    updatedAt:  nowISO(),
+  };
+
+  const id = document.getElementById('extraIncomeModalId').value;
+  if (id) {
+    const idx = state.extraIncome.findIndex(x => x.id === id);
+    if (idx > -1) state.extraIncome[idx] = { ...state.extraIncome[idx], ...data };
+  } else {
+    state.extraIncome.push({ id: 'x' + Date.now(), ...data });
+  }
+
+  saveToStorage();
+  closeModal('extraIncomeModal');
+  renderFinancePage();
+  pushToSheets(['extraIncome']);
+  showToast('บันทึกรายได้เสริมเรียบร้อย', 'success');
 }
 
 // ── Block / Unblock Car ────────────────────────────────────────────────
@@ -1485,7 +1585,7 @@ function renderCustomersPage() {
             return `
               <tr class="row-clickable" onclick="openCustomerDetail('${encodeKey(c.key)}')">
                 <td><strong>${c.name}</strong></td>
-                <td>${c.phone}</td>
+                <td>${telLink(c.phone)}</td>
                 <td><strong style="color:var(--primary);text-shadow:0 0 8px var(--glow-primary-sm);">${c.bookings.length}</strong> ครั้ง</td>
                 <td><strong>${c.totalSpent.toLocaleString()} ฿</strong></td>
                 <td>${c.lastDate || '-'}</td>
@@ -1561,7 +1661,7 @@ function openCustomerDetail(encodedKey) {
 
     <!-- Info row -->
     <div style="display:flex;gap:1rem;flex-wrap:wrap;font-size:.85rem;margin-bottom:1rem;padding:.75rem;background:rgba(255,255,255,0.03);border-radius:var(--radius-sm);border:1px solid rgba(255,255,255,0.06);">
-      <div><i class="fa-solid fa-phone" style="color:var(--gray-500);width:16px;"></i> ${c.phone}</div>
+      <div>${telLink(c.phone)}</div>
       <div><i class="fa-solid fa-calendar" style="color:var(--gray-500);width:16px;"></i> เช่าล่าสุด: <strong>${c.lastDate || '-'}</strong></div>
       ${active.length ? `<div><i class="fa-solid fa-road" style="color:var(--rented);width:16px;"></i> <span style="color:var(--rented);">กำลังเช่าอยู่ ${active.length} รายการ</span></div>` : ''}
       ${upcoming.length ? `<div><i class="fa-solid fa-clock" style="color:var(--maintenance);width:16px;"></i> <span style="color:var(--maintenance);">กำลังจะถึง ${upcoming.length} รายการ</span></div>` : ''}
@@ -1693,6 +1793,7 @@ async function loadFromSheets(silent = false) {
       state.bookings    = mergeById(state.bookings,    d.bookings,    'bookings');
       state.maintenance = mergeById(state.maintenance, d.maintenance, 'maintenance');
       state.expenses    = mergeById(state.expenses,    d.expenses,    'expenses');
+      state.extraIncome = mergeById(state.extraIncome, d.extraIncome, 'extraIncome');
       if (d.catalog?.length) {
         state.catalog = buildVehicleCatalog(d.catalog);
         localStorage.setItem('vehicleCatalog', JSON.stringify(state.catalog));
@@ -1755,6 +1856,7 @@ async function syncNow() {
       state.bookings    = mergeById(state.bookings,    d.bookings,    'bookings');
       state.maintenance = mergeById(state.maintenance, d.maintenance, 'maintenance');
       state.expenses    = mergeById(state.expenses,    d.expenses,    'expenses');
+      state.extraIncome = mergeById(state.extraIncome, d.extraIncome, 'extraIncome');
       state.loadedFromSheets = true;
       pulledOk = true;
       saveToStorage();
@@ -1779,6 +1881,7 @@ async function syncNow() {
       bookings:    state.bookings,
       maintenance: state.maintenance,
       expenses:    state.expenses,
+      extraIncome: state.extraIncome,
       tombstones:  state.tombstones,
     };
     const res  = await fetch(state.sheetsUrl, {
@@ -1835,6 +1938,34 @@ const EXPENSE_TYPE_LABEL = {
   insurance: 'ประกันภัย', tax: 'ภาษีรถ', fuel: 'น้ำมัน',
   maintenance: 'ซ่อมบำรุง', cleaning: 'ทำความสะอาด', other: 'อื่นๆ',
 };
+const INCOME_TYPE_LABEL = {
+  carwash: 'ล้างรถ', fluid: 'เปลี่ยนของเหลวรถยนต์', queue: 'ส่งต่อคิวรถ', other: 'อื่นๆ',
+};
+// Small pill prefixed to finance-table rows so side income is never mistaken
+// for rental income even though both count into the same total.
+const EXTRA_INCOME_TAG = '<span style="display:inline-block;font-size:.68rem;font-weight:700;padding:.05rem .45rem;border-radius:999px;background:rgba(164,249,53,0.14);color:#a4f935;">เสริม</span>';
+// Renders a phone number as a tel: link so tapping it opens the phone app
+// ready to dial. stopPropagation keeps the tap from also triggering the
+// clickable row/card the number usually sits inside.
+function telLink(phone) {
+  if (!phone) return '-';
+  const digits = String(phone).replace(/[^\d+]/g, '');
+  if (!digits) return phone;
+  return `<a href="tel:${digits}" class="tel-link" onclick="event.stopPropagation()"><i class="fa-solid fa-phone"></i> ${phone}</a>`;
+}
+
+// Renders a pickup/return location as a Google-Maps navigation link.
+// Accepts either a pasted Maps URL (used as-is; leftover text becomes the
+// label) or a plain place name (turned into a Maps search so it still
+// navigates). stopPropagation keeps clickable rows from also firing.
+function mapLink(loc) {
+  if (!loc) return '-';
+  const urlMatch = String(loc).match(/https?:\/\/\S+/);
+  const url   = urlMatch ? urlMatch[0] : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc)}`;
+  const label = urlMatch ? (String(loc).replace(urlMatch[0], '').trim() || 'นำทาง') : loc;
+  return `<a href="${url}" target="_blank" rel="noopener" class="map-link" onclick="event.stopPropagation()"><i class="fa-solid fa-location-dot"></i> ${label}</a>`;
+}
+
 function vehicleTypeIcon(type, color) {
   const hex = color && CAR_COLOR_HEX[color];
   // Dark car colors (black, brown, navy, ...) would otherwise vanish against
@@ -2131,7 +2262,18 @@ function positionSelectPanel(panel, trigger) {
   let left = rect.left;
   if (left + rect.width > window.innerWidth - 8) left = window.innerWidth - rect.width - 8;
   panel.style.left = `${Math.max(8, left)}px`;
-  panel.style.top  = `${rect.bottom + 6}px`;
+
+  // Open downward when there's room; otherwise flip above the trigger.
+  // Either way, cap the height to the available space so the whole list is
+  // reachable by scrolling inside the panel instead of running off-screen.
+  const spaceBelow = window.innerHeight - rect.bottom - 14;
+  const spaceAbove = rect.top - 14;
+  const openDown   = spaceBelow >= Math.min(panel.scrollHeight, 160) || spaceBelow >= spaceAbove;
+  const maxH       = Math.max(120, Math.min(260, openDown ? spaceBelow : spaceAbove));
+  panel.style.maxHeight = `${maxH}px`;
+  panel.style.top = openDown
+    ? `${rect.bottom + 6}px`
+    : `${Math.max(8, rect.top - 6 - Math.min(maxH, panel.scrollHeight))}px`;
 }
 
 function closeAllCustomSelects() {
@@ -2152,7 +2294,14 @@ document.getElementById('customSelectPanel')?.addEventListener('click', (e) => {
 
 document.addEventListener('click', closeAllCustomSelects);
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAllCustomSelects(); });
-window.addEventListener('scroll', closeAllCustomSelects, true);
+// Close when the page/modal behind scrolls — but NOT when the scroll comes
+// from inside the panel itself, otherwise scrolling a long option list
+// (years, brands...) instantly closes the dropdown.
+window.addEventListener('scroll', (e) => {
+  const panel = document.getElementById('customSelectPanel');
+  if (panel && (e.target === panel || panel.contains(e.target))) return;
+  closeAllCustomSelects();
+}, true);
 window.addEventListener('resize', closeAllCustomSelects);
 
 // Catches every `select.value = ...` assignment app-wide (e.g. modals
