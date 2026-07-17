@@ -617,8 +617,10 @@ function openAddBookingModal() {
   document.getElementById('bookingReturnLocation').value  = '';
   document.getElementById('bookingMileageOut').value = '';
   document.getElementById('bookingRate').value       = '';
+  document.getElementById('bookingOtFee').value      = '';
   document.getElementById('bookingNote').value       = '';
   document.getElementById('bookingTotalBox').style.display = 'none';
+  updateBookingHints();
   showModal('bookingModal');
 }
 
@@ -639,9 +641,36 @@ function openEditBookingModal(id) {
   document.getElementById('bookingReturnLocation').value  = b.returnLocation || '';
   document.getElementById('bookingMileageOut').value = b.mileageOut || '';
   document.getElementById('bookingRate').value       = b.rate || '';
+  document.getElementById('bookingOtFee').value      = b.otFee || '';
   document.getElementById('bookingNote').value       = b.note || '';
   calcBookingTotal();
   showModal('bookingModal');
+}
+
+// Rough business-hours check used only to nudge staff toward an OT charge —
+// doesn't block or auto-add anything, since OT policy/amount is their call.
+function isOffHours(timeStr) {
+  if (!timeStr) return false;
+  const h = +timeStr.split(':')[0];
+  return h < 8 || h >= 20;
+}
+
+function updateBookingHints() {
+  const start     = document.getElementById('bookingStart').value;
+  const startTime = document.getElementById('bookingStartTime').value;
+  const endTime   = document.getElementById('bookingEndTime').value;
+  const today     = todayStr();
+
+  const mileageHint = document.getElementById('mileageOutHint');
+  mileageHint.style.display = (start && start <= today) ? 'inline' : 'none';
+
+  const otHint = document.getElementById('otHint');
+  if (isOffHours(startTime) || isOffHours(endTime)) {
+    otHint.textContent = '⚠ เวลานอกเวลาทำการ อาจมีค่า OT';
+    otHint.style.display = 'inline';
+  } else {
+    otHint.style.display = 'none';
+  }
 }
 
 function calcBookingTotal() {
@@ -649,7 +678,10 @@ function calcBookingTotal() {
   const end   = document.getElementById('bookingEnd').value;
   const carId = document.getElementById('bookingCar').value;
   const rateOverride = +document.getElementById('bookingRate').value || 0;
+  const otFee = +document.getElementById('bookingOtFee').value || 0;
   const box   = document.getElementById('bookingTotalBox');
+
+  updateBookingHints();
 
   if (!start || !end || !carId) { box.style.display = 'none'; return; }
 
@@ -658,11 +690,24 @@ function calcBookingTotal() {
 
   const car  = getCarById(carId);
   const rate = rateOverride || (car ? car.dailyRate : 0);
-  const total = days * rate;
+  const total = days * rate + otFee;
 
   document.getElementById('bookingDays').textContent  = days;
-  document.getElementById('bookingTotal').textContent = '฿' + total.toLocaleString();
+  document.getElementById('bookingTotal').textContent = '฿' + total.toLocaleString() + (otFee ? ` (รวม OT ${otFee.toLocaleString()} ฿)` : '');
   box.style.display = 'flex';
+}
+
+// A car can't legitimately be handed to two customers over the same span —
+// same-day turnover (one ends exactly when the other starts) is fine and
+// handled by the Booking search's queue view, so only flag a *strict*
+// overlap, matching the definition computeAvailability() already uses.
+function findBookingConflict(carId, start, end, excludeId) {
+  return state.bookings.find(b =>
+    b.carId === carId &&
+    b.id !== excludeId &&
+    b.status !== 'completed' &&
+    b.start < end && b.end > start
+  );
 }
 
 function saveBooking() {
@@ -671,43 +716,61 @@ function saveBooking() {
   const start    = document.getElementById('bookingStart').value;
   const end      = document.getElementById('bookingEnd').value;
   if (!carId || !customer || !start || !end) { showToast('กรุณากรอกข้อมูลที่จำเป็น', 'error'); return; }
+  if (end < start) { showToast('วันคืนรถต้องไม่ก่อนวันรับรถ', 'error'); return; }
+
+  const id    = document.getElementById('bookingModalId').value;
+  const today = todayStr();
+  const status = start <= today ? 'active' : 'upcoming';
+
+  const mileageOut = +document.getElementById('bookingMileageOut').value || null;
+  if (status === 'active' && !mileageOut) {
+    showToast('กรุณากรอกเลขไมล์ออก (จำเป็นเมื่อรับรถวันนี้หรือก่อนหน้า)', 'error');
+    return;
+  }
+
+  const conflict = findBookingConflict(carId, start, end, id || null);
+  if (conflict) {
+    const proceed = confirm(
+      `รถคันนี้ถูกจองซ้อนกับ ${conflict.customer} ช่วง ${conflict.start} – ${conflict.end} อยู่แล้ว\n` +
+      `ต้องการบันทึกทับซ้อนต่อหรือไม่?`
+    );
+    if (!proceed) return;
+  }
 
   const car   = getCarById(carId);
   const days  = daysBetween(start, end);
   const rateOverride = +document.getElementById('bookingRate').value || 0;
   const rate  = rateOverride || (car ? car.dailyRate : 0);
-  const total = days * rate;
-
-  const id   = document.getElementById('bookingModalId').value;
-  const today = todayStr();
-  const status = start <= today ? 'active' : 'upcoming';
+  const otFee = +document.getElementById('bookingOtFee').value || 0;
+  const total = days * rate + otFee;
 
   const data = {
-    carId, customer, start, end, rate, total, status,
+    carId, customer, start, end, rate, total, status, otFee,
     startTime:       document.getElementById('bookingStartTime').value || '',
     endTime:         document.getElementById('bookingEndTime').value || '',
     pickupLocation:  document.getElementById('bookingPickupLocation').value.trim(),
     returnLocation:  document.getElementById('bookingReturnLocation').value.trim(),
     phone:        document.getElementById('bookingPhone').value.trim(),
-    mileageOut:   +document.getElementById('bookingMileageOut').value || null,
+    mileageOut,
     note:         document.getElementById('bookingNote').value.trim(),
     extra: 0, returnMileage: null,
   };
 
+  let touchedCar = false;
   if (id) {
     const idx = state.bookings.findIndex(b => b.id === id);
     if (idx > -1) state.bookings[idx] = { ...state.bookings[idx], ...data };
   } else {
     state.bookings.push({ id: 'b' + Date.now(), ...data });
     // Mark car as rented if active
-    if (status === 'active') updateCarStatus(carId, 'rented');
+    if (status === 'active') { updateCarStatus(carId, 'rented'); touchedCar = true; }
   }
 
   saveToStorage();
   closeModal('bookingModal');
   renderBookingsPage();
   renderDashboard();
-  pushToSheets(['bookings', 'cars']);
+  pushToSheets(touchedCar ? ['bookings', 'cars'] : ['bookings']);
   showToast(id ? 'อัปเดตการจองเรียบร้อย' : 'เพิ่มการจองเรียบร้อย', 'success');
 }
 
@@ -729,6 +792,7 @@ function openReturnModal(bookingId) {
 
   document.getElementById('returnBookingId').value = bookingId;
   document.getElementById('returnDate').value      = todayStr();
+  document.getElementById('returnTime').value      = '';
   document.getElementById('returnMileage').value   = '';
   document.getElementById('returnExtra').value     = '0';
   document.getElementById('returnNote').value      = '';
@@ -739,9 +803,9 @@ function openReturnModal(bookingId) {
   document.getElementById('returnSummary').innerHTML = `
     <strong>${car.plate}</strong> ${car.brand || '-'} ${car.model || '-'}<br>
     ลูกค้า: ${b.customer} · เบอร์: ${b.phone || '-'}<br>
-    วันรับรถ: ${b.start} · กำหนดคืน: ${b.end} (${days} วัน)<br>
+    วันรับรถ: ${b.start}${b.startTime ? ' ' + b.startTime : ''} · กำหนดคืน: ${b.end}${b.endTime ? ' ' + b.endTime : ''} (${days} วัน)<br>
     เลขไมล์ตอนรับรถ: <strong>${((b.mileageOut ?? car.mileage) || 0).toLocaleString()} กม.</strong><br>
-    ยอดเช่า: <strong>${(b.total||0).toLocaleString()} ฿</strong>
+    ยอดเช่า: <strong>${(b.total||0).toLocaleString()} ฿</strong>${b.otFee ? ` (รวม OT ${b.otFee.toLocaleString()} ฿)` : ''}
   `;
   showModal('returnModal');
 }
@@ -777,6 +841,7 @@ function updateReturnKmPreview() {
 function confirmReturn() {
   const bookingId   = document.getElementById('returnBookingId').value;
   const returnDate  = document.getElementById('returnDate').value;
+  const returnTime  = document.getElementById('returnTime').value || '';
   const returnMile  = +document.getElementById('returnMileage').value || null;
   const extra       = +document.getElementById('returnExtra').value  || 0;
   const returnNote  = document.getElementById('returnNote').value.trim();
@@ -786,13 +851,14 @@ function confirmReturn() {
 
   const b   = state.bookings[idx];
   const car = getCarById(b.carId);
+  if (returnDate < b.start) { showToast('วันคืนรถต้องไม่ก่อนวันรับรถ', 'error'); return; }
   const days = daysBetween(b.start, returnDate);
-  const finalTotal = (days * b.rate) + extra;
+  const finalTotal = (days * b.rate) + (b.otFee || 0) + extra;
 
   const baseline = returnMileageBaseline(b, car);
   const kmDriven = (returnMile !== null && baseline !== null && baseline !== undefined) ? (returnMile - baseline) : null;
 
-  state.bookings[idx] = { ...b, status: 'completed', returnDate, returnMileage: returnMile, kmDriven, extra, finalTotal, returnNote };
+  state.bookings[idx] = { ...b, status: 'completed', returnDate, returnTime, returnMileage: returnMile, kmDriven, extra, finalTotal, returnNote };
 
   // Update car mileage & status
   const carIdx = state.cars.findIndex(c => c.id === b.carId);
@@ -1954,11 +2020,5 @@ function showToast(msg, type = '') {
 document.addEventListener('click', e => {
   if (e.target.classList.contains('modal-overlay')) {
     e.target.style.display = 'none';
-  }
-});
-// Enter key on login
-document.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && document.getElementById('loginScreen').style.display !== 'none') {
-    handleLogin();
   }
 });

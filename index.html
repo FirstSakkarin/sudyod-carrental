@@ -526,14 +526,14 @@
             <label>วันรับรถ *</label>
             <div style="display:flex;gap:.5rem;">
               <input type="date" id="bookingStart" onchange="calcBookingTotal()" style="flex:2;" />
-              <input type="time" id="bookingStartTime" title="เวลารับรถ" style="flex:1;" />
+              <input type="time" id="bookingStartTime" title="เวลารับรถ" style="flex:1;" onchange="calcBookingTotal()" />
             </div>
           </div>
           <div class="form-group">
             <label>วันคืนรถ *</label>
             <div style="display:flex;gap:.5rem;">
               <input type="date" id="bookingEnd" onchange="calcBookingTotal()" style="flex:2;" />
-              <input type="time" id="bookingEndTime" title="เวลาคืนรถ" style="flex:1;" />
+              <input type="time" id="bookingEndTime" title="เวลาคืนรถ" style="flex:1;" onchange="calcBookingTotal()" />
             </div>
           </div>
         </div>
@@ -547,14 +547,18 @@
             <input type="text" id="bookingReturnLocation" placeholder="เช่น สำนักงาน" />
           </div>
         </div>
-        <div class="form-row">
+        <div class="form-row-3">
           <div class="form-group">
-            <label>เลขไมล์ออก (กม.)</label>
+            <label>เลขไมล์ออก (กม.) <span id="mileageOutHint" class="hint-required" style="display:none;">* จำเป็นถ้ารับรถวันนี้/ก่อนหน้า</span></label>
             <input type="number" id="bookingMileageOut" placeholder="เลขไมล์ตอนออกรถ" />
           </div>
           <div class="form-group">
             <label>ราคาพิเศษ/วัน <small>(ว่างไว้ = ราคาปกติ)</small></label>
             <input type="number" id="bookingRate" placeholder="บาท/วัน" oninput="calcBookingTotal()" />
+          </div>
+          <div class="form-group">
+            <label>ค่า OT (บาท) <span id="otHint" class="hint-note" style="display:none;"></span></label>
+            <input type="number" id="bookingOtFee" placeholder="0" oninput="calcBookingTotal()" />
           </div>
         </div>
         <div class="booking-total-box" id="bookingTotalBox" style="display:none;">
@@ -587,7 +591,10 @@
         <div class="form-row">
           <div class="form-group">
             <label>วันคืนจริง</label>
-            <input type="date" id="returnDate" />
+            <div style="display:flex;gap:.5rem;">
+              <input type="date" id="returnDate" style="flex:2;" />
+              <input type="time" id="returnTime" title="เวลาคืนจริง" style="flex:1;" />
+            </div>
           </div>
           <div class="form-group">
             <label>เลขไมล์ตอนคืน (กม.)</label>
@@ -596,8 +603,8 @@
           </div>
         </div>
         <div class="form-group">
-          <label>ค่าใช้จ่ายเพิ่มเติม (บาท)</label>
-          <input type="number" id="returnExtra" value="0" placeholder="ค่าทำความสะอาด, น้ำมัน ฯลฯ" />
+          <label>ค่าใช้จ่ายเพิ่มเติม (บาท) <small>(ทำความสะอาด, น้ำมัน, OT คืนดึก ฯลฯ)</small></label>
+          <input type="number" id="returnExtra" value="0" placeholder="ค่าทำความสะอาด, น้ำมัน, ค่า OT ฯลฯ" />
         </div>
         <div class="form-group">
           <label>หมายเหตุการคืน</label>

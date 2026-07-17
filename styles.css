@@ -809,6 +809,8 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
 /* ========== FORMS ========== */
 .form-group { display: flex; flex-direction: column; gap: .3rem; margin-bottom: .9rem; }
 .form-group label { font-size: .82rem; font-weight: 600; color: var(--gray-600); }
+.hint-required { font-size: .7rem; font-weight: 700; color: var(--danger); }
+.hint-note { font-size: .7rem; font-weight: 700; color: var(--maintenance); }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
 .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .75rem; }
 
