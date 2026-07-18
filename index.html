@@ -540,6 +540,10 @@
             <input type="text" id="bookingPhone" placeholder="08X-XXX-XXXX" />
           </div>
         </div>
+        <div class="form-group">
+          <label>ที่อยู่ลูกค้า</label>
+          <textarea id="bookingCustomerAddress" rows="2" placeholder="ที่อยู่ลูกค้า..."></textarea>
+        </div>
         <div class="form-row">
           <div class="form-group">
             <label>วันรับรถ *</label>
@@ -580,10 +584,25 @@
             <input type="number" id="bookingOtFee" placeholder="0" oninput="calcBookingTotal()" />
           </div>
         </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>เงินประกัน (บาท)</label>
+            <input type="number" id="bookingDeposit" placeholder="0" oninput="calcBookingTotal()" />
+          </div>
+          <div class="form-group">
+            <label>โอนจอง (บาท)</label>
+            <input type="number" id="bookingAdvance" placeholder="0" oninput="calcBookingTotal()" />
+          </div>
+        </div>
         <div class="booking-total-box" id="bookingTotalBox" style="display:none;">
           <i class="fa-solid fa-receipt"></i>
           รวม <strong id="bookingDays">0</strong> วัน &nbsp;=&nbsp;
           <strong class="total-amount" id="bookingTotal">฿0</strong>
+        </div>
+        <div class="booking-total-box" id="bookingPickupPaymentBox" style="display:none;">
+          <i class="fa-solid fa-hand-holding-dollar"></i>
+          ยอดชำระวันรับรถ &nbsp;=&nbsp;
+          <strong class="total-amount" id="bookingPickupPayment">฿0</strong>
         </div>
         <div class="form-group">
           <label>หมายเหตุ</label>

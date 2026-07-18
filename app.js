@@ -701,6 +701,7 @@ function openAddBookingModal() {
   document.getElementById('bookingModalId').value    = '';
   document.getElementById('bookingCustomer').value   = '';
   document.getElementById('bookingPhone').value      = '';
+  document.getElementById('bookingCustomerAddress').value = '';
   document.getElementById('bookingStart').value      = '';
   document.getElementById('bookingStartTime').value  = '';
   document.getElementById('bookingEnd').value        = '';
@@ -710,8 +711,11 @@ function openAddBookingModal() {
   document.getElementById('bookingMileageOut').value = '';
   document.getElementById('bookingRate').value       = '';
   document.getElementById('bookingOtFee').value      = '';
+  document.getElementById('bookingDeposit').value    = '';
+  document.getElementById('bookingAdvance').value    = '';
   document.getElementById('bookingNote').value       = '';
   document.getElementById('bookingTotalBox').style.display = 'none';
+  document.getElementById('bookingPickupPaymentBox').style.display = 'none';
   updateBookingHints();
   showModal('bookingModal');
 }
@@ -725,6 +729,7 @@ function openEditBookingModal(id) {
   document.getElementById('bookingCar').value        = b.carId;
   document.getElementById('bookingCustomer').value   = b.customer;
   document.getElementById('bookingPhone').value      = b.phone || '';
+  document.getElementById('bookingCustomerAddress').value = b.customerAddress || '';
   document.getElementById('bookingStart').value      = b.start;
   document.getElementById('bookingStartTime').value  = b.startTime || '';
   document.getElementById('bookingEnd').value        = b.end;
@@ -734,6 +739,8 @@ function openEditBookingModal(id) {
   document.getElementById('bookingMileageOut').value = b.mileageOut || '';
   document.getElementById('bookingRate').value       = b.rate || '';
   document.getElementById('bookingOtFee').value      = b.otFee || '';
+  document.getElementById('bookingDeposit').value    = b.deposit || '';
+  document.getElementById('bookingAdvance').value    = b.bookingDeposit || '';
   document.getElementById('bookingNote').value       = b.note || '';
   calcBookingTotal();
   showModal('bookingModal');
@@ -771,22 +778,31 @@ function calcBookingTotal() {
   const carId = document.getElementById('bookingCar').value;
   const rateOverride = +document.getElementById('bookingRate').value || 0;
   const otFee = +document.getElementById('bookingOtFee').value || 0;
-  const box   = document.getElementById('bookingTotalBox');
+  const deposit = +document.getElementById('bookingDeposit').value || 0;
+  const advance = +document.getElementById('bookingAdvance').value || 0;
+  const box       = document.getElementById('bookingTotalBox');
+  const pickupBox = document.getElementById('bookingPickupPaymentBox');
 
   updateBookingHints();
 
-  if (!start || !end || !carId) { box.style.display = 'none'; return; }
+  if (!start || !end || !carId) { box.style.display = 'none'; pickupBox.style.display = 'none'; return; }
 
   const days = daysBetween(start, end);
-  if (days <= 0) { box.style.display = 'none'; return; }
+  if (days <= 0) { box.style.display = 'none'; pickupBox.style.display = 'none'; return; }
 
   const car  = getCarById(carId);
   const rate = rateOverride || (car ? car.dailyRate : 0);
-  const total = days * rate + otFee;
+  const rentalCost = days * rate;
+  const total = rentalCost + otFee;
 
   document.getElementById('bookingDays').textContent  = days;
   document.getElementById('bookingTotal').textContent = '฿' + total.toLocaleString() + (otFee ? ` (รวม OT ${otFee.toLocaleString()} ฿)` : '');
   box.style.display = 'flex';
+
+  // ยอดชำระวันรับรถ = (ค่าเช่า×วัน) + เงินประกัน - เงินจอง (OT ตัดสินตอนคืนรถ จึงไม่รวมที่นี่)
+  const pickupPayment = rentalCost + deposit - advance;
+  document.getElementById('bookingPickupPayment').textContent = '฿' + pickupPayment.toLocaleString();
+  pickupBox.style.display = (deposit || advance) ? 'flex' : 'none';
 }
 
 // A car can't legitimately be handed to two customers over the same span —
@@ -842,7 +858,10 @@ function saveBooking() {
     endTime:         document.getElementById('bookingEndTime').value || '',
     pickupLocation:  document.getElementById('bookingPickupLocation').value.trim(),
     returnLocation:  document.getElementById('bookingReturnLocation').value.trim(),
-    phone:        document.getElementById('bookingPhone').value.trim(),
+    phone:            document.getElementById('bookingPhone').value.trim(),
+    customerAddress:  document.getElementById('bookingCustomerAddress').value.trim(),
+    deposit:          +document.getElementById('bookingDeposit').value || 0,
+    bookingDeposit:   +document.getElementById('bookingAdvance').value || 0,
     mileageOut,
     note:         document.getElementById('bookingNote').value.trim(),
     extra: 0, returnMileage: null,
@@ -901,6 +920,7 @@ function openReturnModal(bookingId) {
     ${b.returnLocation ? `สถานที่คืนรถ: ${mapLink(b.returnLocation)}<br>` : ''}
     เลขไมล์ตอนรับรถ: <strong>${((b.mileageOut ?? car.mileage) || 0).toLocaleString()} กม.</strong><br>
     ยอดเช่า: <strong>${(b.total||0).toLocaleString()} ฿</strong>${b.otFee ? ` (รวม OT ${b.otFee.toLocaleString()} ฿)` : ''}
+    ${b.deposit ? `<br>เงินประกัน: <strong>${b.deposit.toLocaleString()} ฿</strong>` : ''}
   `;
   showModal('returnModal');
 }

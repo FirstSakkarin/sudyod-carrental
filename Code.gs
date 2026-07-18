@@ -38,7 +38,7 @@ const SHEET_NAMES = {
 // edit here is never overwritten by an older snapshot from a device.
 const HEADERS = {
   cars:        ['id','plate','brand','model','type','year','color','mileage','nextService','dailyRate','status','ownerName','note','blockedUntil','blockedReason','updatedAt'],
-  bookings:    ['id','carId','customer','phone','start','startTime','pickupLocation','end','endTime','returnLocation','mileageOut','rate','otFee','total','status','note','returnDate','returnTime','returnMileage','kmDriven','extra','finalTotal','returnNote','updatedAt'],
+  bookings:    ['id','carId','customer','phone','customerAddress','start','startTime','pickupLocation','end','endTime','returnLocation','mileageOut','rate','otFee','total','deposit','bookingDeposit','status','note','returnDate','returnTime','returnMileage','kmDriven','extra','finalTotal','returnNote','updatedAt'],
   maintenance: ['id','carId','date','type','mileage','cost','nextService','detail','updatedAt'],
   expenses:    ['id','carId','date','expenseType','amount','detail','updatedAt'],
   extraIncome: ['id','carId','date','incomeType','amount','detail','updatedAt'],
