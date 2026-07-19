@@ -744,11 +744,43 @@ function renderGanttChart() {
 }
 
 // Cars belonging to the active tab (รถยนต์/มอเตอร์ไซค์), minus any car
-// already tied up on a long-term booking — see GANTT_LONG_TERM_DAYS.
+// already tied up on a long-term booking — see GANTT_LONG_TERM_DAYS. Sorted
+// by model (then plate) rather than plate/insertion order — "รุ่นรถมาก่อน
+// ทะเบียน": grouping same-model cars together is what makes a swap
+// suggestion (see findSwapCandidates) legible at a glance, since the
+// candidate car is right there in an adjacent row.
 function ganttCarsInScope() {
-  return state.cars.filter(car =>
-    (ganttVehicleType === 'motorcycle' ? car.type === 'motorcycle' : car.type !== 'motorcycle') &&
-    !hasLongTermBooking(car.id)
+  return state.cars
+    .filter(car =>
+      (ganttVehicleType === 'motorcycle' ? car.type === 'motorcycle' : car.type !== 'motorcycle') &&
+      !hasLongTermBooking(car.id)
+    )
+    .sort((a, b) =>
+      (a.brand || '').localeCompare(b.brand || '') ||
+      (a.model || '').localeCompare(b.model || '') ||
+      a.plate.localeCompare(b.plate)
+    );
+}
+
+// Same-model cars are interchangeable from the customer's point of view, so
+// a "double-booked" car isn't necessarily a real problem — it's only a real
+// problem if there's no OTHER car of the same model free to take one of the
+// two bookings instead. This is the core lookup behind that: cars of the
+// same brand+model as `booking`'s car, excluding that car itself, anything
+// out of service (maintenance/blocked/long-term-leased), and anything that
+// itself has a conflicting booking during `booking`'s own window.
+function findSwapCandidates(booking, excludeCarId) {
+  const car = getCarById(excludeCarId ?? booking.carId);
+  if (!car) return [];
+  return state.cars.filter(c =>
+    c.id !== car.id &&
+    c.brand === car.brand && c.model === car.model &&
+    c.status !== 'maintenance' && c.status !== 'blocked' &&
+    !hasLongTermBooking(c.id) &&
+    !state.bookings.some(other =>
+      other.carId === c.id && other.status !== 'completed' && other.id !== booking.id &&
+      other.start < booking.end && other.end > booking.start
+    )
   );
 }
 
@@ -803,31 +835,50 @@ function renderGanttDayView(date) {
       const isDifferentBooking = next && e.booking.id !== next.booking.id;
 
       // Impossible ordering: this car was handed to a new customer (deliver)
-      // before a different booking's return — always a hard conflict, no
-      // matter the gap, since two customers can't hold the same car at once.
+      // before a different booking's return. Hard conflict UNLESS another
+      // car of the same model is free for the new customer's booking —
+      // then it's a reassignment, not a dead end (see findSwapCandidates).
       if (isDifferentBooking && e.type === 'deliver' && next.type === 'return') {
         const h = timeToHourFloat(e.time);
         const leftPct = h === null ? 1 : ((h - minHour) / HOURS) * 100;
-        const title = `${car.plate}\n⚠ ส่งมอบให้ ${e.booking.customer} ${e.time || ''} ก่อนรับคืนจาก ${next.booking.customer} ${next.time || ''}\nรถคันเดียวกันอยู่กับ 2 ลูกค้าพร้อมกัน ตรวจสอบด่วน`;
-        parts.push(`<div class="gantt-event gantt-gap-critical" style="left:${leftPct}%;" title="${title.replace(/"/g, '&quot;')}" onclick="openEditBookingModal('${e.booking.id}')">
-          <i class="fa-solid fa-triangle-exclamation"></i> ${e.time || '-'} ส่งมอบ ${e.booking.customer} ← ก่อนคืนจาก ${next.booking.customer} ${next.time || ''}
-        </div>`);
+        const swapCars = findSwapCandidates(e.booking, car.id);
+        if (swapCars.length) {
+          const title = `${car.plate}\n⇄ ส่งมอบให้ ${e.booking.customer} ${e.time || ''} ก่อนรับคืนจาก ${next.booking.customer} ${next.time || ''}\nสลับไปคันอื่นได้: ${swapCars.map(c => c.plate).join(', ')}`;
+          parts.push(`<div class="gantt-event gantt-gap-swappable" style="left:${leftPct}%;" title="${title.replace(/"/g, '&quot;')}" onclick="openEditBookingModal('${e.booking.id}')">
+            <i class="fa-solid fa-right-left"></i> ${e.time || '-'} ส่งมอบ ${e.booking.customer} ← สลับได้
+          </div>`);
+        } else {
+          const title = `${car.plate}\n⚠ ส่งมอบให้ ${e.booking.customer} ${e.time || ''} ก่อนรับคืนจาก ${next.booking.customer} ${next.time || ''}\nรถคันเดียวกันอยู่กับ 2 ลูกค้าพร้อมกัน ไม่มีรถรุ่นเดียวกันว่างให้สลับ ตรวจสอบด่วน`;
+          parts.push(`<div class="gantt-event gantt-gap-critical" style="left:${leftPct}%;" title="${title.replace(/"/g, '&quot;')}" onclick="openEditBookingModal('${e.booking.id}')">
+            <i class="fa-solid fa-triangle-exclamation"></i> ${e.time || '-'} ส่งมอบ ${e.booking.customer} ← ก่อนคืนจาก ${next.booking.customer} ${next.time || ''}
+          </div>`);
+        }
         skipNext = true;
         return;
       }
 
       // Tight same-day return→pickup turnaround: merge into one chip instead of
-      // two overlapping labels, since at this scale they'd collide anyway.
+      // two overlapping labels, since at this scale they'd collide anyway. If
+      // another same-model car is free, the rush disappears entirely — hand
+      // the new customer that car and prep this one on relaxed time instead.
       if (isDifferentBooking && e.type === 'return' && next.type === 'deliver') {
         const gapMins = minutesBetween(date, e.time, date, next.time);
         if (gapMins !== null && gapMins < 120) {
           const h = timeToHourFloat(e.time);
           const leftPct = h === null ? 1 : ((h - minHour) / HOURS) * 100;
-          const gapCls = gapMins < 0 ? 'gantt-gap-critical' : 'gantt-gap-warn';
-          const title = `${car.plate}\nคืน: ${e.booking.customer} ${e.time || ''}\nรับใหม่: ${next.booking.customer} ${next.time || ''}\n${formatPrepTime(gapMins)}`;
-          parts.push(`<div class="gantt-event ${gapCls}" style="left:${leftPct}%;" title="${title.replace(/"/g, '&quot;')}" onclick="openEditBookingModal('${e.booking.id}')">
-            <i class="fa-solid fa-triangle-exclamation"></i> ${e.time || '-'} ${e.booking.customer} → ${next.time || '-'} ${next.booking.customer} (${gapMins < 0 ? 'ชนเวลา' : gapMins + ' น.'})
-          </div>`);
+          const swapCars = findSwapCandidates(next.booking, car.id);
+          if (swapCars.length) {
+            const title = `${car.plate}\nคืน: ${e.booking.customer} ${e.time || ''}\nรับใหม่: ${next.booking.customer} ${next.time || ''}\n${formatPrepTime(gapMins)}\n⇄ ไม่ต้องรีบ ใช้คันนี้แทนได้: ${swapCars.map(c => c.plate).join(', ')}`;
+            parts.push(`<div class="gantt-event gantt-gap-swappable" style="left:${leftPct}%;" title="${title.replace(/"/g, '&quot;')}" onclick="openEditBookingModal('${e.booking.id}')">
+              <i class="fa-solid fa-right-left"></i> ${e.time || '-'} ${e.booking.customer} → ${next.time || '-'} ${next.booking.customer} (สลับได้)
+            </div>`);
+          } else {
+            const gapCls = gapMins < 0 ? 'gantt-gap-critical' : 'gantt-gap-warn';
+            const title = `${car.plate}\nคืน: ${e.booking.customer} ${e.time || ''}\nรับใหม่: ${next.booking.customer} ${next.time || ''}\n${formatPrepTime(gapMins)}`;
+            parts.push(`<div class="gantt-event ${gapCls}" style="left:${leftPct}%;" title="${title.replace(/"/g, '&quot;')}" onclick="openEditBookingModal('${e.booking.id}')">
+              <i class="fa-solid fa-triangle-exclamation"></i> ${e.time || '-'} ${e.booking.customer} → ${next.time || '-'} ${next.booking.customer} (${gapMins < 0 ? 'ชนเวลา' : gapMins + ' น.'})
+            </div>`);
+          }
           skipNext = true;
           return;
         }
@@ -889,10 +940,26 @@ function renderGanttWeekView() {
     return;
   }
 
+  // Group cars by model so swap candidates are visually adjacent — a thin
+  // label divider marks each new model group, only when it actually has
+  // more than one car (a group of one has no swap partner to point at).
+  const modelCounts = {};
+  carsToShow.forEach(car => {
+    const key = `${car.brand}|||${car.model}`;
+    modelCounts[key] = (modelCounts[key] || 0) + 1;
+  });
+  let lastModelKey = null;
+
   const rows = carsToShow.map(car => {
+    const modelKey = `${car.brand}|||${car.model}`;
+    const groupHeader = (modelKey !== lastModelKey && modelCounts[modelKey] > 1)
+      ? `<div class="gantt-model-group"><i class="fa-solid fa-layer-group"></i> ${car.brand} ${car.model} · ${modelCounts[modelKey]} คัน (สลับกันได้)</div>`
+      : '';
+    lastModelKey = modelKey;
+
     if (car.status === 'maintenance' || car.status === 'blocked') {
       const label = car.status === 'maintenance' ? 'ซ่อมบำรุง' : 'งดให้บริการ';
-      return `
+      return groupHeader + `
         <div class="gantt-row">
           <div class="gantt-carlabel" title="${car.plate}">${vehicleTypeIcon(car.type)} ${car.plate}</div>
           <div class="gantt-track gantt-track-disabled">
@@ -917,6 +984,15 @@ function renderGanttWeekView() {
         }
       }
     }
+    // A conflicting booking isn't necessarily a dead end — if another car of
+    // the same model is free for that stretch, it can take the booking
+    // instead, so the "conflict" is really just a reassignment waiting to
+    // happen. Only flag it red/urgent when NO such car exists.
+    const swapCandidatesById = {};
+    conflictIds.forEach(id => {
+      const b = bookings.find(x => x.id === id);
+      swapCandidatesById[id] = b ? findSwapCandidates(b, car.id) : [];
+    });
 
     const bars = bookings.map(b => {
       const clipStart = b.start < windowStart ? windowStart : b.start;
@@ -925,19 +1001,25 @@ function renderGanttWeekView() {
       const endIdx     = Math.max(daysBetween(windowStart, clipEnd), startIdx + 0.4);
       const leftPct    = (startIdx / WINDOW) * 100;
       const widthPct   = ((endIdx - startIdx) / WINDOW) * 100;
-      const isConflict = conflictIds.has(b.id);
-      const statusClass = isConflict ? 'gantt-bar-conflict' : (b.status === 'active' ? 'gantt-bar-active' : 'gantt-bar-upcoming');
+      const isConflict     = conflictIds.has(b.id);
+      const swapCars        = isConflict ? swapCandidatesById[b.id] : [];
+      const isSwappable     = isConflict && swapCars.length > 0;
+      const isHardConflict  = isConflict && !isSwappable;
+      const statusClass = isHardConflict ? 'gantt-bar-conflict'
+        : isSwappable ? 'gantt-bar-swappable'
+        : (b.status === 'active' ? 'gantt-bar-active' : 'gantt-bar-upcoming');
       const title = `${car.plate} · ${b.customer}\n${b.start}${b.startTime ? ' ' + b.startTime : ''} → ${b.end}${b.endTime ? ' ' + b.endTime : ''}` +
-        (isConflict ? '\n⚠ ชนกับการจองอื่นของรถคันนี้' : '');
+        (isHardConflict ? '\n⚠ ชนกับการจองอื่นของรถคันนี้ — ไม่มีรถรุ่นเดียวกันว่างให้สลับ ต้องแก้ไขด่วน' : '') +
+        (isSwappable ? `\n⇄ ชนกับการจองอื่นของรถคันนี้ แต่สลับไปคันอื่นได้: ${swapCars.map(c => c.plate).join(', ')}` : '');
       return `<div class="gantt-bar ${statusClass}"
         style="left:${leftPct}%;width:${widthPct}%;top:${3 + laneOf[b.id] * 32}px;"
         title="${title.replace(/"/g, '&quot;')}"
         onclick="openEditBookingModal('${b.id}')">
-        ${isConflict ? '<i class="fa-solid fa-triangle-exclamation"></i>&nbsp;' : ''}${b.customer}
+        ${isHardConflict ? '<i class="fa-solid fa-triangle-exclamation"></i>&nbsp;' : ''}${isSwappable ? '<i class="fa-solid fa-right-left"></i>&nbsp;' : ''}${b.customer}
       </div>`;
     }).join('');
 
-    return `
+    return groupHeader + `
       <div class="gantt-row" style="min-height:${Math.max(44, laneCount * 32 + 12)}px;">
         <div class="gantt-carlabel" title="${car.plate}">${vehicleTypeIcon(car.type)} ${car.plate}</div>
         <div class="gantt-track">${trackCols}${bars}</div>

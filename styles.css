@@ -724,6 +724,15 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
   0%, 100% { box-shadow: 0 0 10px rgba(255,64,36,0.35); }
   50%      { box-shadow: 0 0 18px rgba(255,64,36,0.55); }
 }
+/* Overlaps two bookings, but a same-model car is free to take one of them —
+   informational, not urgent, so no pulse: it's a reassignment, not a crisis.
+   Green (not gold/blue/red — all already taken by upcoming/active/conflict)
+   deliberately reads as "you're fine, a solution exists" rather than alarm. */
+.gantt-bar-swappable {
+  background: rgba(52,211,153,0.16);
+  color: #34d399;
+  border: 1px dashed rgba(52,211,153,0.5);
+}
 
 /* Day (hourly) view */
 .gantt-day-link { cursor: pointer; }
@@ -748,8 +757,22 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
 }
 .gantt-event-deliver { background: rgba(96,165,250,0.16); color: #60a5fa; border: 1px solid rgba(96,165,250,0.4); }
 .gantt-event-return  { background: rgba(250,204,21,0.14); color: var(--primary); border: 1px solid rgba(250,204,21,0.35); }
-.gantt-gap-warn     { background: rgba(254,202,37,0.16); color: #feca25; border: 1px dashed rgba(254,202,37,0.5); }
-.gantt-gap-critical { background: rgba(255,64,36,0.18); color: #ff4024; border: 1px dashed rgba(255,64,36,0.55); }
+.gantt-gap-warn      { background: rgba(254,202,37,0.16); color: #feca25; border: 1px dashed rgba(254,202,37,0.5); }
+.gantt-gap-critical  { background: rgba(255,64,36,0.18); color: #ff4024; border: 1px dashed rgba(255,64,36,0.55); }
+.gantt-gap-swappable { background: rgba(52,211,153,0.16); color: #34d399; border: 1px dashed rgba(52,211,153,0.5); }
+
+/* Model-group divider — separates rows of the same brand+model so a "can be
+   swapped" suggestion has an obvious, adjacent car to point at. */
+.gantt-model-group {
+  padding: .4rem 0 .2rem;
+  font-size: .7rem;
+  font-weight: 700;
+  color: var(--gray-500);
+  border-top: 1px solid rgba(255,255,255,0.06);
+  margin-top: .2rem;
+}
+.gantt-model-group:first-child { border-top: none; margin-top: 0; }
+.gantt-model-group i { opacity: .7; margin-right: .3rem; }
 
 /* ========== RETURN LIST ========== */
 .return-list { padding: 0 1.25rem 1rem; }
