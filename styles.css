@@ -659,15 +659,18 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
 .gantt-wrap {
   padding: .75rem 1.25rem 1.25rem;
   overflow-x: auto;
-  /* Same fix as the date/time pickers: without an explicit touch-action,
-     mobile browsers can resolve an ambiguous swipe as the page's vertical
-     scroll instead of this element's horizontal one, especially inside a
-     backdrop-filter card (.section-card) — telling the browser up front
-     "this element pans horizontally" makes the gesture land here reliably. */
-  touch-action: pan-x;
+  /* Horizontal panning is handled entirely by JS now (initGanttDragScroll,
+     with momentum) instead of relying on the browser's own touch scrolling,
+     which too often lost an ambiguous swipe to the page's vertical scroll
+     before it ever reached this element. pan-y keeps vertical scrolling
+     native (so the page still scrolls through normally) while telling the
+     browser not to touch horizontal itself — that's JS's job here. */
+  touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
+  cursor: grab;
 }
+.gantt-wrap.gantt-dragging { cursor: grabbing; user-select: none; }
 .gantt-table { min-width: 620px; }
 .gantt-header-row, .gantt-row { display: flex; align-items: stretch; }
 .gantt-header-row { padding-bottom: .5rem; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: .35rem; }

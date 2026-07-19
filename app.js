@@ -741,6 +741,91 @@ function renderGanttChart() {
   renderGanttControls();
   if (ganttDayView) renderGanttDayView(ganttDayView);
   else renderGanttWeekView();
+  initGanttDragScroll();
+}
+
+// Touch/mouse drag-to-scroll for the Gantt date columns, with momentum on
+// release — a native overflow-x:auto scrollbar technically works, but on a
+// lot of mobile browsers a horizontal swipe inside a card gets swallowed by
+// the page's own vertical scroll before it ever reaches this element. Doing
+// it via Pointer Events sidesteps that entirely: JS owns the horizontal
+// gesture outright (touch-action:pan-y on .gantt-wrap tells the browser
+// "don't handle horizontal panning yourself, hand it to JS, but keep
+// handling vertical natively so the page can still scroll through").
+function initGanttDragScroll() {
+  const wrap = document.getElementById('ganttChart');
+  if (!wrap || wrap.dataset.dragInit) return;
+  wrap.dataset.dragInit = '1';
+
+  const DRAG_THRESHOLD = 6; // px of movement before a tap becomes a pan
+  let dragging = false, moved = false;
+  let startX = 0, startY = 0, startScroll = 0;
+  let lastX = 0, lastT = 0, velocity = 0;
+  let momentumFrame = null;
+
+  const stopMomentum = () => { if (momentumFrame) cancelAnimationFrame(momentumFrame); momentumFrame = null; };
+
+  wrap.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    stopMomentum();
+    dragging = true;
+    moved = false;
+    startX = e.clientX;
+    startY = e.clientY;
+    startScroll = wrap.scrollLeft;
+    lastX = e.clientX;
+    lastT = performance.now();
+    velocity = 0;
+    try { wrap.setPointerCapture(e.pointerId); } catch {}
+  });
+
+  wrap.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    if (!moved) {
+      if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+      // A mostly-vertical gesture is the user trying to scroll the page,
+      // not pan the chart — bail out and let native vertical scroll (which
+      // touch-action:pan-y already permits) take it from here.
+      if (Math.abs(dy) > Math.abs(dx)) { dragging = false; return; }
+      moved = true;
+      wrap.classList.add('gantt-dragging');
+    }
+    e.preventDefault();
+    wrap.scrollLeft = startScroll - dx;
+    const now = performance.now();
+    const dt = now - lastT;
+    if (dt > 0) velocity = (e.clientX - lastX) / dt;
+    lastX = e.clientX;
+    lastT = now;
+  });
+
+  const endDrag = () => {
+    if (!dragging) return;
+    dragging = false;
+    wrap.classList.remove('gantt-dragging');
+    if (!moved) return;
+
+    // This was a pan, not a tap — swallow the click that would otherwise
+    // fire on whatever booking bar/chip ended up under the pointer.
+    const suppressClick = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
+    wrap.addEventListener('click', suppressClick, true);
+    setTimeout(() => wrap.removeEventListener('click', suppressClick, true), 0);
+
+    // Momentum: keep coasting briefly from the release velocity, decaying
+    // every frame — the "flick and it glides" feel of a native scroller.
+    let v = -velocity * 16;
+    const step = () => {
+      if (Math.abs(v) < 0.5) { momentumFrame = null; return; }
+      wrap.scrollLeft += v;
+      v *= 0.94;
+      momentumFrame = requestAnimationFrame(step);
+    };
+    if (Math.abs(v) > 0.5) momentumFrame = requestAnimationFrame(step);
+  };
+  wrap.addEventListener('pointerup', endDrag);
+  wrap.addEventListener('pointercancel', endDrag);
 }
 
 // Cars belonging to the active tab (รถยนต์/มอเตอร์ไซค์), minus any car
