@@ -1150,10 +1150,11 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 .quick-check-header h3 { color: #1a1a1a; font-weight: 800; font-size: 1.05rem; }
 .quick-check-pair { display: flex; align-items: stretch; gap: .6rem; }
 .quick-check-pair .form-group { flex: 1; min-width: 0; }
-/* The dash sits in its own column with an invisible label matching the real
-   labels' height, so its input-height row lines up with — and the dash is
-   centered inside — the actual date/time boxes next to it, not the labels. */
-.quick-check-dash-col { display: flex; flex-direction: column; gap: .3rem; flex: 0 0 auto; }
+/* The dash sits in its own column, reusing .form-group only so its invisible
+   label matches the real labels' height (for vertical centering) — it must
+   NOT also inherit the flex:1 that rule gives real .form-groups above, so
+   this selector's specificity is bumped to win over it. */
+.quick-check-pair .quick-check-dash-col { flex: 0 0 auto; }
 .quick-check-dash-col label { visibility: hidden; }
 .quick-check-dash {
   flex: 1;

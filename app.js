@@ -1204,6 +1204,26 @@ function runSuggest() {
 }
 
 // ── Bookings page quick search (moved here from the dashboard) ─────────
+// เวลาคืนรถ defaults to "24 hours after เวลารับรถ" — since 24h later always
+// lands on the same clock time (just the next day), that default is simply
+// the pickup time itself. Once the user picks a return time by hand, this
+// stops overwriting it (tracked with a flag, not by checking emptiness —
+// a real time picker never leaves the field blank once touched).
+let quickCheckReturnTimeManual = false;
+
+function onQuickCheckPickupTimeChange() {
+  const pickupTime = document.getElementById('bookSuggestTime').value;
+  if (pickupTime && !quickCheckReturnTimeManual) {
+    document.getElementById('bookSuggestEndTime').value = pickupTime;
+  }
+  runBookingsSearch();
+}
+
+function onQuickCheckReturnTimeChange() {
+  quickCheckReturnTimeManual = true;
+  runBookingsSearch();
+}
+
 function runBookingsSearch() {
   const start     = document.getElementById('bookSuggestDate').value;
   const startTime = document.getElementById('bookSuggestTime').value;

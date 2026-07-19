@@ -216,7 +216,7 @@
                 <label>วันรับรถ</label>
                 <input type="date" id="bookSuggestDate" onchange="runBookingsSearch()" />
               </div>
-              <div class="quick-check-dash-col"><label>&nbsp;</label><span class="quick-check-dash">–</span></div>
+              <div class="quick-check-dash-col form-group"><label>&nbsp;</label><span class="quick-check-dash">–</span></div>
               <div class="form-group">
                 <label>วันคืนรถ</label>
                 <input type="date" id="bookSuggestEndDate" onchange="runBookingsSearch()" />
@@ -225,12 +225,12 @@
             <div class="quick-check-pair">
               <div class="form-group">
                 <label>เวลารับรถ</label>
-                <input type="time" id="bookSuggestTime" onchange="runBookingsSearch()" />
+                <input type="time" id="bookSuggestTime" onchange="onQuickCheckPickupTimeChange()" />
               </div>
-              <div class="quick-check-dash-col"><label>&nbsp;</label><span class="quick-check-dash">–</span></div>
+              <div class="quick-check-dash-col form-group"><label>&nbsp;</label><span class="quick-check-dash">–</span></div>
               <div class="form-group">
                 <label>เวลาคืนรถ</label>
-                <input type="time" id="bookSuggestEndTime" onchange="runBookingsSearch()" />
+                <input type="time" id="bookSuggestEndTime" onchange="onQuickCheckReturnTimeChange()" />
               </div>
             </div>
           </div>
