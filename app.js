@@ -784,13 +784,16 @@ function findSwapCandidates(booking, excludeCarId) {
   );
 }
 
-// Deterministic car-label color for the Gantt chart: each brand gets its
-// own hue family, and each model within that brand nudges the hue a bit —
-// so cars of the SAME model (the actual swap candidates) share one color,
-// while different models under the same brand still read as related. Any
-// brand not in the hand-picked list below (i.e. a new one added later)
-// falls back to a hash of its name, so new fleet entries always get a
-// consistent color without needing this list touched.
+// Deterministic per-brand color for the Gantt chart — a light accent, not
+// the primary way to tell cars apart. Grouping by model already does the
+// precise work (the bold "Honda City · 3 คัน" band + adjacent rows), which
+// reads reliably regardless of color vision; a color per model on top of
+// that turned out to be too many subtly-different hues to actually
+// distinguish, so this only varies by brand now — fewer, better-separated
+// colors, used just to hint "which brand family" at a glance. Any brand not
+// in the hand-picked list (i.e. a new one added later) falls back to a hash
+// of its name, so new fleet entries always get a consistent color without
+// this list needing to be touched.
 const GANTT_BRAND_HUES = {
   'Toyota': 15, 'Honda': 205, 'Isuzu': 265, 'Mazda': 320, 'Mitsubishi': 60,
   'Nissan': 175, 'Ford': 100, 'MG': 290, 'Hyundai': 235, 'Yamaha': 350, 'GPX': 130,
@@ -800,11 +803,14 @@ function hashHue(str) {
   for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
   return h % 360;
 }
+function ganttBrandHue(brand) {
+  return GANTT_BRAND_HUES[brand] ?? hashHue(brand || '');
+}
 function ganttCarColor(car) {
-  const baseHue  = GANTT_BRAND_HUES[car.brand] ?? hashHue(car.brand || '');
-  const nudge    = (hashHue(car.model || '') % 36) - 18; // ±18°, same model -> same nudge
-  const hue      = (baseHue + nudge + 360) % 360;
-  return `hsl(${hue}, 60%, 62%)`;
+  return `hsl(${ganttBrandHue(car.brand)}, 55%, 60%)`;
+}
+function ganttCarBandBg(car) {
+  return `hsla(${ganttBrandHue(car.brand)}, 55%, 55%, 0.08)`;
 }
 
 // Cars relevant to a specific day = have a pickup or return event that day.
@@ -921,8 +927,8 @@ function renderGanttDayView(date) {
 
     const carColor = ganttCarColor(car);
     return `
-      <div class="gantt-row" style="border-left:3px solid ${carColor};">
-        <div class="gantt-carlabel" title="${car.plate}" style="color:${carColor};">${vehicleTypeIcon(car.type)} ${car.plate}</div>
+      <div class="gantt-row" style="border-left:4px solid ${carColor};">
+        <div class="gantt-carlabel" title="${car.plate}">${vehicleTypeIcon(car.type)} ${car.plate}</div>
         <div class="gantt-track">${trackCols}${parts.join('')}</div>
       </div>`;
   }).join('');
@@ -977,7 +983,9 @@ function renderGanttWeekView() {
   const rows = carsToShow.map(car => {
     const modelKey = `${car.brand}|||${car.model}`;
     const groupHeader = (modelKey !== lastModelKey && modelCounts[modelKey] > 1)
-      ? `<div class="gantt-model-group" style="color:${ganttCarColor(car)};"><i class="fa-solid fa-layer-group"></i> ${car.brand} ${car.model} · ${modelCounts[modelKey]} คัน</div>`
+      ? `<div class="gantt-model-group" style="background:${ganttCarBandBg(car)};border-left-color:${ganttCarColor(car)};">
+          <i class="fa-solid fa-layer-group"></i> ${car.brand} ${car.model} <span class="gantt-model-group-count">· ${modelCounts[modelKey]} คัน</span>
+        </div>`
       : '';
     lastModelKey = modelKey;
 
@@ -986,8 +994,8 @@ function renderGanttWeekView() {
     if (car.status === 'maintenance' || car.status === 'blocked') {
       const label = car.status === 'maintenance' ? 'ซ่อมบำรุง' : 'งดให้บริการ';
       return groupHeader + `
-        <div class="gantt-row" style="border-left:3px solid ${carColor};">
-          <div class="gantt-carlabel" title="${car.plate}" style="color:${carColor};">${vehicleTypeIcon(car.type)} ${car.plate}</div>
+        <div class="gantt-row" style="border-left:4px solid ${carColor};">
+          <div class="gantt-carlabel" title="${car.plate}">${vehicleTypeIcon(car.type)} ${car.plate}</div>
           <div class="gantt-track gantt-track-disabled">
             ${trackCols}
             <span class="pill pill-${car.status}" style="position:relative;">${label}</span>
@@ -1046,8 +1054,8 @@ function renderGanttWeekView() {
     }).join('');
 
     return groupHeader + `
-      <div class="gantt-row" style="min-height:${Math.max(44, laneCount * 32 + 12)}px;border-left:3px solid ${carColor};">
-        <div class="gantt-carlabel" title="${car.plate}" style="color:${carColor};">${vehicleTypeIcon(car.type)} ${car.plate}</div>
+      <div class="gantt-row" style="min-height:${Math.max(44, laneCount * 32 + 12)}px;border-left:4px solid ${carColor};">
+        <div class="gantt-carlabel" title="${car.plate}">${vehicleTypeIcon(car.type)} ${car.plate}</div>
         <div class="gantt-track">${trackCols}${bars}</div>
       </div>`;
   }).join('');

@@ -321,6 +321,14 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
 /* ========== MAIN CONTENT ========== */
 .main-content {
   flex: 1;
+  /* Flex items default to min-width:auto, which means "never shrink below
+     your content's intrinsic minimum" — so a single wide descendant deep
+     inside (the Gantt table's min-width:620px) was preventing this whole
+     column from narrowing past ~620px, blowing the entire page wider than
+     the viewport on mobile instead of staying put while just the Gantt's
+     own overflow-x:auto scrolled internally. min-width:0 opts back into
+     normal shrink behavior. */
+  min-width: 0;
   margin-left: var(--sidebar-w);
   padding: 1.5rem;
   min-height: 100vh;
@@ -648,7 +656,18 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
   font-family: inherit;
 }
 .gantt-type-tab.active { background: var(--primary); color: #1a1a1a; }
-.gantt-wrap { padding: .75rem 1.25rem 1.25rem; overflow-x: auto; }
+.gantt-wrap {
+  padding: .75rem 1.25rem 1.25rem;
+  overflow-x: auto;
+  /* Same fix as the date/time pickers: without an explicit touch-action,
+     mobile browsers can resolve an ambiguous swipe as the page's vertical
+     scroll instead of this element's horizontal one, especially inside a
+     backdrop-filter card (.section-card) — telling the browser up front
+     "this element pans horizontally" makes the gesture land here reliably. */
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
 .gantt-table { min-width: 620px; }
 .gantt-header-row, .gantt-row { display: flex; align-items: stretch; }
 .gantt-header-row { padding-bottom: .5rem; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: .35rem; }
@@ -761,18 +780,22 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
 .gantt-gap-critical  { background: rgba(255,64,36,0.18); color: #ff4024; border: 1px dashed rgba(255,64,36,0.55); }
 .gantt-gap-swappable { background: rgba(52,211,153,0.16); color: #34d399; border: 1px dashed rgba(52,211,153,0.5); }
 
-/* Model-group divider — separates rows of the same brand+model so a "can be
-   swapped" suggestion has an obvious, adjacent car to point at. */
+/* Model-group divider — a full-width band (not a thin colored line) so
+   "these rows are the same model, interchangeable" reads as an unmissable
+   structural break on its own, without depending on anyone distinguishing
+   between similar hues. Color here is just a light accent on top of that;
+   the text label + count is what actually carries the information. */
 .gantt-model-group {
-  padding: .4rem 0 .2rem;
-  font-size: .7rem;
+  padding: .5rem .75rem;
+  margin: .35rem -1.25rem .3rem;
+  border-left: 3px solid;
+  font-size: .78rem;
   font-weight: 700;
-  color: var(--gray-500);
-  border-top: 1px solid rgba(255,255,255,0.06);
-  margin-top: .2rem;
+  color: var(--gray-800);
 }
-.gantt-model-group:first-child { border-top: none; margin-top: 0; }
-.gantt-model-group i { opacity: .7; margin-right: .3rem; }
+.gantt-model-group:first-child { margin-top: 0; }
+.gantt-model-group i { opacity: .8; margin-right: .35rem; }
+.gantt-model-group-count { font-weight: 600; color: var(--gray-500); }
 
 /* ========== RETURN LIST ========== */
 .return-list { padding: 0 1.25rem 1rem; }
