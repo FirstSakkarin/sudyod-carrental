@@ -800,9 +800,23 @@ function initGanttDragScroll() {
       dragGroupEl = groupEl;
       dragGroupCarIds = groupEl.dataset.groupCarIds.split(',');
     } else if (labelEl) {
-      mode = 'reorder';
-      dragRowEl = labelEl.closest('.gantt-row');
-      dragRowCarId = dragRowEl?.dataset.orderCarId || null;
+      // Grabbing any one car that belongs to a same-model group (not just
+      // the group's header band) moves the whole group together — a car
+      // that's part of a "these are interchangeable" group shouldn't be
+      // draggable loose from its group by accident, only the group as
+      // a whole, or a car that's the only one of its model.
+      const rowEl = labelEl.closest('.gantt-row');
+      const carId = rowEl?.dataset.orderCarId || null;
+      const groupIds = carId ? ganttModelGroupCarIds(carId) : null;
+      if (groupIds && groupIds.length > 1) {
+        mode = 'reorderGroup';
+        dragGroupEl = rowEl;
+        dragGroupCarIds = groupIds;
+      } else {
+        mode = 'reorder';
+        dragRowEl = rowEl;
+        dragRowCarId = carId;
+      }
     } else if (barEl) {
       mode = 'bar';
       dragBarEl = barEl;
@@ -1162,6 +1176,17 @@ function ganttCarsInScope() {
   const ranked   = defaultSorted.filter(c => order[c.id] !== undefined).sort((a, b) => order[a.id] - order[b.id]);
   const unranked = defaultSorted.filter(c => order[c.id] === undefined);
   return [...ranked, ...unranked];
+}
+
+// IDs of every car sharing carId's brand+model within the current tab's
+// scope, if there's more than one — otherwise just [carId] itself. Used to
+// decide whether grabbing this car's row should drag its whole model group
+// along (see initGanttDragScroll's 'reorderGroup' mode).
+function ganttModelGroupCarIds(carId) {
+  const car = getCarById(carId);
+  if (!car) return [carId];
+  const sameModel = ganttCarsInScope().filter(c => c.brand === car.brand && c.model === car.model);
+  return sameModel.length > 1 ? sameModel.map(c => c.id) : [carId];
 }
 
 // Same-model cars are interchangeable from the customer's point of view, so
