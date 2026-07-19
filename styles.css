@@ -618,6 +618,139 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
   box-shadow: 0 0 8px var(--blocked-glow);
 }
 
+/* ========== GANTT CHART (Dashboard — all-cars queue view) ========== */
+.gantt-subheader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .5rem;
+  padding: .85rem 1.25rem 0;
+}
+.gantt-type-tabs {
+  display: flex;
+  gap: .25rem;
+  background: rgba(255,255,255,0.04);
+  padding: .2rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.gantt-type-tab {
+  padding: .35rem .9rem;
+  border-radius: 999px;
+  font-size: .78rem;
+  font-weight: 700;
+  color: var(--gray-500);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all .15s;
+  font-family: inherit;
+}
+.gantt-type-tab.active { background: var(--primary); color: #1a1a1a; }
+.gantt-wrap { padding: .75rem 1.25rem 1.25rem; overflow-x: auto; }
+.gantt-table { min-width: 620px; }
+.gantt-header-row, .gantt-row { display: flex; align-items: stretch; }
+.gantt-header-row { padding-bottom: .5rem; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: .35rem; }
+.gantt-carlabel-head, .gantt-carlabel {
+  width: 132px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  font-size: .78rem;
+  padding-right: .5rem;
+  color: var(--gray-500);
+  font-weight: 700;
+}
+.gantt-carlabel { color: var(--gray-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gantt-day-head {
+  flex: 1;
+  text-align: center;
+  font-size: .72rem;
+  color: var(--gray-500);
+}
+.gantt-day-head .gantt-dow { font-weight: 700; }
+.gantt-day-head .gantt-date { font-size: .68rem; opacity: .8; }
+.gantt-day-head.gantt-today { color: var(--primary); }
+.gantt-day-head.gantt-today .gantt-date { color: var(--primary); font-weight: 700; }
+.gantt-row { min-height: 44px; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+.gantt-row:last-child { border-bottom: none; }
+.gantt-track { position: relative; flex: 1; min-height: 38px; }
+.gantt-track-cols { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(7, 1fr); pointer-events: none; }
+.gantt-col { border-right: 1px solid rgba(255,255,255,0.05); }
+.gantt-col:last-child { border-right: none; }
+.gantt-track-disabled { display: flex; align-items: center; justify-content: center; }
+.gantt-bar {
+  position: absolute;
+  top: 3px;
+  height: 28px;
+  border-radius: 6px;
+  padding: 0 .5rem;
+  font-size: .72rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: transform .12s, box-shadow .12s;
+}
+.gantt-bar:hover { transform: translateY(-1px); z-index: 5; }
+/* Booking-timeline colors: kept distinct from the car-status glass palette
+   (available/rented/maintenance/blocked) since a Gantt bar encodes the
+   BOOKING's state, not the car's — active vs. upcoming vs. a scheduling
+   conflict that needs eyes on it right now. */
+.gantt-bar-active {
+  background: rgba(96,165,250,0.16);
+  color: #60a5fa;
+  border: 1px solid rgba(96,165,250,0.4);
+  box-shadow: 0 0 8px rgba(96,165,250,0.3);
+}
+.gantt-bar-upcoming {
+  background: rgba(250,204,21,0.14);
+  color: var(--primary);
+  border: 1px solid rgba(250,204,21,0.35);
+  box-shadow: 0 0 8px var(--glow-primary-xs);
+}
+.gantt-bar-conflict {
+  background: rgba(255,64,36,0.18);
+  color: #ff4024;
+  border: 1px solid rgba(255,64,36,0.55);
+  box-shadow: 0 0 10px rgba(255,64,36,0.35);
+  animation: gantt-pulse 1.6s ease-in-out infinite;
+}
+@keyframes gantt-pulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(255,64,36,0.35); }
+  50%      { box-shadow: 0 0 18px rgba(255,64,36,0.55); }
+}
+
+/* Day (hourly) view */
+.gantt-day-link { cursor: pointer; }
+.gantt-day-link:hover .gantt-date { text-decoration: underline; }
+.gantt-hour-head { flex: 1; text-align: center; font-size: .66rem; color: var(--gray-500); }
+.gantt-event {
+  position: absolute;
+  top: 6px;
+  height: 26px;
+  min-width: 30px;
+  border-radius: 6px;
+  padding: 0 .4rem;
+  font-size: .7rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: .3rem;
+  white-space: nowrap;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  z-index: 2;
+}
+.gantt-event-deliver { background: rgba(96,165,250,0.16); color: #60a5fa; border: 1px solid rgba(96,165,250,0.4); }
+.gantt-event-return  { background: rgba(250,204,21,0.14); color: var(--primary); border: 1px solid rgba(250,204,21,0.35); }
+.gantt-gap-warn     { background: rgba(254,202,37,0.16); color: #feca25; border: 1px dashed rgba(254,202,37,0.5); }
+.gantt-gap-critical { background: rgba(255,64,36,0.18); color: #ff4024; border: 1px dashed rgba(255,64,36,0.55); }
+
 /* ========== RETURN LIST ========== */
 .return-list { padding: 0 1.25rem 1rem; }
 .return-item {

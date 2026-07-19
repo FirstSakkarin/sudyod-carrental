@@ -356,6 +356,8 @@ function renderDashboard() {
   // Car mini grid
   document.getElementById('dashboardCarList').innerHTML =
     sortCarsByStatus(cars).map(carMiniCardHtml).join('');
+
+  renderGanttChart();
 }
 
 // Shared status-tinted glass card, used by the dashboard grid and the
@@ -634,6 +636,322 @@ function openCarDetail(id) {
     blockBtn.onclick = () => { closeModal('carDetailModal'); openBlockCarModal(id); };
   }
   showModal('carDetailModal');
+}
+
+// ── Gantt chart (all-cars queue view, Dashboard) ─────────────────────────
+let ganttOffset = 0;
+let ganttDayView = null; // null = week view, else a 'YYYY-MM-DD' string = day (hourly) view
+let ganttVehicleType = 'car'; // 'car' (default) | 'motorcycle'
+// Persisted so a staff member who hides the chart doesn't see it pop back
+// up on the next visit — defaults to visible per the owner's request.
+let ganttVisible = localStorage.getItem('ganttVisible') !== '0';
+
+// Cars leased out long-term (a single booking spanning most of the year)
+// sit outside the day-to-day turnover this chart exists to manage — one
+// giant bar on every single week is just noise, not a queue to plan around.
+const GANTT_LONG_TERM_DAYS = 300;
+function hasLongTermBooking(carId) {
+  return state.bookings.some(b =>
+    b.carId === carId && b.status !== 'completed' &&
+    daysBetween(b.start, b.end) >= GANTT_LONG_TERM_DAYS
+  );
+}
+
+function toggleGanttVisibility() {
+  ganttVisible = !ganttVisible;
+  localStorage.setItem('ganttVisible', ganttVisible ? '1' : '0');
+  applyGanttVisibility();
+}
+
+function applyGanttVisibility() {
+  const body = document.getElementById('ganttBody');
+  const btn  = document.getElementById('ganttToggleBtn');
+  if (body) body.style.display = ganttVisible ? '' : 'none';
+  if (btn)  btn.innerHTML = ganttVisible
+    ? '<i class="fa-solid fa-eye"></i>'
+    : '<i class="fa-solid fa-eye-slash"></i>';
+}
+
+function setGanttVehicleType(type) { ganttVehicleType = type; renderGanttChart(); }
+
+function renderGanttTypeTabs() {
+  const el = document.getElementById('ganttTypeTabs');
+  if (!el) return;
+  el.innerHTML = `
+    <button class="gantt-type-tab ${ganttVehicleType === 'car' ? 'active' : ''}" onclick="setGanttVehicleType('car')">รถยนต์</button>
+    <button class="gantt-type-tab ${ganttVehicleType === 'motorcycle' ? 'active' : ''}" onclick="setGanttVehicleType('motorcycle')">มอเตอร์ไซค์</button>`;
+}
+
+function shiftGantt(days) { ganttOffset += days; renderGanttChart(); }
+function resetGantt()     { ganttOffset = 0;     renderGanttChart(); }
+
+function openGanttDay(dateStr)  { ganttDayView = dateStr; renderGanttChart(); }
+function backToGanttWeek()      { ganttDayView = null;    renderGanttChart(); }
+function shiftGanttDay(n)       { ganttDayView = addDaysStr(ganttDayView, n); renderGanttChart(); }
+
+function addDaysStr(dateStr, n) {
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+function timeToHourFloat(t) {
+  if (!t) return null;
+  const [h, m] = t.split(':').map(Number);
+  return h + m / 60;
+}
+
+// Interval-scheduling lane assignment: overlapping bookings get stacked into
+// separate lanes instead of drawn on top of each other, so a double-booking
+// mistake is visually obvious instead of hidden.
+function assignGanttLanes(bookings) {
+  const sorted = [...bookings].sort((a, b) => a.start.localeCompare(b.start));
+  const laneEnds = [];
+  const laneOf = {};
+  sorted.forEach(b => {
+    let lane = laneEnds.findIndex(end => end <= b.start);
+    if (lane === -1) { lane = laneEnds.length; laneEnds.push(b.end); }
+    else { laneEnds[lane] = b.end; }
+    laneOf[b.id] = lane;
+  });
+  return { laneOf, laneCount: laneEnds.length || 1 };
+}
+
+function renderGanttControls() {
+  const el = document.getElementById('ganttControls');
+  if (!el) return;
+  if (ganttDayView) {
+    el.innerHTML = `
+      <button class="btn btn-secondary btn-sm" onclick="backToGanttWeek()"><i class="fa-solid fa-arrow-left"></i> มุมมองสัปดาห์</button>
+      <button class="icon-btn" onclick="shiftGanttDay(-1)" title="วันก่อนหน้า"><i class="fa-solid fa-chevron-left"></i></button>
+      <span style="font-size:.85rem;color:var(--gray-700);font-weight:700;min-width:150px;text-align:center;">${formatDateThai(new Date(ganttDayView))}</span>
+      <button class="icon-btn" onclick="shiftGanttDay(1)" title="วันถัดไป"><i class="fa-solid fa-chevron-right"></i></button>`;
+  } else {
+    el.innerHTML = `
+      <button class="icon-btn" onclick="shiftGantt(-7)" title="7 วันก่อนหน้า"><i class="fa-solid fa-chevron-left"></i></button>
+      <button class="btn btn-secondary btn-sm" onclick="resetGantt()">วันนี้</button>
+      <button class="icon-btn" onclick="shiftGantt(7)" title="7 วันถัดไป"><i class="fa-solid fa-chevron-right"></i></button>`;
+  }
+}
+
+function renderGanttChart() {
+  if (!document.getElementById('ganttChart')) return;
+  applyGanttVisibility();
+  renderGanttTypeTabs();
+  renderGanttControls();
+  if (ganttDayView) renderGanttDayView(ganttDayView);
+  else renderGanttWeekView();
+}
+
+// Cars belonging to the active tab (รถยนต์/มอเตอร์ไซค์), minus any car
+// already tied up on a long-term booking — see GANTT_LONG_TERM_DAYS.
+function ganttCarsInScope() {
+  return state.cars.filter(car =>
+    (ganttVehicleType === 'motorcycle' ? car.type === 'motorcycle' : car.type !== 'motorcycle') &&
+    !hasLongTermBooking(car.id)
+  );
+}
+
+// Cars relevant to a specific day = have a pickup or return event that day.
+// Shows a small hourly timeline per event, with a highlighted gap when a
+// same-car return→next-pickup turnaround is tight enough to need attention.
+function renderGanttDayView(date) {
+  const wrap = document.getElementById('ganttChart');
+  if (!wrap) return;
+
+  const relevant = ganttCarsInScope().filter(car =>
+    state.bookings.some(b => b.carId === car.id && b.status !== 'completed' && (b.start === date || b.end === date))
+  );
+
+  if (!relevant.length) {
+    wrap.innerHTML = `<p class="empty-state" style="padding:1.5rem;">ไม่มีรถรับ/คืนในวันนี้</p>`;
+    return;
+  }
+
+  const carEvents = relevant.map(car => {
+    const events = [];
+    state.bookings.forEach(b => {
+      if (b.carId !== car.id || b.status === 'completed') return;
+      if (b.end === date)   events.push({ type: 'return',  time: b.endTime   || null, booking: b });
+      if (b.start === date) events.push({ type: 'deliver', time: b.startTime || null, booking: b });
+    });
+    events.sort((a, b) => (timeToHourFloat(a.time) ?? 12) - (timeToHourFloat(b.time) ?? 12));
+    return { car, events };
+  });
+
+  let minHour = 6, maxHour = 22;
+  carEvents.forEach(({ events }) => events.forEach(e => {
+    const h = timeToHourFloat(e.time);
+    if (h !== null) { minHour = Math.min(minHour, Math.floor(h)); maxHour = Math.max(maxHour, Math.ceil(h)); }
+  }));
+  const HOURS = maxHour - minHour;
+
+  const hourHeaders = Array.from({ length: HOURS }, (_, i) => minHour + i)
+    .map(h => `<div class="gantt-hour-head">${h}:00</div>`).join('');
+
+  const trackCols = `<div class="gantt-track-cols" style="grid-template-columns:repeat(${HOURS},1fr);">` +
+    '<div class="gantt-col"></div>'.repeat(HOURS) + '</div>';
+
+  const rows = carEvents.map(({ car, events }) => {
+    const parts = [];
+    let skipNext = false;
+
+    events.forEach((e, i) => {
+      if (skipNext) { skipNext = false; return; }
+
+      const next = events[i + 1];
+      const isDifferentBooking = next && e.booking.id !== next.booking.id;
+
+      // Impossible ordering: this car was handed to a new customer (deliver)
+      // before a different booking's return — always a hard conflict, no
+      // matter the gap, since two customers can't hold the same car at once.
+      if (isDifferentBooking && e.type === 'deliver' && next.type === 'return') {
+        const h = timeToHourFloat(e.time);
+        const leftPct = h === null ? 1 : ((h - minHour) / HOURS) * 100;
+        const title = `${car.plate}\n⚠ ส่งมอบให้ ${e.booking.customer} ${e.time || ''} ก่อนรับคืนจาก ${next.booking.customer} ${next.time || ''}\nรถคันเดียวกันอยู่กับ 2 ลูกค้าพร้อมกัน ตรวจสอบด่วน`;
+        parts.push(`<div class="gantt-event gantt-gap-critical" style="left:${leftPct}%;" title="${title.replace(/"/g, '&quot;')}" onclick="openEditBookingModal('${e.booking.id}')">
+          <i class="fa-solid fa-triangle-exclamation"></i> ${e.time || '-'} ส่งมอบ ${e.booking.customer} ← ก่อนคืนจาก ${next.booking.customer} ${next.time || ''}
+        </div>`);
+        skipNext = true;
+        return;
+      }
+
+      // Tight same-day return→pickup turnaround: merge into one chip instead of
+      // two overlapping labels, since at this scale they'd collide anyway.
+      if (isDifferentBooking && e.type === 'return' && next.type === 'deliver') {
+        const gapMins = minutesBetween(date, e.time, date, next.time);
+        if (gapMins !== null && gapMins < 120) {
+          const h = timeToHourFloat(e.time);
+          const leftPct = h === null ? 1 : ((h - minHour) / HOURS) * 100;
+          const gapCls = gapMins < 0 ? 'gantt-gap-critical' : 'gantt-gap-warn';
+          const title = `${car.plate}\nคืน: ${e.booking.customer} ${e.time || ''}\nรับใหม่: ${next.booking.customer} ${next.time || ''}\n${formatPrepTime(gapMins)}`;
+          parts.push(`<div class="gantt-event ${gapCls}" style="left:${leftPct}%;" title="${title.replace(/"/g, '&quot;')}" onclick="openEditBookingModal('${e.booking.id}')">
+            <i class="fa-solid fa-triangle-exclamation"></i> ${e.time || '-'} ${e.booking.customer} → ${next.time || '-'} ${next.booking.customer} (${gapMins < 0 ? 'ชนเวลา' : gapMins + ' น.'})
+          </div>`);
+          skipNext = true;
+          return;
+        }
+      }
+
+      const h = timeToHourFloat(e.time);
+      const leftPct = h === null ? 1 : ((h - minHour) / HOURS) * 100;
+      const icon  = e.type === 'deliver' ? 'fa-truck-fast' : 'fa-rotate-left';
+      const label = e.type === 'deliver' ? 'ส่งมอบ' : 'รับคืน';
+      const timeLabel = e.time || 'ไม่ระบุเวลา';
+      const cls = e.type === 'deliver' ? 'gantt-event-deliver' : 'gantt-event-return';
+      const title = `${label} ${car.plate} · ${e.booking.customer} · ${timeLabel}`;
+      parts.push(`<div class="gantt-event ${cls}" style="left:${leftPct}%;" title="${title.replace(/"/g, '&quot;')}" onclick="openEditBookingModal('${e.booking.id}')">
+        <i class="fa-solid ${icon}"></i> ${timeLabel} ${e.booking.customer}
+      </div>`);
+    });
+
+    return `
+      <div class="gantt-row">
+        <div class="gantt-carlabel" title="${car.plate}">${vehicleTypeIcon(car.type)} ${car.plate}</div>
+        <div class="gantt-track">${trackCols}${parts.join('')}</div>
+      </div>`;
+  }).join('');
+
+  wrap.innerHTML = `
+    <div class="gantt-table" style="min-width:${Math.max(620, HOURS * 55 + 132)}px;">
+      <div class="gantt-header-row">
+        <div class="gantt-carlabel-head">รถ</div>
+        ${hourHeaders}
+      </div>
+      ${rows}
+    </div>`;
+}
+
+function renderGanttWeekView() {
+  const wrap = document.getElementById('ganttChart');
+  if (!wrap) return;
+
+  const WINDOW = 7;
+  const today       = todayStr();
+  const windowStart = addDaysStr(today, ganttOffset);
+  const windowEnd   = addDaysStr(windowStart, WINDOW); // exclusive
+  const days        = Array.from({ length: WINDOW }, (_, i) => addDaysStr(windowStart, i));
+  const DOW         = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+
+  const headerCells = days.map(d => {
+    const dt = new Date(d);
+    return `<div class="gantt-day-head gantt-day-link ${d === today ? 'gantt-today' : ''}" onclick="openGanttDay('${d}')" title="ดูรายละเอียดรายชั่วโมงของวันนี้">
+      <div class="gantt-dow">${DOW[dt.getDay()]}</div>
+      <div class="gantt-date">${dt.getDate()}/${dt.getMonth() + 1}</div>
+    </div>`;
+  }).join('');
+
+  const trackCols = '<div class="gantt-track-cols">' + '<div class="gantt-col"></div>'.repeat(WINDOW) + '</div>';
+
+  const carsToShow = ganttCarsInScope();
+  if (!carsToShow.length) {
+    wrap.innerHTML = `<p class="empty-state" style="padding:1.5rem;">ไม่มีรถในหมวดนี้</p>`;
+    return;
+  }
+
+  const rows = carsToShow.map(car => {
+    if (car.status === 'maintenance' || car.status === 'blocked') {
+      const label = car.status === 'maintenance' ? 'ซ่อมบำรุง' : 'งดให้บริการ';
+      return `
+        <div class="gantt-row">
+          <div class="gantt-carlabel" title="${car.plate}">${vehicleTypeIcon(car.type)} ${car.plate}</div>
+          <div class="gantt-track gantt-track-disabled">
+            ${trackCols}
+            <span class="pill pill-${car.status}" style="position:relative;">${label}</span>
+          </div>
+        </div>`;
+    }
+
+    const bookings = state.bookings.filter(b =>
+      b.carId === car.id && b.status !== 'completed' &&
+      b.start < windowEnd && b.end >= windowStart
+    );
+
+    const { laneOf, laneCount } = assignGanttLanes(bookings);
+    const conflictIds = new Set();
+    for (let i = 0; i < bookings.length; i++) {
+      for (let j = i + 1; j < bookings.length; j++) {
+        if (bookings[i].start < bookings[j].end && bookings[i].end > bookings[j].start) {
+          conflictIds.add(bookings[i].id);
+          conflictIds.add(bookings[j].id);
+        }
+      }
+    }
+
+    const bars = bookings.map(b => {
+      const clipStart = b.start < windowStart ? windowStart : b.start;
+      const clipEnd    = b.end > windowEnd ? windowEnd : b.end;
+      const startIdx   = daysBetween(windowStart, clipStart);
+      const endIdx     = Math.max(daysBetween(windowStart, clipEnd), startIdx + 0.4);
+      const leftPct    = (startIdx / WINDOW) * 100;
+      const widthPct   = ((endIdx - startIdx) / WINDOW) * 100;
+      const isConflict = conflictIds.has(b.id);
+      const statusClass = isConflict ? 'gantt-bar-conflict' : (b.status === 'active' ? 'gantt-bar-active' : 'gantt-bar-upcoming');
+      const title = `${car.plate} · ${b.customer}\n${b.start}${b.startTime ? ' ' + b.startTime : ''} → ${b.end}${b.endTime ? ' ' + b.endTime : ''}` +
+        (isConflict ? '\n⚠ ชนกับการจองอื่นของรถคันนี้' : '');
+      return `<div class="gantt-bar ${statusClass}"
+        style="left:${leftPct}%;width:${widthPct}%;top:${3 + laneOf[b.id] * 32}px;"
+        title="${title.replace(/"/g, '&quot;')}"
+        onclick="openEditBookingModal('${b.id}')">
+        ${isConflict ? '<i class="fa-solid fa-triangle-exclamation"></i>&nbsp;' : ''}${b.customer}
+      </div>`;
+    }).join('');
+
+    return `
+      <div class="gantt-row" style="min-height:${Math.max(44, laneCount * 32 + 12)}px;">
+        <div class="gantt-carlabel" title="${car.plate}">${vehicleTypeIcon(car.type)} ${car.plate}</div>
+        <div class="gantt-track">${trackCols}${bars}</div>
+      </div>`;
+  }).join('');
+
+  wrap.innerHTML = `
+    <div class="gantt-table">
+      <div class="gantt-header-row">
+        <div class="gantt-carlabel-head">รถ</div>
+        ${headerCells}
+      </div>
+      ${rows}
+    </div>`;
 }
 
 // ── Bookings Page ──────────────────────────────────────────────────────
