@@ -757,43 +757,69 @@ function initGanttDragScroll() {
   if (!wrap || wrap.dataset.dragInit) return;
   wrap.dataset.dragInit = '1';
 
-  const DRAG_THRESHOLD = 6; // px of movement before a tap becomes a pan
-  let dragging = false, moved = false;
-  let startX = 0, startY = 0, startScroll = 0;
-  let lastX = 0, lastT = 0, velocity = 0;
-  let momentumFrame = null;
+  const DRAG_THRESHOLD = 6; // px of movement before a tap becomes a drag
+  let mode = null; // null | 'pan' | 'bar'
+  let startX = 0, startY = 0, moved = false;
 
+  // pan-mode (scroll the whole chart) state
+  let panStartScroll = 0, lastX = 0, lastT = 0, velocity = 0, momentumFrame = null;
   const stopMomentum = () => { if (momentumFrame) cancelAnimationFrame(momentumFrame); momentumFrame = null; };
+
+  // bar-drag-mode (reassign a booking to a different car row) state
+  let dragBookingId = null, dragOrigCarId = null, dragBarEl = null, ghostEl = null, hoveredRow = null;
 
   wrap.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
-    stopMomentum();
-    dragging = true;
-    moved = false;
     startX = e.clientX;
     startY = e.clientY;
-    startScroll = wrap.scrollLeft;
-    lastX = e.clientX;
-    lastT = performance.now();
-    velocity = 0;
+    moved = false;
+
+    const barEl = e.target.closest('.gantt-bar[data-booking-id]');
+    if (barEl) {
+      mode = 'bar';
+      dragBarEl = barEl;
+      dragBookingId = barEl.dataset.bookingId;
+      dragOrigCarId = barEl.closest('.gantt-row')?.dataset.carId || null;
+    } else {
+      mode = 'pan';
+      stopMomentum();
+      panStartScroll = wrap.scrollLeft;
+      lastX = e.clientX;
+      lastT = performance.now();
+      velocity = 0;
+    }
     try { wrap.setPointerCapture(e.pointerId); } catch {}
   });
 
   wrap.addEventListener('pointermove', (e) => {
-    if (!dragging) return;
+    if (!mode) return;
     const dx = e.clientX - startX;
     const dy = e.clientY - startY;
+
+    if (mode === 'bar') {
+      if (!moved) {
+        if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+        moved = true;
+        beginBarGhost(dragBarEl, e.clientX, e.clientY);
+      }
+      e.preventDefault();
+      updateBarGhost(e.clientX, e.clientY);
+      updateHoveredRow(e.clientX, e.clientY);
+      return;
+    }
+
+    // mode === 'pan'
     if (!moved) {
       if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
       // A mostly-vertical gesture is the user trying to scroll the page,
       // not pan the chart — bail out and let native vertical scroll (which
       // touch-action:pan-y already permits) take it from here.
-      if (Math.abs(dy) > Math.abs(dx)) { dragging = false; return; }
+      if (Math.abs(dy) > Math.abs(dx)) { mode = null; return; }
       moved = true;
       wrap.classList.add('gantt-dragging');
     }
     e.preventDefault();
-    wrap.scrollLeft = startScroll - dx;
+    wrap.scrollLeft = panStartScroll - dx;
     const now = performance.now();
     const dt = now - lastT;
     if (dt > 0) velocity = (e.clientX - lastX) / dt;
@@ -801,31 +827,118 @@ function initGanttDragScroll() {
     lastT = now;
   });
 
+  function beginBarGhost(barEl, x, y) {
+    const rect = barEl.getBoundingClientRect();
+    ghostEl = barEl.cloneNode(true);
+    ghostEl.classList.add('gantt-bar-ghost');
+    ghostEl.style.position = 'fixed';
+    ghostEl.style.left = rect.left + 'px';
+    ghostEl.style.top = rect.top + 'px';
+    ghostEl.style.width = rect.width + 'px';
+    ghostEl.dataset.offsetX = x - rect.left;
+    ghostEl.dataset.offsetY = y - rect.top;
+    document.body.appendChild(ghostEl);
+    barEl.classList.add('gantt-bar-dragging-source');
+  }
+  function updateBarGhost(x, y) {
+    if (!ghostEl) return;
+    ghostEl.style.left = (x - (+ghostEl.dataset.offsetX)) + 'px';
+    ghostEl.style.top  = (y - (+ghostEl.dataset.offsetY)) + 'px';
+  }
+  function updateHoveredRow(x, y) {
+    if (hoveredRow) hoveredRow.classList.remove('gantt-row-drop-target');
+    // Hide the ghost for a moment so elementFromPoint sees the real row
+    // underneath instead of the floating clone that's following the pointer.
+    if (ghostEl) ghostEl.style.display = 'none';
+    const el = document.elementFromPoint(x, y);
+    if (ghostEl) ghostEl.style.display = '';
+    hoveredRow = el ? el.closest('.gantt-row[data-car-id]') : null;
+    if (hoveredRow) hoveredRow.classList.add('gantt-row-drop-target');
+  }
+  function cleanupBarDrag() {
+    if (ghostEl) { ghostEl.remove(); ghostEl = null; }
+    if (dragBarEl) dragBarEl.classList.remove('gantt-bar-dragging-source');
+    if (hoveredRow) { hoveredRow.classList.remove('gantt-row-drop-target'); hoveredRow = null; }
+  }
+
   const endDrag = () => {
-    if (!dragging) return;
-    dragging = false;
-    wrap.classList.remove('gantt-dragging');
-    if (!moved) return;
+    if (mode === 'bar') {
+      const targetCarId = hoveredRow ? hoveredRow.dataset.carId : null;
+      const bookingId = dragBookingId, origCarId = dragOrigCarId, wasMoved = moved;
+      cleanupBarDrag();
+      mode = null;
+      if (wasMoved && targetCarId && targetCarId !== origCarId) {
+        reassignBookingCar(bookingId, targetCarId);
+      }
+      // If it was just a tap (not moved), the bar's own onclick already
+      // fires normally — nothing else to do here.
+      return;
+    }
 
-    // This was a pan, not a tap — swallow the click that would otherwise
-    // fire on whatever booking bar/chip ended up under the pointer.
-    const suppressClick = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
-    wrap.addEventListener('click', suppressClick, true);
-    setTimeout(() => wrap.removeEventListener('click', suppressClick, true), 0);
+    if (mode === 'pan') {
+      wrap.classList.remove('gantt-dragging');
+      if (moved) {
+        // This was a pan, not a tap — swallow the click that would
+        // otherwise fire on whatever booking bar/chip is under the pointer.
+        const suppressClick = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
+        wrap.addEventListener('click', suppressClick, true);
+        setTimeout(() => wrap.removeEventListener('click', suppressClick, true), 0);
 
-    // Momentum: keep coasting briefly from the release velocity, decaying
-    // every frame — the "flick and it glides" feel of a native scroller.
-    let v = -velocity * 16;
-    const step = () => {
-      if (Math.abs(v) < 0.5) { momentumFrame = null; return; }
-      wrap.scrollLeft += v;
-      v *= 0.94;
-      momentumFrame = requestAnimationFrame(step);
-    };
-    if (Math.abs(v) > 0.5) momentumFrame = requestAnimationFrame(step);
+        // Momentum: keep coasting briefly from the release velocity,
+        // decaying every frame — "flick and it glides" instead of stopping
+        // dead the instant a finger lifts.
+        let v = -velocity * 16;
+        const step = () => {
+          if (Math.abs(v) < 0.5) { momentumFrame = null; return; }
+          wrap.scrollLeft += v;
+          v *= 0.94;
+          momentumFrame = requestAnimationFrame(step);
+        };
+        if (Math.abs(v) > 0.5) momentumFrame = requestAnimationFrame(step);
+      }
+    }
+    mode = null;
   };
   wrap.addEventListener('pointerup', endDrag);
   wrap.addEventListener('pointercancel', endDrag);
+}
+
+// Drop a booking's bar onto a different car's row to reassign it there —
+// same-model isn't enforced (staff may have a good reason to cross models),
+// so the confirm dialog is the safety net: it always names both cars, and
+// calls out explicitly if the destination already has an overlapping
+// booking, without blocking the move outright (matches this chart's
+// existing "show conflicts, don't hide them" stance elsewhere).
+function reassignBookingCar(bookingId, newCarId) {
+  const booking = state.bookings.find(b => b.id === bookingId);
+  const newCar  = getCarById(newCarId);
+  const oldCar  = booking ? getCarById(booking.carId) : null;
+  if (!booking || !newCar || !oldCar) { renderGanttChart(); return; }
+
+  const conflict = state.bookings.some(b =>
+    b.id !== booking.id && b.carId === newCarId && b.status !== 'completed' &&
+    b.start < booking.end && b.end > booking.start
+  );
+
+  const msg = `ย้ายการจองของ ${booking.customer}\nจาก ${oldCar.plate} (${oldCar.brand} ${oldCar.model})\nไปที่ ${newCar.plate} (${newCar.brand} ${newCar.model})?` +
+    (conflict ? '\n\n⚠ รถคันปลายทางมีการจองซ้อนช่วงเวลานี้อยู่แล้ว ถ้ายืนยันจะเกิดการจองซ้อนที่ต้องตามแก้เอง' : '');
+
+  if (!confirm(msg)) { renderGanttChart(); return; }
+
+  booking.carId = newCarId;
+  booking.updatedAt = nowISO();
+  // Car status flags only need to follow the move for a booking that's
+  // currently checked out — an upcoming booking hasn't put either car
+  // "out" yet, so neither car's status needs to change for that case.
+  if (booking.status === 'active') {
+    updateCarStatus(oldCar.id, 'available');
+    updateCarStatus(newCarId, 'rented');
+  }
+
+  saveToStorage();
+  renderCurrentPage();
+  pushToSheets(['bookings', 'cars']);
+  showToast(`ย้ายการจองไปที่ ${newCar.plate} เรียบร้อย`, 'success');
 }
 
 // Cars belonging to the active tab (รถยนต์/มอเตอร์ไซค์), minus any car
@@ -1129,8 +1242,10 @@ function renderGanttWeekView() {
         : (b.status === 'active' ? 'gantt-bar-active' : 'gantt-bar-upcoming');
       const title = `${car.plate} · ${b.customer}\n${b.start}${b.startTime ? ' ' + b.startTime : ''} → ${b.end}${b.endTime ? ' ' + b.endTime : ''}` +
         (isHardConflict ? '\n⚠ ชนกับการจองอื่นของรถคันนี้ — ไม่มีรถรุ่นเดียวกันว่างให้สลับ ต้องแก้ไขด่วน' : '') +
-        (isSwappable ? `\n⇄ ชนกับการจองอื่นของรถคันนี้ แต่สลับไปคันอื่นได้: ${swapCars.map(c => c.plate).join(', ')}` : '');
+        (isSwappable ? `\n⇄ ชนกับการจองอื่นของรถคันนี้ แต่สลับไปคันอื่นได้: ${swapCars.map(c => c.plate).join(', ')}` : '') +
+        '\n\n💡 ลากชื่อลูกค้าไปวางบนแถวรถคันอื่นเพื่อย้ายการจอง';
       return `<div class="gantt-bar ${statusClass}"
+        data-booking-id="${b.id}"
         style="left:${leftPct}%;width:${widthPct}%;top:${3 + laneOf[b.id] * 32}px;"
         title="${title.replace(/"/g, '&quot;')}"
         onclick="openEditBookingModal('${b.id}')">
@@ -1139,7 +1254,7 @@ function renderGanttWeekView() {
     }).join('');
 
     return groupHeader + `
-      <div class="gantt-row" style="min-height:${Math.max(44, laneCount * 32 + 12)}px;border-left:4px solid ${carColor};background:${ganttCarRowBg(car)};">
+      <div class="gantt-row" data-car-id="${car.id}" style="min-height:${Math.max(44, laneCount * 32 + 12)}px;border-left:4px solid ${carColor};background:${ganttCarRowBg(car)};">
         <div class="gantt-carlabel" title="${car.plate}">${vehicleTypeIcon(car.type)} ${car.plate}</div>
         <div class="gantt-track">${trackCols}${bars}</div>
       </div>`;

@@ -719,6 +719,24 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
   transition: transform .12s, box-shadow .12s;
 }
 .gantt-bar:hover { transform: translateY(-1px); z-index: 5; }
+.gantt-bar[data-booking-id] { cursor: grab; }
+/* Original bar while its ghost is being dragged elsewhere — dashed and
+   faded so it reads as "this one's being moved", not just hidden. */
+.gantt-bar-dragging-source { opacity: .35; border-style: dashed !important; }
+/* The floating clone that follows the pointer during a bar drag. */
+.gantt-bar-ghost {
+  pointer-events: none;
+  z-index: 9999;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  transform: scale(1.04) rotate(-1deg);
+  cursor: grabbing;
+}
+/* Row currently under the dragged ghost — a clear "drop here" highlight. */
+.gantt-row.gantt-row-drop-target {
+  background: rgba(250,204,21,0.12) !important;
+  outline: 2px dashed var(--primary);
+  outline-offset: -2px;
+}
 /* Booking-timeline colors: kept distinct from the car-status glass palette
    (available/rented/maintenance/blocked) since a Gantt bar encodes the
    BOOKING's state, not the car's — active vs. upcoming vs. a scheduling
