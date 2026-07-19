@@ -772,15 +772,34 @@ function initGanttDragScroll() {
   // reorder-mode (drag a car's own row to a new position in the list) state
   let dragRowEl = null, dragRowCarId = null, rowGhostEl = null, insertBeforeRowEl = null, insertPosition = null;
 
+  // reorderGroup-mode (drag a whole model-group header to move all its cars
+  // together) state — reuses the same insert-indicator row target as the
+  // single-row reorder above, just moving a block of car IDs instead of one.
+  let dragGroupEl = null, dragGroupCarIds = null, groupGhostEl = null;
+
+  let pointerId = null;
+
   wrap.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     startX = e.clientX;
     startY = e.clientY;
     moved = false;
+    pointerId = e.pointerId;
+    // Pointer capture is deliberately NOT taken here — only once a drag is
+    // confirmed (past DRAG_THRESHOLD in pointermove below). Capturing
+    // eagerly on every pointerdown, even a plain tap that never moves,
+    // retargets the browser's synthesized click event to this wrapper
+    // instead of the element actually tapped — which silently broke
+    // "click a booking bar to view it" and any other bare click/tap.
 
+    const groupEl = e.target.closest('.gantt-model-group[data-group-car-ids]');
     const labelEl = e.target.closest('.gantt-carlabel-draggable');
     const barEl = e.target.closest('.gantt-bar[data-booking-id]');
-    if (labelEl) {
+    if (groupEl) {
+      mode = 'reorderGroup';
+      dragGroupEl = groupEl;
+      dragGroupCarIds = groupEl.dataset.groupCarIds.split(',');
+    } else if (labelEl) {
       mode = 'reorder';
       dragRowEl = labelEl.closest('.gantt-row');
       dragRowCarId = dragRowEl?.dataset.orderCarId || null;
@@ -797,7 +816,6 @@ function initGanttDragScroll() {
       lastT = performance.now();
       velocity = 0;
     }
-    try { wrap.setPointerCapture(e.pointerId); } catch {}
   });
 
   wrap.addEventListener('pointermove', (e) => {
@@ -809,6 +827,7 @@ function initGanttDragScroll() {
       if (!moved) {
         if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
         moved = true;
+        try { wrap.setPointerCapture(pointerId); } catch {}
         beginBarGhost(dragBarEl, e.clientX, e.clientY);
       }
       e.preventDefault();
@@ -821,10 +840,24 @@ function initGanttDragScroll() {
       if (!moved) {
         if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
         moved = true;
+        try { wrap.setPointerCapture(pointerId); } catch {}
         beginRowGhost(dragRowEl, e.clientX, e.clientY);
       }
       e.preventDefault();
       updateRowGhost(e.clientX, e.clientY);
+      updateInsertIndicator(e.clientX, e.clientY);
+      return;
+    }
+
+    if (mode === 'reorderGroup') {
+      if (!moved) {
+        if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+        moved = true;
+        try { wrap.setPointerCapture(pointerId); } catch {}
+        beginGroupGhost(dragGroupEl, e.clientX, e.clientY);
+      }
+      e.preventDefault();
+      updateGroupGhost(e.clientX, e.clientY);
       updateInsertIndicator(e.clientX, e.clientY);
       return;
     }
@@ -837,6 +870,7 @@ function initGanttDragScroll() {
       // touch-action:pan-y already permits) take it from here.
       if (Math.abs(dy) > Math.abs(dx)) { mode = null; return; }
       moved = true;
+      try { wrap.setPointerCapture(pointerId); } catch {}
       wrap.classList.add('gantt-dragging');
     }
     e.preventDefault();
@@ -899,13 +933,18 @@ function initGanttDragScroll() {
     if (!rowGhostEl) return;
     rowGhostEl.style.top = (y - (+rowGhostEl.dataset.offsetY)) + 'px';
   }
+  // Shared between 'reorder' (one car) and 'reorderGroup' (a whole model
+  // group) — the only difference is which car IDs count as "part of what's
+  // being dragged" and therefore can't be a valid drop target themselves.
   function updateInsertIndicator(x, y) {
     if (insertBeforeRowEl) insertBeforeRowEl.classList.remove('gantt-row-insert-above', 'gantt-row-insert-below');
-    if (rowGhostEl) rowGhostEl.style.display = 'none';
+    const activeGhost = mode === 'reorderGroup' ? groupGhostEl : rowGhostEl;
+    if (activeGhost) activeGhost.style.display = 'none';
     const el = document.elementFromPoint(x, y);
-    if (rowGhostEl) rowGhostEl.style.display = '';
+    if (activeGhost) activeGhost.style.display = '';
     const row = el ? el.closest('.gantt-row[data-order-car-id]') : null;
-    if (!row || row === dragRowEl) { insertBeforeRowEl = null; insertPosition = null; return; }
+    const excludedIds = mode === 'reorderGroup' ? dragGroupCarIds : [dragRowCarId];
+    if (!row || excludedIds.includes(row.dataset.orderCarId)) { insertBeforeRowEl = null; insertPosition = null; return; }
     const rect = row.getBoundingClientRect();
     insertPosition = (y < rect.top + rect.height / 2) ? 'above' : 'below';
     insertBeforeRowEl = row;
@@ -914,6 +953,37 @@ function initGanttDragScroll() {
   function cleanupRowDrag() {
     if (rowGhostEl) { rowGhostEl.remove(); rowGhostEl = null; }
     if (dragRowEl) dragRowEl.classList.remove('gantt-row-dragging-source');
+    if (insertBeforeRowEl) { insertBeforeRowEl.classList.remove('gantt-row-insert-above', 'gantt-row-insert-below'); insertBeforeRowEl = null; }
+    insertPosition = null;
+  }
+
+  function beginGroupGhost(groupEl, x, y) {
+    const rect = groupEl.getBoundingClientRect();
+    groupGhostEl = groupEl.cloneNode(true);
+    groupGhostEl.classList.add('gantt-group-ghost');
+    groupGhostEl.style.position = 'fixed';
+    groupGhostEl.style.left = rect.left + 'px';
+    groupGhostEl.style.top = rect.top + 'px';
+    groupGhostEl.style.width = rect.width + 'px';
+    groupGhostEl.dataset.offsetY = y - rect.top;
+    document.body.appendChild(groupGhostEl);
+    groupEl.classList.add('gantt-row-dragging-source');
+    dragGroupCarIds.forEach(id => {
+      const row = wrap.querySelector(`.gantt-row[data-order-car-id="${id}"]`);
+      if (row) row.classList.add('gantt-row-dragging-source');
+    });
+  }
+  function updateGroupGhost(x, y) {
+    if (!groupGhostEl) return;
+    groupGhostEl.style.top = (y - (+groupGhostEl.dataset.offsetY)) + 'px';
+  }
+  function cleanupGroupDrag() {
+    if (groupGhostEl) { groupGhostEl.remove(); groupGhostEl = null; }
+    if (dragGroupEl) dragGroupEl.classList.remove('gantt-row-dragging-source');
+    if (dragGroupCarIds) dragGroupCarIds.forEach(id => {
+      const row = wrap.querySelector(`.gantt-row[data-order-car-id="${id}"]`);
+      if (row) row.classList.remove('gantt-row-dragging-source');
+    });
     if (insertBeforeRowEl) { insertBeforeRowEl.classList.remove('gantt-row-insert-above', 'gantt-row-insert-below'); insertBeforeRowEl = null; }
     insertPosition = null;
   }
@@ -939,6 +1009,17 @@ function initGanttDragScroll() {
       mode = null;
       if (wasMoved && targetCarId && sourceCarId && targetCarId !== sourceCarId) {
         applyGanttRowReorder(sourceCarId, targetCarId, position);
+      }
+      return;
+    }
+
+    if (mode === 'reorderGroup') {
+      const targetCarId = insertBeforeRowEl ? insertBeforeRowEl.dataset.orderCarId : null;
+      const position = insertPosition, sourceCarIds = dragGroupCarIds, wasMoved = moved;
+      cleanupGroupDrag();
+      mode = null;
+      if (wasMoved && targetCarId && sourceCarIds) {
+        applyGanttGroupReorder(sourceCarIds, targetCarId, position);
       }
       return;
     }
@@ -981,6 +1062,23 @@ function applyGanttRowReorder(sourceCarId, targetCarId, position) {
   const targetIdx = currentList.indexOf(targetCarId);
   if (targetIdx === -1) { renderGanttChart(); return; }
   currentList.splice(position === 'above' ? targetIdx : targetIdx + 1, 0, sourceCarId);
+
+  const orderMap = {};
+  currentList.forEach((id, i) => { orderMap[id] = i; });
+  saveGanttOrder(orderMap);
+  renderGanttChart();
+}
+
+// Same idea as applyGanttRowReorder, but moves an entire model group (every
+// car under one "Honda City · 3 คัน"-style header) as one contiguous block,
+// preserving their order relative to each other — dragging the group header
+// itself is what "เรียงลำดับยี่ห้อ/รุ่น" (group-level reordering) means here,
+// as opposed to dragging one car's own row.
+function applyGanttGroupReorder(sourceCarIds, targetCarId, position) {
+  const currentList = ganttCarsInScope().map(c => c.id).filter(id => !sourceCarIds.includes(id));
+  const targetIdx = currentList.indexOf(targetCarId);
+  if (targetIdx === -1) { renderGanttChart(); return; }
+  currentList.splice(position === 'above' ? targetIdx : targetIdx + 1, 0, ...sourceCarIds);
 
   const orderMap = {};
   currentList.forEach((id, i) => { orderMap[id] = i; });
@@ -1277,18 +1375,22 @@ function renderGanttWeekView() {
   // Group cars by model so swap candidates are visually adjacent — a thin
   // label divider marks each new model group, only when it actually has
   // more than one car (a group of one has no swap partner to point at).
+  // Also collect each group's car IDs, so its header can be grabbed to drag
+  // the whole group as one block (see 'reorderGroup' mode).
   const modelCounts = {};
+  const modelCarIds = {};
   carsToShow.forEach(car => {
     const key = `${car.brand}|||${car.model}`;
     modelCounts[key] = (modelCounts[key] || 0) + 1;
+    (modelCarIds[key] = modelCarIds[key] || []).push(car.id);
   });
   let lastModelKey = null;
 
   const rows = carsToShow.map(car => {
     const modelKey = `${car.brand}|||${car.model}`;
     const groupHeader = (modelKey !== lastModelKey && modelCounts[modelKey] > 1)
-      ? `<div class="gantt-model-group">
-          <i class="fa-solid fa-layer-group"></i> ${car.brand} ${car.model} <span class="gantt-model-group-count">· ${modelCounts[modelKey]} คัน</span>
+      ? `<div class="gantt-model-group gantt-model-group-draggable" data-group-car-ids="${modelCarIds[modelKey].join(',')}" title="ลากเพื่อย้ายทั้งกลุ่ม · ${car.brand} ${car.model}">
+          <i class="fa-solid fa-grip-vertical gantt-drag-handle"></i><i class="fa-solid fa-layer-group"></i> ${car.brand} ${car.model} <span class="gantt-model-group-count">· ${modelCounts[modelKey]} คัน</span>
         </div>`
       : '';
     lastModelKey = modelKey;
