@@ -782,13 +782,15 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
 
 /* Model-group divider — a full-width band (not a thin colored line) so
    "these rows are the same model, interchangeable" reads as an unmissable
-   structural break on its own, without depending on anyone distinguishing
-   between similar hues. Color here is just a light accent on top of that;
-   the text label + count is what actually carries the information. */
+   structural break on its own — text + a full-width band, not color, is
+   what carries the grouping, since each row below now has its own strong,
+   distinct per-car color (see ganttCarColor) and a brand-tinted header
+   would just clash with rows that no longer share one hue with each other. */
 .gantt-model-group {
   padding: .5rem .75rem;
   margin: .35rem -1.25rem .3rem;
-  border-left: 3px solid;
+  background: rgba(255,255,255,0.05);
+  border-left: 3px solid rgba(255,255,255,0.18);
   font-size: .78rem;
   font-weight: 700;
   color: var(--gray-800);
