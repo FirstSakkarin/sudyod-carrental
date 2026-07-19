@@ -679,7 +679,8 @@ function renderGanttTypeTabs() {
   if (!el) return;
   el.innerHTML = `
     <button class="gantt-type-tab ${ganttVehicleType === 'car' ? 'active' : ''}" onclick="setGanttVehicleType('car')">รถยนต์</button>
-    <button class="gantt-type-tab ${ganttVehicleType === 'motorcycle' ? 'active' : ''}" onclick="setGanttVehicleType('motorcycle')">มอเตอร์ไซค์</button>`;
+    <button class="gantt-type-tab ${ganttVehicleType === 'motorcycle' ? 'active' : ''}" onclick="setGanttVehicleType('motorcycle')">มอเตอร์ไซค์</button>
+    ${hasCustomGanttOrder() ? `<button class="gantt-type-tab gantt-reset-order-btn" onclick="resetGanttOrder()" title="กลับไปเรียงตามยี่ห้อ/รุ่นอัตโนมัติ"><i class="fa-solid fa-arrow-rotate-left"></i></button>` : ''}`;
 }
 
 function shiftGantt(days) { ganttOffset += days; renderGanttChart(); }
@@ -758,7 +759,7 @@ function initGanttDragScroll() {
   wrap.dataset.dragInit = '1';
 
   const DRAG_THRESHOLD = 6; // px of movement before a tap becomes a drag
-  let mode = null; // null | 'pan' | 'bar'
+  let mode = null; // null | 'pan' | 'bar' | 'reorder'
   let startX = 0, startY = 0, moved = false;
 
   // pan-mode (scroll the whole chart) state
@@ -768,14 +769,22 @@ function initGanttDragScroll() {
   // bar-drag-mode (reassign a booking to a different car row) state
   let dragBookingId = null, dragOrigCarId = null, dragBarEl = null, ghostEl = null, hoveredRow = null;
 
+  // reorder-mode (drag a car's own row to a new position in the list) state
+  let dragRowEl = null, dragRowCarId = null, rowGhostEl = null, insertBeforeRowEl = null, insertPosition = null;
+
   wrap.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     startX = e.clientX;
     startY = e.clientY;
     moved = false;
 
+    const labelEl = e.target.closest('.gantt-carlabel-draggable');
     const barEl = e.target.closest('.gantt-bar[data-booking-id]');
-    if (barEl) {
+    if (labelEl) {
+      mode = 'reorder';
+      dragRowEl = labelEl.closest('.gantt-row');
+      dragRowCarId = dragRowEl?.dataset.orderCarId || null;
+    } else if (barEl) {
       mode = 'bar';
       dragBarEl = barEl;
       dragBookingId = barEl.dataset.bookingId;
@@ -805,6 +814,18 @@ function initGanttDragScroll() {
       e.preventDefault();
       updateBarGhost(e.clientX, e.clientY);
       updateHoveredRow(e.clientX, e.clientY);
+      return;
+    }
+
+    if (mode === 'reorder') {
+      if (!moved) {
+        if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+        moved = true;
+        beginRowGhost(dragRowEl, e.clientX, e.clientY);
+      }
+      e.preventDefault();
+      updateRowGhost(e.clientX, e.clientY);
+      updateInsertIndicator(e.clientX, e.clientY);
       return;
     }
 
@@ -861,6 +882,42 @@ function initGanttDragScroll() {
     if (hoveredRow) { hoveredRow.classList.remove('gantt-row-drop-target'); hoveredRow = null; }
   }
 
+  function beginRowGhost(rowEl, x, y) {
+    const rect = rowEl.getBoundingClientRect();
+    rowGhostEl = rowEl.cloneNode(true);
+    rowGhostEl.classList.add('gantt-row-ghost');
+    rowGhostEl.style.position = 'fixed';
+    rowGhostEl.style.left = rect.left + 'px';
+    rowGhostEl.style.top = rect.top + 'px';
+    rowGhostEl.style.width = rect.width + 'px';
+    rowGhostEl.style.height = rect.height + 'px';
+    rowGhostEl.dataset.offsetY = y - rect.top;
+    document.body.appendChild(rowGhostEl);
+    rowEl.classList.add('gantt-row-dragging-source');
+  }
+  function updateRowGhost(x, y) {
+    if (!rowGhostEl) return;
+    rowGhostEl.style.top = (y - (+rowGhostEl.dataset.offsetY)) + 'px';
+  }
+  function updateInsertIndicator(x, y) {
+    if (insertBeforeRowEl) insertBeforeRowEl.classList.remove('gantt-row-insert-above', 'gantt-row-insert-below');
+    if (rowGhostEl) rowGhostEl.style.display = 'none';
+    const el = document.elementFromPoint(x, y);
+    if (rowGhostEl) rowGhostEl.style.display = '';
+    const row = el ? el.closest('.gantt-row[data-order-car-id]') : null;
+    if (!row || row === dragRowEl) { insertBeforeRowEl = null; insertPosition = null; return; }
+    const rect = row.getBoundingClientRect();
+    insertPosition = (y < rect.top + rect.height / 2) ? 'above' : 'below';
+    insertBeforeRowEl = row;
+    row.classList.add(insertPosition === 'above' ? 'gantt-row-insert-above' : 'gantt-row-insert-below');
+  }
+  function cleanupRowDrag() {
+    if (rowGhostEl) { rowGhostEl.remove(); rowGhostEl = null; }
+    if (dragRowEl) dragRowEl.classList.remove('gantt-row-dragging-source');
+    if (insertBeforeRowEl) { insertBeforeRowEl.classList.remove('gantt-row-insert-above', 'gantt-row-insert-below'); insertBeforeRowEl = null; }
+    insertPosition = null;
+  }
+
   const endDrag = () => {
     if (mode === 'bar') {
       const targetCarId = hoveredRow ? hoveredRow.dataset.carId : null;
@@ -872,6 +929,17 @@ function initGanttDragScroll() {
       }
       // If it was just a tap (not moved), the bar's own onclick already
       // fires normally — nothing else to do here.
+      return;
+    }
+
+    if (mode === 'reorder') {
+      const targetCarId = insertBeforeRowEl ? insertBeforeRowEl.dataset.orderCarId : null;
+      const position = insertPosition, sourceCarId = dragRowCarId, wasMoved = moved;
+      cleanupRowDrag();
+      mode = null;
+      if (wasMoved && targetCarId && sourceCarId && targetCarId !== sourceCarId) {
+        applyGanttRowReorder(sourceCarId, targetCarId, position);
+      }
       return;
     }
 
@@ -901,6 +969,23 @@ function initGanttDragScroll() {
   };
   wrap.addEventListener('pointerup', endDrag);
   wrap.addEventListener('pointercancel', endDrag);
+}
+
+// Moves sourceCarId to just before/after targetCarId in the current tab's
+// row order and persists it (see saveGanttOrder/ganttCarsInScope) — this is
+// what lets staff sort the queue however makes sense to them (by car, by
+// dragging same-brand or same-model cars next to each other, whatever),
+// rather than being stuck with the default brand→model→plate ordering.
+function applyGanttRowReorder(sourceCarId, targetCarId, position) {
+  const currentList = ganttCarsInScope().map(c => c.id).filter(id => id !== sourceCarId);
+  const targetIdx = currentList.indexOf(targetCarId);
+  if (targetIdx === -1) { renderGanttChart(); return; }
+  currentList.splice(position === 'above' ? targetIdx : targetIdx + 1, 0, sourceCarId);
+
+  const orderMap = {};
+  currentList.forEach((id, i) => { orderMap[id] = i; });
+  saveGanttOrder(orderMap);
+  renderGanttChart();
 }
 
 // Drop a booking's bar onto a different car's row to reassign it there —
@@ -947,17 +1032,38 @@ function reassignBookingCar(bookingId, newCarId) {
 // ทะเบียน": grouping same-model cars together is what makes a swap
 // suggestion (see findSwapCandidates) legible at a glance, since the
 // candidate car is right there in an adjacent row.
+// Row order is drag-customizable (see initGanttDragScroll's 'reorder' mode)
+// and persisted separately per รถยนต์/มอเตอร์ไซค์ tab, since those are two
+// unrelated lists. Cars with no saved position (new fleet additions, or
+// before anyone has dragged anything) fall back to sorting by brand → model
+// → plate, so the list is always sensible without requiring setup first.
+function ganttOrderKey() { return 'ganttOrder_' + ganttVehicleType; }
+function loadGanttOrder() {
+  try { return JSON.parse(localStorage.getItem(ganttOrderKey()) || '{}'); } catch { return {}; }
+}
+function saveGanttOrder(orderMap) { localStorage.setItem(ganttOrderKey(), JSON.stringify(orderMap)); }
+function hasCustomGanttOrder() { return Object.keys(loadGanttOrder()).length > 0; }
+function resetGanttOrder() {
+  if (!confirm('รีเซ็ตลำดับรถกลับเป็นเรียงตามยี่ห้อ/รุ่นอัตโนมัติ?')) return;
+  localStorage.removeItem(ganttOrderKey());
+  renderGanttChart();
+}
+
 function ganttCarsInScope() {
-  return state.cars
-    .filter(car =>
-      (ganttVehicleType === 'motorcycle' ? car.type === 'motorcycle' : car.type !== 'motorcycle') &&
-      !hasLongTermBooking(car.id)
-    )
-    .sort((a, b) =>
-      (a.brand || '').localeCompare(b.brand || '') ||
-      (a.model || '').localeCompare(b.model || '') ||
-      a.plate.localeCompare(b.plate)
-    );
+  const filtered = state.cars.filter(car =>
+    (ganttVehicleType === 'motorcycle' ? car.type === 'motorcycle' : car.type !== 'motorcycle') &&
+    !hasLongTermBooking(car.id)
+  );
+  const defaultSorted = [...filtered].sort((a, b) =>
+    (a.brand || '').localeCompare(b.brand || '') ||
+    (a.model || '').localeCompare(b.model || '') ||
+    a.plate.localeCompare(b.plate)
+  );
+  const order = loadGanttOrder();
+  if (!Object.keys(order).length) return defaultSorted;
+  const ranked   = defaultSorted.filter(c => order[c.id] !== undefined).sort((a, b) => order[a.id] - order[b.id]);
+  const unranked = defaultSorted.filter(c => order[c.id] === undefined);
+  return [...ranked, ...unranked];
 }
 
 // Same-model cars are interchangeable from the customer's point of view, so
@@ -1192,8 +1298,8 @@ function renderGanttWeekView() {
     if (car.status === 'maintenance' || car.status === 'blocked') {
       const label = car.status === 'maintenance' ? 'ซ่อมบำรุง' : 'งดให้บริการ';
       return groupHeader + `
-        <div class="gantt-row" style="border-left:4px solid ${carColor};background:${ganttCarRowBg(car)};">
-          <div class="gantt-carlabel" title="${car.plate}">${vehicleTypeIcon(car.type)} ${car.plate}</div>
+        <div class="gantt-row" data-order-car-id="${car.id}" style="border-left:4px solid ${carColor};background:${ganttCarRowBg(car)};">
+          <div class="gantt-carlabel gantt-carlabel-draggable" title="ลากเพื่อเรียงลำดับ · ${car.plate}"><i class="fa-solid fa-grip-vertical gantt-drag-handle"></i>${vehicleTypeIcon(car.type)} ${car.plate}</div>
           <div class="gantt-track gantt-track-disabled">
             ${trackCols}
             <span class="pill pill-${car.status}" style="position:relative;">${label}</span>
@@ -1254,8 +1360,8 @@ function renderGanttWeekView() {
     }).join('');
 
     return groupHeader + `
-      <div class="gantt-row" data-car-id="${car.id}" style="min-height:${Math.max(44, laneCount * 32 + 12)}px;border-left:4px solid ${carColor};background:${ganttCarRowBg(car)};">
-        <div class="gantt-carlabel" title="${car.plate}">${vehicleTypeIcon(car.type)} ${car.plate}</div>
+      <div class="gantt-row" data-car-id="${car.id}" data-order-car-id="${car.id}" style="min-height:${Math.max(44, laneCount * 32 + 12)}px;border-left:4px solid ${carColor};background:${ganttCarRowBg(car)};">
+        <div class="gantt-carlabel gantt-carlabel-draggable" title="ลากเพื่อเรียงลำดับ · ${car.plate}"><i class="fa-solid fa-grip-vertical gantt-drag-handle"></i>${vehicleTypeIcon(car.type)} ${car.plate}</div>
         <div class="gantt-track">${trackCols}${bars}</div>
       </div>`;
   }).join('');
