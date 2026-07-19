@@ -191,59 +191,47 @@
           </button>
         </div>
 
-        <div class="section-card">
-          <div class="section-card-header">
-            <h3><i class="fa-solid fa-magnifying-glass"></i> เช็ครถว่างด่วน</h3>
+        <div class="section-card quick-check-card">
+          <div class="section-card-header quick-check-header">
+            <h3><i class="fa-solid fa-bolt"></i> เช็คคิวรถด่วน</h3>
           </div>
           <div class="suggest-form">
-            <div class="form-row-3">
+            <div class="form-group">
+              <label>ประเภทรถ</label>
+              <select id="bookSuggestType" onchange="runBookingsSearch()">
+                <option value="">ทุกประเภท</option>
+                <option value="sedan">Sedan</option>
+                <option value="hatchback">Hatchback</option>
+                <option value="suv">SUV</option>
+                <option value="mpv">MPV</option>
+                <option value="ppv">PPV</option>
+                <option value="van">รถตู้</option>
+                <option value="pickup">กระบะ</option>
+                <option value="ev">EV</option>
+                <option value="motorcycle">มอเตอร์ไซค์</option>
+              </select>
+            </div>
+            <div class="quick-check-pair">
               <div class="form-group">
-                <label><i class="fa-solid fa-calendar"></i> วันรับรถ</label>
+                <label>วันรับรถ</label>
                 <input type="date" id="bookSuggestDate" onchange="runBookingsSearch()" />
               </div>
+              <span class="quick-check-dash">–</span>
               <div class="form-group">
-                <label><i class="fa-solid fa-clock"></i> เวลารับรถ</label>
-                <input type="time" id="bookSuggestTime" onchange="runBookingsSearch()" />
-              </div>
-              <div class="form-group">
-                <label><i class="fa-solid fa-location-dot"></i> สถานที่รับรถ</label>
-                <input type="text" id="bookSuggestLocation" placeholder="เช่น สนามบินเชียงใหม่" onchange="runBookingsSearch()" />
-              </div>
-            </div>
-            <div class="form-row-3">
-              <div class="form-group">
-                <label><i class="fa-solid fa-calendar-xmark"></i> วันคืนรถ</label>
+                <label>วันคืนรถ</label>
                 <input type="date" id="bookSuggestEndDate" onchange="runBookingsSearch()" />
-              </div>
-              <div class="form-group">
-                <label><i class="fa-solid fa-clock"></i> เวลาคืนรถ</label>
-                <input type="time" id="bookSuggestEndTime" onchange="runBookingsSearch()" />
-              </div>
-              <div class="form-group">
-                <label><i class="fa-solid fa-location-dot"></i> สถานที่คืนรถ</label>
-                <input type="text" id="bookSuggestEndLocation" placeholder="เช่น สำนักงาน" onchange="runBookingsSearch()" />
               </div>
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label><i class="fa-solid fa-car"></i> ประเภทรถ</label>
-                <select id="bookSuggestType" onchange="runBookingsSearch()">
-                  <option value="">ทุกประเภท</option>
-                  <option value="sedan">Sedan</option>
-                  <option value="hatchback">Hatchback</option>
-                  <option value="suv">SUV</option>
-                  <option value="mpv">MPV</option>
-                  <option value="ppv">PPV</option>
-                  <option value="van">รถตู้</option>
-                  <option value="pickup">กระบะ</option>
-                  <option value="ev">EV</option>
-                  <option value="motorcycle">มอเตอร์ไซค์</option>
-                </select>
+                <label>เวลารับรถ</label>
+                <input type="time" id="bookSuggestTime" onchange="runBookingsSearch()" />
+              </div>
+              <div class="form-group">
+                <label>เวลาคืนรถ</label>
+                <input type="time" id="bookSuggestEndTime" onchange="runBookingsSearch()" />
               </div>
             </div>
-            <button class="btn btn-primary" onclick="runBookingsSearch()">
-              <i class="fa-solid fa-magnifying-glass"></i> ค้นหารถ
-            </button>
           </div>
           <div id="bookSuggestResults"></div>
         </div>

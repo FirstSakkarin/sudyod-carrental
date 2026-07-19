@@ -1138,6 +1138,18 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 
 /* ========== SUGGEST PAGE ========== */
 .suggest-form { padding: 1rem 1.25rem; }
+
+/* "เช็คคิวรถด่วน" quick-check widget: solid yellow header on a dark card,
+   trimmed to just type + pickup/return date + time (no location/button —
+   results list itself updates live via each field's onchange). */
+.quick-check-header {
+  background: var(--primary);
+  border-bottom: none;
+}
+.quick-check-header h3 { color: #1a1a1a; font-weight: 800; font-size: 1.05rem; }
+.quick-check-pair { display: flex; align-items: flex-end; gap: .6rem; }
+.quick-check-pair .form-group { flex: 1; min-width: 0; }
+.quick-check-dash { padding-bottom: .68rem; color: var(--gray-500); font-weight: 700; }
 #suggestResults .section-card { margin-top: 1rem; }
 .suggest-car-card {
   display: flex;

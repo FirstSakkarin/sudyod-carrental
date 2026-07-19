@@ -1224,10 +1224,14 @@ function prefillBooking(carId, prefix = 'suggest') {
   document.getElementById('bookingCar').value             = carId;
   document.getElementById('bookingStart').value           = document.getElementById(`${prefix}Date`).value;
   document.getElementById('bookingStartTime').value       = document.getElementById(`${prefix}Time`).value;
-  document.getElementById('bookingPickupLocation').value  = document.getElementById(`${prefix}Location`).value.trim();
   document.getElementById('bookingEnd').value             = document.getElementById(`${prefix}EndDate`).value;
   document.getElementById('bookingEndTime').value         = document.getElementById(`${prefix}EndTime`).value;
-  document.getElementById('bookingReturnLocation').value  = document.getElementById(`${prefix}EndLocation`).value.trim();
+  // The quick-check widget (prefix 'bookSuggest') has no location fields —
+  // only the full "ค้นหา & จองรถ" page (prefix 'suggest') does.
+  const pickupLoc = document.getElementById(`${prefix}Location`);
+  const returnLoc = document.getElementById(`${prefix}EndLocation`);
+  if (pickupLoc) document.getElementById('bookingPickupLocation').value = pickupLoc.value.trim();
+  if (returnLoc) document.getElementById('bookingReturnLocation').value = returnLoc.value.trim();
   calcBookingTotal();
 }
 
