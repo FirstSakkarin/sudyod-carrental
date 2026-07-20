@@ -1124,13 +1124,11 @@ function reassignBookingCar(bookingId, newCarId) {
 
   booking.carId = newCarId;
   booking.updatedAt = nowISO();
-  // Car status flags only need to follow the move for a booking that's
-  // currently checked out — an upcoming booking hasn't put either car
-  // "out" yet, so neither car's status needs to change for that case.
-  if (booking.status === 'active') {
-    updateCarStatus(oldCar.id, 'available');
-    updateCarStatus(newCarId, 'rented');
-  }
+  // Re-derive both cars' status from their remaining bookings rather than
+  // setting them directly — the old car may still have another active
+  // booking of its own, so it shouldn't be blindly marked 'available'.
+  syncCarActiveStatus(oldCar.id);
+  syncCarActiveStatus(newCarId);
 
   saveToStorage();
   renderCurrentPage();
@@ -1720,7 +1718,7 @@ function saveBooking() {
   const total = days * rate + otFee;
 
   const data = {
-    carId, customer, start, end, rate, total, status, otFee,
+    carId, customer, start, end, rate, total, otFee,
     startTime:       document.getElementById('bookingStartTime').value || '',
     endTime:         document.getElementById('bookingEndTime').value || '',
     pickupLocation:  document.getElementById('bookingPickupLocation').value.trim(),
@@ -1731,16 +1729,27 @@ function saveBooking() {
     bookingDeposit:   +document.getElementById('bookingAdvance').value || 0,
     mileageOut,
     note:         document.getElementById('bookingNote').value.trim(),
-    extra: 0, returnMileage: null,
     updatedAt: nowISO(),
   };
 
   let touchedCar = false;
   if (id) {
     const idx = state.bookings.findIndex(b => b.id === id);
-    if (idx > -1) state.bookings[idx] = { ...state.bookings[idx], ...data };
+    if (idx > -1) {
+      const existing = state.bookings[idx];
+      // Editing an already-returned booking must not resurrect it — leave
+      // status/extra/returnMileage/finalTotal exactly as confirmReturn left
+      // them, only update the editable trip details.
+      if (existing.status !== 'completed') data.status = status;
+      const oldCarId = existing.carId;
+      state.bookings[idx] = { ...existing, ...data };
+      if (existing.status !== 'completed') {
+        if (syncCarActiveStatus(oldCarId)) touchedCar = true;
+        if (oldCarId !== carId && syncCarActiveStatus(carId)) touchedCar = true;
+      }
+    }
   } else {
-    state.bookings.push({ id: 'b' + Date.now(), ...data });
+    state.bookings.push({ id: 'b' + Date.now(), ...data, status, extra: 0, returnMileage: null });
     // Mark car as rented if active
     if (status === 'active') { updateCarStatus(carId, 'rented'); touchedCar = true; }
   }
@@ -1842,13 +1851,12 @@ function confirmReturn() {
 
   state.bookings[idx] = { ...b, status: 'completed', returnDate, returnTime, returnMileage: returnMile, kmDriven, extra, finalTotal, returnNote, updatedAt: nowISO() };
 
-  // Update car mileage & status
+  // Update car mileage, then re-derive status from any remaining active
+  // bookings — not a blind 'available', since the same car can be
+  // double-booked and still owe another customer their rental.
   const carIdx = state.cars.findIndex(c => c.id === b.carId);
-  if (carIdx > -1) {
-    state.cars[carIdx].status  = 'available';
-    if (returnMile) state.cars[carIdx].mileage = returnMile;
-    touch(state.cars[carIdx]);
-  }
+  if (carIdx > -1 && returnMile) { state.cars[carIdx].mileage = returnMile; touch(state.cars[carIdx]); }
+  syncCarActiveStatus(b.carId);
 
   saveToStorage();
   closeModal('returnModal');
@@ -1947,10 +1955,15 @@ function saveMaintenance() {
     if (idx > -1) state.maintenance[idx] = { ...state.maintenance[idx], ...data };
   } else {
     state.maintenance.push({ id: 'm' + Date.now(), ...data });
-    // Update car next service mileage
-    if (data.nextService) {
-      const cIdx = state.cars.findIndex(c => c.id === carId);
-      if (cIdx > -1) { state.cars[cIdx].nextService = data.nextService; touch(state.cars[cIdx]); touchedCarNextService = true; }
+  }
+  // Keep the car's next-service mileage in sync with whatever this form
+  // submission says, whether this record is newly created or being
+  // corrected — matches how the rest of this save already treats the form
+  // as the source of truth for the car's maintenance state.
+  if (data.nextService) {
+    const cIdx = state.cars.findIndex(c => c.id === carId);
+    if (cIdx > -1 && state.cars[cIdx].nextService !== data.nextService) {
+      state.cars[cIdx].nextService = data.nextService; touch(state.cars[cIdx]); touchedCarNextService = true;
     }
   }
 
@@ -2915,6 +2928,24 @@ function vehicleTypeIcon(type, color) {
 function updateCarStatus(carId, status) {
   const idx = state.cars.findIndex(c => c.id === carId);
   if (idx > -1) { state.cars[idx].status = status; touch(state.cars[idx]); }
+}
+
+// Recomputes carId's status from whether it currently has any 'active'
+// booking, without disturbing cars parked in maintenance/blocked — those
+// were taken out of the rental pool on purpose and a booking edit
+// shouldn't silently put them back in service. Returns true if it changed
+// anything, so callers know whether a 'cars' sync is needed.
+function syncCarActiveStatus(carId) {
+  const cIdx = state.cars.findIndex(c => c.id === carId);
+  if (cIdx < 0) return false;
+  const car = state.cars[cIdx];
+  if (car.status !== 'rented' && car.status !== 'available') return false;
+  const shouldBeRented = state.bookings.some(b => b.carId === carId && b.status === 'active');
+  const newStatus = shouldBeRented ? 'rented' : 'available';
+  if (car.status === newStatus) return false;
+  car.status = newStatus;
+  touch(car);
+  return true;
 }
 
 function populateCarSelect(selectId, availableOnly) {
