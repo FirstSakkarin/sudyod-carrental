@@ -1664,8 +1664,8 @@ function calcBookingTotal() {
   document.getElementById('bookingTotal').textContent = '฿' + total.toLocaleString() + (otFee ? ` (รวม OT ${otFee.toLocaleString()} ฿)` : '');
   box.style.display = 'flex';
 
-  // ยอดชำระวันรับรถ = (ค่าเช่า×วัน) + เงินประกัน - เงินจอง (OT ตัดสินตอนคืนรถ จึงไม่รวมที่นี่)
-  const pickupPayment = rentalCost + deposit - advance;
+  // ยอดชำระวันรับรถ = (ค่าเช่า×วัน) + ค่า OT + เงินประกัน - เงินจอง
+  const pickupPayment = rentalCost + otFee + deposit - advance;
   document.getElementById('bookingPickupPayment').textContent = '฿' + pickupPayment.toLocaleString();
   pickupBox.style.display = (deposit || advance) ? 'flex' : 'none';
 }
