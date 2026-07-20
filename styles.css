@@ -1113,9 +1113,6 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
    one column below 768px. Used where the two fields are meant to be read
    as a pair (pickup/return location, deposit/advance). */
 .form-row-2col { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
-/* Mileage / special rate / OT fee — OT gets a narrower 30% share since its
-   values are short, leaving more room for the other two fields. */
-.form-row-price { display: grid; grid-template-columns: 7fr 7fr 6fr; gap: .75rem; }
 
 .form-group input,
 .form-group select,
