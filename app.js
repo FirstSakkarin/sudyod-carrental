@@ -1541,8 +1541,10 @@ function renderBookingsPage() {
                 <td>${b.customer}<br><span style="font-size:.78rem;">${telLink(b.phone)}</span></td>
                 <td>
                   <div class="booking-daterange">
-                    <div>รับ ${b.start}${b.startTime ? ' ' + b.startTime : ''}</div>
-                    <div>คืน ${b.end}${b.endTime ? ' ' + b.endTime : ''}</div>
+                    <div>รับ ${formatDateShortThai(b.start)}</div>
+                    ${b.startTime ? `<div class="daterange-time">${b.startTime}</div>` : ''}
+                    <div>คืน ${formatDateShortThai(b.end)}</div>
+                    ${b.endTime ? `<div class="daterange-time">${b.endTime}</div>` : ''}
                   </div>
                   ${isOverdue ? '<span class="pill pill-overdue" style="font-size:.68rem;margin-top:.25rem;">เกินกำหนด</span>' : ''}
                   ${b.pickupLocation || b.returnLocation ? `<div class="return-location">${b.pickupLocation ? 'ส่ง: ' + mapLink(b.pickupLocation) : ''}${b.pickupLocation && b.returnLocation ? '<br>' : ''}${b.returnLocation ? 'คืน: ' + mapLink(b.returnLocation) : ''}</div>` : ''}
@@ -2996,6 +2998,16 @@ function formatDateThai(d) {
   const DAYS = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัส','ศุกร์','เสาร์'];
   const MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
   return `${DAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear() + 543}`;
+}
+
+// Compact d/mmm/yy form for tight spaces (mobile table cells) — no weekday,
+// 2-digit Buddhist year, e.g. "2026-07-01" -> "1 ก.ค. 69".
+function formatDateShortThai(dateStr) {
+  if (!dateStr) return '';
+  const MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const [y, m, d] = dateStr.split('-').map(Number);
+  if (!y || !m || !d) return dateStr;
+  return `${d} ${MONTHS[m - 1]} ${String(y + 543).slice(-2)}`;
 }
 
 // ── Custom date/time pickers ────────────────────────────────────────────
