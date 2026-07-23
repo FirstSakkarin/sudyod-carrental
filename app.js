@@ -1541,10 +1541,10 @@ function renderBookingsPage() {
                 <td>${b.customer}<br><span style="font-size:.78rem;">${telLink(b.phone)}</span></td>
                 <td>
                   <div class="booking-daterange">
-                    <div>รับ ${formatDateShortThai(b.start)}</div>
-                    ${b.startTime ? `<div class="daterange-time">${b.startTime}</div>` : ''}
-                    <div>คืน ${formatDateShortThai(b.end)}</div>
-                    ${b.endTime ? `<div class="daterange-time">${b.endTime}</div>` : ''}
+                    <div class="daterange-pickup">รับ ${formatDateShortThai(b.start)}</div>
+                    ${b.startTime ? `<div class="daterange-time daterange-pickup">${b.startTime}</div>` : ''}
+                    <div class="daterange-return">คืน ${formatDateShortThai(b.end)}</div>
+                    ${b.endTime ? `<div class="daterange-time daterange-return">${b.endTime}</div>` : ''}
                   </div>
                   ${isOverdue ? '<span class="pill pill-overdue" style="font-size:.68rem;margin-top:.25rem;">เกินกำหนด</span>' : ''}
                   ${b.pickupLocation || b.returnLocation ? `<div class="return-location">${b.pickupLocation ? 'ส่ง: ' + mapLink(b.pickupLocation) : ''}${b.pickupLocation && b.returnLocation ? '<br>' : ''}${b.returnLocation ? 'คืน: ' + mapLink(b.returnLocation) : ''}</div>` : ''}

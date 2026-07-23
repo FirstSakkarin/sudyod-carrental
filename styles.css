@@ -394,7 +394,11 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
 .map-link:hover { color: #6ee7b7; border-bottom-color: #6ee7b7; }
 .return-location { font-size: .76rem; color: var(--gray-500); margin-top: .15rem; }
 .booking-daterange { display: flex; flex-direction: column; gap: .15rem; }
-.daterange-time { font-size: .78rem; color: var(--gray-500); margin: -.1rem 0 .1rem; }
+.daterange-time { font-size: .78rem; margin: -.1rem 0 .1rem; opacity: .75; }
+/* Same blue/gold pairing as the Gantt chart's deliver/return events, so
+   "รับ" vs "คืน" read as visually distinct at a glance. */
+.daterange-pickup { color: #60a5fa; }
+.daterange-return { color: var(--primary); }
 
 /* Stat boxes share the car cards' liquid-glass palette: translucent
    status-tinted gradient + tinted border and glow, white text on top. */
