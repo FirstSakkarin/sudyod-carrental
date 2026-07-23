@@ -1539,8 +1539,14 @@ function renderBookingsPage() {
               <tr class="row-clickable" onclick="openEditBookingModal('${b.id}')">
                 <td><strong>${car ? car.plate : '-'}</strong><br><span style="font-size:.78rem;color:var(--gray-400);">${car ? car.brand+' '+car.model : ''}</span></td>
                 <td>${b.customer}<br><span style="font-size:.78rem;">${telLink(b.phone)}</span></td>
-                <td>${b.start}<br>– ${b.end}${isOverdue ? ' <span class="pill pill-overdue" style="font-size:.68rem;">เกินกำหนด</span>' : ''}
-                  ${b.pickupLocation || b.returnLocation ? `<br><span style="font-size:.72rem;">${b.pickupLocation ? 'รับ: ' + mapLink(b.pickupLocation) : ''}${b.pickupLocation && b.returnLocation ? ' · ' : ''}${b.returnLocation ? 'คืน: ' + mapLink(b.returnLocation) : ''}</span>` : ''}</td>
+                <td>
+                  <div class="booking-daterange">
+                    <div>รับ ${b.start}${b.startTime ? ' ' + b.startTime : ''}</div>
+                    <div>คืน ${b.end}${b.endTime ? ' ' + b.endTime : ''}</div>
+                  </div>
+                  ${isOverdue ? '<span class="pill pill-overdue" style="font-size:.68rem;margin-top:.25rem;">เกินกำหนด</span>' : ''}
+                  ${b.pickupLocation || b.returnLocation ? `<div class="return-location">${b.pickupLocation ? 'ส่ง: ' + mapLink(b.pickupLocation) : ''}${b.pickupLocation && b.returnLocation ? '<br>' : ''}${b.returnLocation ? 'คืน: ' + mapLink(b.returnLocation) : ''}</div>` : ''}
+                </td>
                 <td><strong>${(b.status === 'completed' ? (b.finalTotal || b.total || 0) : (b.total || 0)).toLocaleString()} ฿</strong></td>
                 <td><span class="pill pill-${STATUS_PILL[b.status]||'completed'}">${STATUS_LABEL[b.status]||b.status}</span></td>
                 <td>

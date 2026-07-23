@@ -393,6 +393,7 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
 .map-link i { font-size: .78em; opacity: .8; }
 .map-link:hover { color: #6ee7b7; border-bottom-color: #6ee7b7; }
 .return-location { font-size: .76rem; color: var(--gray-500); margin-top: .15rem; }
+.booking-daterange { display: flex; flex-direction: column; gap: .15rem; }
 
 /* Stat boxes share the car cards' liquid-glass palette: translucent
    status-tinted gradient + tinted border and glow, white text on top. */
@@ -1778,6 +1779,9 @@ body.is-owner .owner-only { display: flex; }
      (edit/delete/view), so hiding it would make rows unmanageable on mobile. */
   .data-table th:nth-child(n+4):not(:last-child),
   .data-table td:nth-child(n+4):not(:last-child) { display: none; }
+  /* With most columns hidden, give the survivors more breathing room
+     instead of the desktop-sized padding meant for a full 6-column row. */
+  .data-table th, .data-table td { padding: .65rem .5rem; }
   .quick-actions-grid { grid-template-columns: repeat(4, 1fr); gap: .5rem; }
 
   /* Car grid: 2 equal columns with compact type sizes for the narrow cards. */
