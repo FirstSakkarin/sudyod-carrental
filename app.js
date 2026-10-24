@@ -1295,7 +1295,6 @@ function ganttCarLabelHtml(car) {
   const spec = [car.model, car.engineCC ? (+car.engineCC).toFixed(1) : '', car.seats ? car.seats + ' ที่' : '']
     .filter(Boolean).join(' · ');
   return `<i class="fa-solid fa-grip-vertical gantt-drag-handle"></i>` +
-    (car.orderNo ? `<span class="gantt-orderno">${car.orderNo}</span>` : '') +
     `<span class="gantt-carlabel-text"><span class="gantt-carlabel-plate">${vehicleTypeIcon(car.type)} ${car.plate}</span>` +
     (spec ? `<span class="gantt-carlabel-spec">${spec}</span>` : '') + `</span>`;
 }
@@ -1430,26 +1429,59 @@ function renderGanttDayView(date) {
     </div>`;
 }
 
+// Sheet-style colors for the queue table: the shop's paper queue sheet
+// fills each car's name cell with a strong color and draws its bookings in
+// that same color, so one car can be traced across the whole row.
+function ganttSheetCarColor(car) {
+  return `hsl(${ganttCarHue(car)}, 65%, 36%)`;
+}
+function ganttSheetBarColor(car) {
+  return `hsl(${ganttCarHue(car)}, 62%, 42%)`;
+}
+
+// Half-day slot of a date+time inside the window: each day is two slots,
+// morning (before 12:00) and afternoon, like the sheet's เช้า/บ่าย columns.
+function ganttHalfIndex(windowStart, date, time, isEnd) {
+  const day = daysBetween(windowStart, date) * 2;
+  if (!time) return isEnd ? day + 1 : day; // no time: treat as a morning hand-over
+  const afternoon = time >= '12:00';
+  if (isEnd) return day + (afternoon ? 2 : 1);
+  return day + (afternoon ? 1 : 0);
+}
+
+// "24/10:10.00" — how the sheet writes a pickup/return moment.
+function ganttSheetStamp(date, time) {
+  const d = new Date(date);
+  return `${d.getDate()}/${d.getMonth() + 1}` + (time ? ':' + time.replace(':', '.') : '');
+}
+
 function renderGanttWeekView() {
   const wrap = document.getElementById('ganttChart');
   if (!wrap) return;
 
   const WINDOW = 7;
+  const SLOTS  = WINDOW * 2;
   const today       = todayStr();
   const windowStart = addDaysStr(today, ganttOffset);
   const windowEnd   = addDaysStr(windowStart, WINDOW); // exclusive
   const days        = Array.from({ length: WINDOW }, (_, i) => addDaysStr(windowStart, i));
   const DOW         = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+  const todayIdx    = days.indexOf(today);
 
   const headerCells = days.map(d => {
     const dt = new Date(d);
-    return `<div class="gantt-day-head gantt-day-link ${d === today ? 'gantt-today' : ''}" onclick="openGanttDay('${d}')" title="ดูรายละเอียดรายชั่วโมงของวันนี้">
-      <div class="gantt-dow">${DOW[dt.getDay()]}</div>
-      <div class="gantt-date">${dt.getDate()}/${dt.getMonth() + 1}</div>
+    return `<div class="gantt-sheet-dayhead ${d === today ? 'gantt-today' : ''}">
+      <div class="gantt-day-head gantt-day-link" onclick="openGanttDay('${d}')" title="ดูรายละเอียดรายชั่วโมงของวันนี้">
+        <span class="gantt-date">${dt.getDate()}/${dt.getMonth() + 1}</span> <span class="gantt-dow">${DOW[dt.getDay()]}</span>
+      </div>
+      <div class="gantt-halfhead"><span>เช้า</span><span>บ่าย</span></div>
     </div>`;
   }).join('');
 
-  const trackCols = '<div class="gantt-track-cols">' + '<div class="gantt-col"></div>'.repeat(WINDOW) + '</div>';
+  const trackCols = '<div class="gantt-track-cols gantt-sheet-cols">' +
+    Array.from({ length: SLOTS }, (_, i) =>
+      `<div class="gantt-col ${i % 2 ? 'gantt-col-pm' : 'gantt-col-am'} ${Math.floor(i / 2) === todayIdx ? 'gantt-col-today' : ''}"></div>`
+    ).join('') + '</div>';
 
   const carsToShow = ganttCarsInScope();
   if (!carsToShow.length) {
@@ -1481,13 +1513,16 @@ function renderGanttWeekView() {
       : '';
     lastModelKey = modelKey;
 
-    const carColor = ganttCarColor(car);
+    const labelColor = ganttSheetCarColor(car);
+    const barColor   = ganttSheetBarColor(car);
+    const noCell = `<div class="gantt-sheet-no">${car.orderNo || ''}</div>`;
+    const labelCell = `<div class="gantt-carlabel gantt-carlabel-draggable" style="background:${labelColor};" title="ลากเพื่อเรียงลำดับ · ${car.plate}">${ganttCarLabelHtml(car)}</div>`;
 
     if (car.status === 'maintenance' || car.status === 'blocked') {
       const label = car.status === 'maintenance' ? 'ซ่อมบำรุง' : 'งดให้บริการ';
       return groupHeader + `
-        <div class="gantt-row" data-order-car-id="${car.id}" style="border-left:4px solid ${carColor};background:${ganttCarRowBg(car)};">
-          <div class="gantt-carlabel gantt-carlabel-draggable" title="ลากเพื่อเรียงลำดับ · ${car.plate}">${ganttCarLabelHtml(car)}</div>
+        <div class="gantt-row" data-order-car-id="${car.id}">
+          ${noCell}${labelCell}
           <div class="gantt-track gantt-track-disabled">
             ${trackCols}
             <span class="pill pill-${car.status}" style="position:relative;">${label}</span>
@@ -1521,12 +1556,13 @@ function renderGanttWeekView() {
     });
 
     const bars = bookings.map(b => {
-      const clipStart = b.start < windowStart ? windowStart : b.start;
-      const clipEnd    = b.end > windowEnd ? windowEnd : b.end;
-      const startIdx   = daysBetween(windowStart, clipStart);
-      const endIdx     = Math.max(daysBetween(windowStart, clipEnd), startIdx + 0.4);
-      const leftPct    = (startIdx / WINDOW) * 100;
-      const widthPct   = ((endIdx - startIdx) / WINDOW) * 100;
+      const rawStart = ganttHalfIndex(windowStart, b.start, b.startTime, false);
+      const rawEnd   = ganttHalfIndex(windowStart, b.end, b.endTime, true);
+      const startIdx = Math.max(0, rawStart);
+      const endIdx   = Math.min(SLOTS, Math.max(rawEnd, rawStart + 1));
+      if (endIdx <= startIdx) return '';
+      const leftPct  = (startIdx / SLOTS) * 100;
+      const widthPct = ((endIdx - startIdx) / SLOTS) * 100;
       const isConflict     = conflictIds.has(b.id);
       const swapCars        = isConflict ? swapCandidatesById[b.id] : [];
       const isSwappable     = isConflict && swapCars.length > 0;
@@ -1534,29 +1570,31 @@ function renderGanttWeekView() {
       const statusClass = isHardConflict ? 'gantt-bar-conflict'
         : isSwappable ? 'gantt-bar-swappable'
         : (b.status === 'active' ? 'gantt-bar-active' : 'gantt-bar-upcoming');
+      const text = `${ganttSheetStamp(b.start, b.startTime)}-${ganttSheetStamp(b.end, b.endTime)} ${b.customer || ''}`;
       const title = `${car.plate} · ${b.customer}\n${b.start}${b.startTime ? ' ' + b.startTime : ''} → ${b.end}${b.endTime ? ' ' + b.endTime : ''}` +
         (isHardConflict ? '\n⚠ ชนกับการจองอื่นของรถคันนี้ — ไม่มีรถรุ่นเดียวกันว่างให้สลับ ต้องแก้ไขด่วน' : '') +
         (isSwappable ? `\n⇄ ชนกับการจองอื่นของรถคันนี้ แต่สลับไปคันอื่นได้: ${swapCars.map(c => c.plate).join(', ')}` : '') +
-        '\n\n💡 ลากชื่อลูกค้าไปวางบนแถวรถคันอื่นเพื่อย้ายการจอง';
-      return `<div class="gantt-bar ${statusClass}"
+        '\n\n💡 ลากแถบไปวางบนแถวรถคันอื่นเพื่อย้ายการจอง';
+      return `<div class="gantt-bar gantt-sheet-bar ${statusClass}"
         data-booking-id="${b.id}"
-        style="left:${leftPct}%;width:${widthPct}%;top:${3 + laneOf[b.id] * 32}px;"
+        style="left:${leftPct}%;width:${widthPct}%;top:${4 + laneOf[b.id] * 32}px;--bar-color:${barColor};"
         title="${title.replace(/"/g, '&quot;')}"
         onclick="openEditBookingModal('${b.id}')">
-        ${isHardConflict ? '<i class="fa-solid fa-triangle-exclamation"></i>&nbsp;' : ''}${isSwappable ? '<i class="fa-solid fa-right-left"></i>&nbsp;' : ''}${b.customer}
+        ${rawStart < 0 ? '<i class="fa-solid fa-caret-left"></i>&nbsp;' : ''}${isHardConflict ? '<i class="fa-solid fa-triangle-exclamation"></i>&nbsp;' : ''}${isSwappable ? '<i class="fa-solid fa-right-left"></i>&nbsp;' : ''}${text}
       </div>`;
     }).join('');
 
     return groupHeader + `
-      <div class="gantt-row" data-car-id="${car.id}" data-order-car-id="${car.id}" style="min-height:${Math.max(44, laneCount * 32 + 12)}px;border-left:4px solid ${carColor};background:${ganttCarRowBg(car)};">
-        <div class="gantt-carlabel gantt-carlabel-draggable" title="ลากเพื่อเรียงลำดับ · ${car.plate}">${ganttCarLabelHtml(car)}</div>
+      <div class="gantt-row" data-car-id="${car.id}" data-order-car-id="${car.id}" style="min-height:${Math.max(40, laneCount * 32 + 8)}px;">
+        ${noCell}${labelCell}
         <div class="gantt-track">${trackCols}${bars}</div>
       </div>`;
   }).join('');
 
   wrap.innerHTML = `
-    <div class="gantt-table">
+    <div class="gantt-table gantt-sheet">
       <div class="gantt-header-row">
+        <div class="gantt-sheet-no gantt-sheet-nohead">ลำดับ</div>
         <div class="gantt-carlabel-head">รถ</div>
         ${headerCells}
       </div>

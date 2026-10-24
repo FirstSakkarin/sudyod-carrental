@@ -870,6 +870,87 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
   cursor: grabbing;
 }
 
+/* ---- Sheet look for the week queue (matches the shop's paper queue Sheet):
+   white grid, order-number column, car-colored name cells, เช้า/บ่าย halves,
+   bars in each car's own color, yellow today column. ---- */
+.gantt-sheet {
+  --sheet-line: #d4d4d8;
+  --sheet-line-strong: #a1a1aa;
+  min-width: 980px;
+  background: #fff;
+  color: #18181b;
+  border: 1px solid var(--sheet-line-strong);
+  border-radius: 8px;
+  overflow: clip;
+}
+.gantt-sheet .gantt-header-row { padding-bottom: 0; margin-bottom: 0; border-bottom: 1px solid var(--sheet-line-strong); background: #fafafa; }
+.gantt-sheet .gantt-row { padding: 0; min-height: 40px; border-bottom: 1px solid var(--sheet-line); background: #fff; }
+.gantt-sheet .gantt-row:last-child { border-bottom: none; }
+.gantt-sheet-no {
+  width: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  font-size: .8rem; font-weight: 800; color: #3f3f46;
+  border-right: 1px solid var(--sheet-line); background: #fafafa;
+  /* negative inset = stick flush to the card edge, past .gantt-wrap's padding */
+  position: sticky; left: -1.25rem; z-index: 3;
+}
+.gantt-sheet-nohead { font-size: .7rem; font-weight: 700; color: #71717a; }
+.gantt-sheet .gantt-carlabel-head, .gantt-sheet .gantt-carlabel {
+  width: 190px; padding: 0 .55rem; box-sizing: border-box;
+  position: sticky; left: calc(44px - 1.25rem); z-index: 3;
+  border-right: 1px solid var(--sheet-line-strong);
+}
+.gantt-sheet .gantt-carlabel-head { background: #fafafa; color: #71717a; justify-content: center; }
+.gantt-sheet .gantt-carlabel { color: #fff; font-weight: 700; }
+.gantt-sheet .gantt-carlabel-spec { color: rgba(255,255,255,0.82); }
+.gantt-sheet .gantt-drag-handle { color: #fff; opacity: .6; }
+.gantt-sheet .gantt-carlabel-draggable:hover .gantt-drag-handle { color: #fff; opacity: 1; }
+.gantt-sheet-dayhead { flex: 1; min-width: 0; display: flex; flex-direction: column; border-right: 1px solid var(--sheet-line-strong); }
+.gantt-sheet-dayhead:last-child { border-right: none; }
+.gantt-sheet .gantt-day-head { padding: .35rem 0 .2rem; font-size: .76rem; color: #27272a; }
+.gantt-sheet .gantt-day-head .gantt-date { font-size: .8rem; font-weight: 800; opacity: 1; }
+.gantt-sheet .gantt-day-head .gantt-dow { font-weight: 600; color: #71717a; }
+.gantt-halfhead { display: flex; border-top: 1px solid var(--sheet-line); }
+.gantt-halfhead span { flex: 1; text-align: center; font-size: .68rem; color: #71717a; padding: .1rem 0; }
+.gantt-halfhead span + span { border-left: 1px solid var(--sheet-line); }
+.gantt-sheet-dayhead.gantt-today { background: #fde047; }
+.gantt-sheet-dayhead.gantt-today .gantt-day-head,
+.gantt-sheet-dayhead.gantt-today .gantt-day-head .gantt-date,
+.gantt-sheet-dayhead.gantt-today .gantt-day-head .gantt-dow,
+.gantt-sheet-dayhead.gantt-today .gantt-halfhead span { color: #1a1a1a; }
+.gantt-sheet .gantt-track { min-height: 40px; }
+.gantt-sheet-cols { grid-template-columns: repeat(14, 1fr); }
+.gantt-sheet .gantt-col { border-right: 1px solid #ececef; }
+.gantt-sheet .gantt-col-pm { border-right: 1px solid var(--sheet-line-strong); }
+.gantt-sheet .gantt-col:last-child { border-right: none; }
+.gantt-sheet .gantt-col-today { background: rgba(253,224,71,0.22); }
+.gantt-sheet .gantt-col-am.gantt-col-today { box-shadow: inset 2px 0 0 #eab308; }
+.gantt-sheet .gantt-col-pm.gantt-col-today { box-shadow: inset -2px 0 0 #eab308; }
+.gantt-sheet .gantt-sheet-bar {
+  height: 28px; margin-left: 2px; border-radius: 7px; padding: 0 .45rem;
+  font-size: .72rem; font-weight: 700; color: #fff;
+  background: var(--bar-color); border: 1px solid rgba(0,0,0,0.12);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.15); backdrop-filter: none;
+  max-width: calc(100% - 4px);
+}
+.gantt-sheet .gantt-sheet-bar.gantt-bar-conflict {
+  background: #fff; color: #dc2626; border: 2px solid #dc2626;
+  animation: gantt-pulse 1.6s ease-in-out infinite;
+}
+.gantt-sheet .gantt-sheet-bar.gantt-bar-swappable {
+  background: #fff; color: var(--bar-color); border: 2px dashed var(--bar-color);
+}
+.gantt-sheet .gantt-model-group {
+  margin: 0; padding: .35rem .75rem; background: #f4f4f5; color: #27272a;
+  border-left: none; border-bottom: 1px solid var(--sheet-line);
+}
+.gantt-sheet .gantt-model-group-count { color: #71717a; }
+.gantt-sheet .gantt-row.gantt-row-drop-target { background: #fef9c3 !important; outline-color: #ca8a04; }
+@media (max-width: 768px) {
+  .gantt-sheet { min-width: 860px; }
+  .gantt-sheet-no { width: 34px; }
+  .gantt-sheet .gantt-carlabel-head, .gantt-sheet .gantt-carlabel { width: 132px; left: calc(34px - 1.25rem); font-size: .74rem; }
+}
+
 /* ========== RETURN LIST ========== */
 .return-list { padding: 0 1.25rem 1rem; }
 .return-item {
