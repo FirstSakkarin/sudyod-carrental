@@ -69,6 +69,7 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
   background: var(--glass); border: 1px solid var(--glass-edge-soft); box-shadow: var(--specular);
 }
 .sortlab { color: var(--muted); font-size: .85rem; }
+.nav button.impbtn { font-size: .9rem; font-weight: 600; }
 
 /* ---- queue sheet ---- */
 .wrap { max-width: 1200px; margin: 14px auto 0; overflow-x: auto; border-radius: 22px; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
@@ -323,6 +324,8 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
   const TOP = `<div class="top"><div class="controls">
       <div class="nav"><button id="prev" aria-label="ย้อนไป">‹</button><button id="today">วันนี้</button><button id="next" aria-label="ถัดไป">›</button></div>
       <div class="seg" role="group" aria-label="จำนวนวันที่แสดง"><button id="span3" aria-pressed="false">3 วัน</button><button id="span7" aria-pressed="false">7 วัน</button><button id="span30" aria-pressed="false">เดือน</button></div>
+      <div class="nav"><button id="imp" class="impbtn" title="นำเข้าคิวจากไฟล์ที่ยูทำให้">⇪ นำเข้าคิว</button></div>
+      <input type="file" id="impFile" accept=".json,application/json,text/plain" hidden>
     </div></div>`;
   const LEGEND = `<div class="legend">
     <span><i style="background:rgba(253,224,71,.45)"></i>วันนี้</span>
@@ -756,6 +759,7 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
     renderCurrentPage();
   }
   function doUndo() {
+    if (undo.ids) { undoImport(); return; }
     const { b, before } = undo; undo = null;
     const from = b.carId;
     Object.assign(b, before);
@@ -959,6 +963,46 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
     sheet.pick = e.target.value.slice(0, 5); renderSheet();
   });
   R.getElementById('today').onclick = () => goTo(0);
+  // ---------- import bookings from a file (e.g. the shop's queue Sheet, converted by Yu) ----------
+  const impFile = R.getElementById('impFile');
+  R.getElementById('imp').onclick = () => { impFile.value = ''; impFile.click(); };
+  impFile.onchange = async () => {
+    const f = impFile.files && impFile.files[0]; if (!f) return;
+    let list;
+    try { const d = JSON.parse(await f.text()); list = Array.isArray(d) ? d : d.bookings; } catch (_) { list = null; }
+    if (!Array.isArray(list)) { alert('ไฟล์นี้อ่านไม่ได้ ต้องเป็นไฟล์นำเข้าคิวที่ยูส่งให้'); return; }
+    const carIds = new Set(state.cars.map(c => c.id));
+    const key = b => `${b.carId}|${b.start}|${b.startTime || ''}`;
+    const have = new Set(state.bookings.map(b => b.id)), haveKey = new Set(state.bookings.map(key));
+    const add = [], dup = [], bad = [];
+    list.forEach(b => {
+      if (!b || !b.id || !b.start || !b.end || !carIds.has(b.carId)) bad.push(b);
+      else if (have.has(b.id) || haveKey.has(key(b))) dup.push(b);
+      else add.push(b);
+    });
+    if (!add.length) { alert(`ไม่มีคิวใหม่ให้นำเข้า (ซ้ำ ${dup.length} · ใช้ไม่ได้ ${bad.length})`); return; }
+    const msg = `นำเข้า ${add.length} คิวลงเว็บและชีต?` + (dup.length ? `\nข้าม ${dup.length} คิวที่มีอยู่แล้ว` : '') + (bad.length ? `\nข้าม ${bad.length} คิวที่ไม่เจอรถ` : '');
+    if (!confirm(msg)) return;
+    const now = nowISO(), ids = [];
+    add.forEach(b => {
+      const rec = Object.assign({ phone: '', customerAddress: '', pickupLocation: '', returnLocation: '', mileageOut: 0, rate: 0, otFee: 0, total: 0, deposit: 0, bookingDeposit: 0, note: '' }, b, { updatedAt: now });
+      if (state.tombstones && state.tombstones.bookings) delete state.tombstones.bookings[rec.id];
+      state.bookings.push(rec); ids.push(rec.id);
+    });
+    [...new Set(add.map(b => b.carId))].forEach(id => syncCarActiveStatus(id));
+    saveToStorage(); pushToSheets(['bookings', 'cars']); renderCurrentPage();
+    undo = { ids, carIds: [...new Set(add.map(b => b.carId))] };
+    toast(`นำเข้าแล้ว ${add.length} คิว` + (dup.length ? ` · ข้ามที่ซ้ำ ${dup.length}` : ''), true);
+  };
+  function undoImport() {
+    const { ids, carIds } = undo; undo = null;
+    const gone = new Set(ids);
+    state.bookings = state.bookings.filter(b => !gone.has(b.id));
+    ids.forEach(id => markDeleted('bookings', id));
+    carIds.forEach(id => syncCarActiveStatus(id));
+    saveToStorage(); pushToSheets(['bookings', 'cars']); renderCurrentPage();
+    L.getElementById('toastHost').innerHTML = '';
+  }
   [['span3', 3], ['span7', 7], ['span30', 30]].forEach(([id, n]) => {
     R.getElementById(id).onclick = () => { const l = Math.round(leftDay()) - BACK + offset; dw = fitDw(n); store.set('qlab.dw', dw); goTo(l); };
   });
