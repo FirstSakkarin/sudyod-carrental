@@ -208,6 +208,7 @@ function seedSampleData() {
 // ── Navigation ─────────────────────────────────────────────────────────
 const PAGE_LABELS = {
   dashboard:   'ภาพรวม',
+  work:        'งานรับ-ส่งรถ',
   cars:        'รถทั้งหมด',
   bookings:    'การจอง',
   maintenance: 'ซ่อมบำรุง',
@@ -244,6 +245,7 @@ function navigate(page) {
 
 function renderCurrentPage() {
   if (currentPage === 'dashboard')   renderDashboard();
+  if (currentPage === 'work' && window.renderWorkPage) window.renderWorkPage();
   if (currentPage === 'cars')        renderCarsPage();
   if (currentPage === 'bookings')    renderBookingsPage();
   if (currentPage === 'maintenance') renderMaintenancePage();
