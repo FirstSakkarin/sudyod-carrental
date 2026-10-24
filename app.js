@@ -159,9 +159,20 @@ function initApp() {
   }
 }
 
+// The Sheet can hand back a phone as a number (942364296), which loses the
+// leading 0 and breaks code that treats it as text. Keep phones as strings.
+function fixPhones(list) {
+  (list || []).forEach(b => {
+    if (b.phone == null || typeof b.phone === 'string') return;
+    const s = String(b.phone);
+    b.phone = /^[1-9]\d{8}$/.test(s) ? '0' + s : s;
+  });
+  return list;
+}
+
 function loadFromStorage() {
   state.cars          = JSON.parse(localStorage.getItem('cars')          || '[]');
-  state.bookings      = JSON.parse(localStorage.getItem('bookings')      || '[]');
+  state.bookings      = fixPhones(JSON.parse(localStorage.getItem('bookings')      || '[]'));
   state.maintenance   = JSON.parse(localStorage.getItem('maintenance')   || '[]');
   state.expenses      = JSON.parse(localStorage.getItem('expenses')      || '[]');
   state.extraIncome   = JSON.parse(localStorage.getItem('extraIncome')   || '[]');
@@ -3019,7 +3030,7 @@ async function loadFromSheets(silent = false) {
       // whole collection being clobbered one way or the other.
       mergeTombstones(d.tombstones);
       state.cars        = mergeById(state.cars,        d.cars,        'cars');
-      state.bookings    = mergeById(state.bookings,    d.bookings,    'bookings');
+      state.bookings    = fixPhones(mergeById(state.bookings,    d.bookings,    'bookings'));
       state.maintenance = mergeById(state.maintenance, d.maintenance, 'maintenance');
       state.expenses    = mergeById(state.expenses,    d.expenses,    'expenses');
       state.extraIncome = mergeById(state.extraIncome, d.extraIncome, 'extraIncome');
@@ -3085,7 +3096,7 @@ async function syncNow() {
       const d = pullJson.data;
       mergeTombstones(d.tombstones);
       state.cars        = mergeById(state.cars,        d.cars,        'cars');
-      state.bookings    = mergeById(state.bookings,    d.bookings,    'bookings');
+      state.bookings    = fixPhones(mergeById(state.bookings,    d.bookings,    'bookings'));
       state.maintenance = mergeById(state.maintenance, d.maintenance, 'maintenance');
       state.expenses    = mergeById(state.expenses,    d.expenses,    'expenses');
       state.extraIncome = mergeById(state.extraIncome, d.extraIncome, 'extraIncome');
