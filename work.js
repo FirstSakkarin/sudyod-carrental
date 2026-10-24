@@ -476,7 +476,10 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--brand); outline
     if (t.dataset.close) { if (t.dataset.close === 'x' || e.target === t) { sheet = null; drawSheet(); } return; }
     if (t.dataset.w) { const id = t.dataset.j, pr = prep[id] || (prep[id] = {}); pr.water = Math.max(0, (+pr.water || 0) + +t.dataset.w); savePrep(id); render(); return; }
     if (t.dataset.staff) { const id = t.dataset.j, pr = prep[id] || (prep[id] = {}), n = t.dataset.staff, cur = pr.staff || []; pr.staff = cur.includes(n) ? cur.filter(x => x !== n) : STAFF.filter(x => x === n || cur.includes(x)); savePrep(id); render(); return; }
-    if (t.dataset.cs) { const id = t.dataset.j, pr = prep[id] || (prep[id] = {}); pr.cs = Math.max(0, (+pr.cs || 0) + +t.dataset.cs); savePrep(id); render(); return; }
+    if (t.dataset.cs) { const id = t.dataset.j, pr = prep[id] || (prep[id] = {}); pr.cs = Math.max(0, (+pr.cs || 0) + +t.dataset.cs);
+      const bk = bookingOf(id), dd = bk ? priceBooking(bk).days : 1, oldFee = bk ? carseatFee(bk.carseat, dd) : 0, newFee = carseatFee(pr.cs, dd);
+      if (bk && newFee !== oldFee && (+bk.total || 0)) bk.total = Math.max(0, (+bk.total || 0) - oldFee + newFee);
+      savePrep(id); render(); if (newFee !== oldFee) toast(newFee > oldFee ? `Carseat ตัวที่ ${pr.cs} คิดเพิ่มวันละ ${CARSEAT_FEE} × ${dd} วัน = ${(newFee - oldFee).toLocaleString()} บาท` : 'ลดค่า Carseat แล้ว', false); return; }
     if (t.dataset.open) { const o = t.dataset.open; if (opened[o]) delete opened[o]; else opened[o] = 1; render(); return; }
     if (t.dataset.copy) { copy(t.dataset.copy); return; }
     if (t.dataset.copyday) { copy(daySummary(day), 'คัดลอกสรุปงานแล้ว ไปวางในไลน์ได้เลย'); return; }
