@@ -6,7 +6,7 @@
   <title>สุดยอด รถเช่า เชียงใหม่</title>
   <link rel="icon" type="image/jpeg" href="logo.jpg" />
   <link rel="apple-touch-icon" href="logo.jpg" />
-  <link rel="stylesheet" href="styles.css?v=20261024j" />
+  <link rel="stylesheet" href="styles.css?v=20261024k" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 </head>
 <body>
@@ -22,6 +22,9 @@
       <nav class="sidebar-nav">
         <a href="#" class="nav-item active" onclick="navigate('dashboard')">
           <i class="fa-solid fa-chart-pie"></i><span>ภาพรวม</span>
+        </a>
+        <a href="#" class="nav-item" onclick="navigate('work')">
+          <i class="fa-solid fa-truck-fast"></i><span>งานรับ-ส่งรถ</span>
         </a>
         <a href="#" class="nav-item" onclick="navigate('cars')">
           <i class="fa-solid fa-car"></i><span>รถทั้งหมด</span>
@@ -94,6 +97,23 @@
             </button>
           </div>
         </div>
+        <div class="section-card">
+          <div class="section-card-header">
+            <h3><i class="fa-solid fa-chart-gantt"></i> ตารางคิวรถทั้งหมด</h3>
+            <button class="icon-btn" id="ganttToggleBtn" onclick="toggleGanttVisibility()" title="ซ่อน/แสดงตารางคิวรถ">
+              <i class="fa-solid fa-eye"></i>
+            </button>
+          </div>
+          <div id="ganttBody">
+            <div class="gantt-subheader">
+              <div class="gantt-type-tabs" id="ganttTypeTabs"></div>
+              <div id="ganttControls" style="display:flex;gap:.4rem;align-items:center;"></div>
+            </div>
+            <div class="gantt-sort-bar" id="ganttSortTabs"></div>
+            <div id="ganttChart" class="gantt-wrap"></div>
+          </div>
+        </div>
+
         <div class="stats-grid">
           <div class="stat-card stat-total stat-card-clickable" onclick="goToCarsFiltered('')">
             <div class="stat-icon"><i class="fa-solid fa-car"></i></div>
@@ -125,7 +145,7 @@
           </div>
         </div>
 
-        <div class="today-grid">
+        <div class="today-grid" style="display:none">
           <div class="section-card">
             <div class="section-card-header">
               <h3><i class="fa-solid fa-truck-fast"></i> ส่งรถวันนี้</h3>
@@ -142,27 +162,15 @@
 
         <div class="section-card">
           <div class="section-card-header">
-            <h3><i class="fa-solid fa-chart-gantt"></i> ตารางคิวรถทั้งหมด</h3>
-            <button class="icon-btn" id="ganttToggleBtn" onclick="toggleGanttVisibility()" title="ซ่อน/แสดงตารางคิวรถ">
-              <i class="fa-solid fa-eye"></i>
-            </button>
-          </div>
-          <div id="ganttBody">
-            <div class="gantt-subheader">
-              <div class="gantt-type-tabs" id="ganttTypeTabs"></div>
-              <div id="ganttControls" style="display:flex;gap:.4rem;align-items:center;"></div>
-            </div>
-            <div class="gantt-sort-bar" id="ganttSortTabs"></div>
-            <div id="ganttChart" class="gantt-wrap"></div>
-          </div>
-        </div>
-
-        <div class="section-card">
-          <div class="section-card-header">
             <h3><i class="fa-solid fa-list"></i> สถานะรถทุกคัน</h3>
           </div>
           <div id="dashboardCarList" class="car-grid"></div>
         </div>
+      </section>
+
+      <!-- WORK PAGE: today's / tomorrow's deliveries and returns (drawn by work.js) -->
+      <section id="page-work" class="page">
+        <div id="workMount"></div>
       </section>
 
       <!-- CARS PAGE -->
@@ -955,6 +963,10 @@
         <i class="fa-solid fa-chart-pie"></i>
         <span>ภาพรวม</span>
       </a>
+      <a class="bnav-item" data-page="work" onclick="navigate('work')">
+        <i class="fa-solid fa-truck-fast"></i>
+        <span>งานรับ-ส่งรถ</span>
+      </a>
       <a class="bnav-item" data-page="bookings" onclick="navigate('bookings')">
         <i class="fa-solid fa-calendar-check"></i>
         <span>จองรถ</span>
@@ -962,10 +974,6 @@
       <a class="bnav-item" data-page="finance" onclick="navigate('finance')">
         <i class="fa-solid fa-coins"></i>
         <span>การเงิน</span>
-      </a>
-      <a class="bnav-item" data-page="maintenance" onclick="navigate('maintenance')">
-        <i class="fa-solid fa-wrench"></i>
-        <span>ซ่อมบำรุง</span>
       </a>
       <a class="bnav-item bnav-menu" onclick="toggleSidebar()">
         <span class="bnav-logo-circle"><img src="logo.jpg" alt="เมนู" /></span>
@@ -981,8 +989,8 @@
   <!-- Custom select dropdown panel (native <select> popups can't be restyled) -->
   <div id="customSelectPanel" class="custom-select-panel"></div>
 
-  <script src="app.js?v=20261024j"></script>
-  <script src="queue.js?v=20261024j"></script>
-  <script src="work.js?v=20261024j"></script>
+  <script src="app.js?v=20261024k"></script>
+  <script src="queue.js?v=20261024k"></script>
+  <script src="work.js?v=20261024k"></script>
 </body>
 </html>

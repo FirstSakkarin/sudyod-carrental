@@ -543,22 +543,20 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--brand); outline
     return layerRoot;
   }
   function mount() {
-    const grid = document.querySelector('#page-dashboard .today-grid') || document.querySelector('.today-grid');
-    if (!grid) return;
-    grid.style.display = 'none';
+    const spot = document.getElementById('workMount');
+    if (!spot) return;
     let host = document.getElementById('wkHost');
     if (!host || !inst) {
       if (host) host.remove();
-      host = document.createElement('div'); host.id = 'wkHost'; host.style.margin = '0 0 1rem';
-      grid.parentNode.insertBefore(host, grid);
+      host = document.createElement('div'); host.id = 'wkHost';
+      spot.appendChild(host);
       const R = host.attachShadow({ mode: 'open' });
       R.innerHTML = `<style>${CSS}</style><div class="wk"><div class="scroll"><div class="page"><header class="head" id="head"></header><main class="list" id="list" aria-live="polite"></main></div></div></div>`;
       inst = create(R, layer());
     }
     inst.render();
   }
-  const origDash = window.renderDashboard;
-  window.renderDashboard = function () { const r = origDash.apply(this, arguments); try { mount(); } catch (err) { console.error('work page', err); } return r; };
+  window.renderWorkPage = function () { try { mount(); } catch (err) { console.error('work page', err); } };
   setInterval(() => { const h = document.getElementById('wkHost'); if (inst && h && h.isConnected && h.offsetParent) inst.render(); }, 60000);
 
   // Return form: start from what staff already noted on the job card.
@@ -575,5 +573,5 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--brand); outline
     }
     return r;
   };
-  if (document.readyState !== 'loading' && typeof state !== 'undefined') { try { mount(); } catch (_) {} }
+  if (typeof currentPage !== 'undefined' && currentPage === 'work') window.renderWorkPage();
 })();
