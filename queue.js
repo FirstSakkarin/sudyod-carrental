@@ -594,21 +594,23 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
   const thTime = t => t ? `${t.replace(':', '.')} น.` : '';
   function confirmData(b, c) {
     const rate = +b.rate || 0, ot = +b.otFee || 0, dep = +b.deposit || 0, paid = +b.bookingDeposit || 0;
-    const nights = Math.max(1, Math.round((new Date(b.end) - new Date(b.start)) / 864e5));
-    const total = +b.total || rate * nights + ot;
-    const days = rate && total > ot ? Math.round((total - ot) / rate) : nights;
+    const p = priceBooking(b), late = +b.lateFee || 0, disc = +b.discount || 0;
+    const total = +b.total || p.total;
+    const days = rate && total - ot - late + disc > 0 ? Math.round((total - ot - late + disc) / rate) : p.days;
     const name = String(who(b)).trim();
     return { name: /^คุณ/.test(name) ? name : 'คุณ' + name, phone: b.phone || '', carTxt: `${c.name} ${c.plate}`.trim(),
       range: `${thDate(b.start)}-${thDate(b.end)}`, pick: b.pickupLocation || '', ret: b.returnLocation || '',
-      st: thTime(b.startTime), et: thTime(b.endTime), rate, ot, dep, paid, total, days, due: total - paid + dep };
+      st: thTime(b.startTime), et: thTime(b.endTime), rate, ot, dep, paid, total, days, late, lateH: late && p.lateRate ? Math.round(late / p.lateRate) : 0, disc, rent: total - ot - late + disc, due: total - paid + dep };
   }
   function confirmText(b, c) {
     const d = confirmData(b, c), L = ['ยืนยันการจอง', `   - ${d.name}`];
     if (d.phone) L.push(`- เบอร์โทร ${d.phone}`);
     L.push(`- ${d.carTxt}`, `- ช่วงเวลาเช่า ${d.range}`, `- รับรถ ${d.pick ? d.pick + ' ' : ''}เวลา ${d.st}`, `- คืนรถ ${d.ret ? d.ret + ' ' : ''}เวลา ${d.et}`);
     if (d.total) {
-      L.push('', 'สรุปค่าเช่า', d.rate ? `ค่าเช่า ${d.days} วัน ${baht(d.rate)}/วัน = ${baht(d.total - d.ot)} บาท` : `ค่าเช่า ${baht(d.total - d.ot)} บาท`);
+      L.push('', 'สรุปค่าเช่า', d.rate ? `ค่าเช่า ${d.days} วัน ${baht(d.rate)}/วัน = ${baht(d.rent)} บาท` : `ค่าเช่า ${baht(d.rent)} บาท`);
+      if (d.late) L.push(`ค่าเลท ${d.lateH ? d.lateH + ' ชม. ' : ''}${baht(d.late)} บาท`);
       if (d.ot) L.push(`ค่าเกินเวลา ${baht(d.ot)} บาท`);
+      if (d.disc) L.push(`ส่วนลด -${baht(d.disc)} บาท`);
       if (d.dep) L.push(`เงินมัดจำ ${baht(d.dep)} บาท`);
       if (d.paid) L.push(`โอนจองมาแล้ว ${baht(d.paid)} บาท`);
       L.push('', 'สรุป', `${baht(d.total)}${d.paid ? '-' + baht(d.paid) : ''}${d.dep ? '+' + baht(d.dep) : ''}= ${baht(d.due)} บาท`, '', `ยอดที่ต้องชำระในวันรับรถ ${baht(d.due)} บาท`);
@@ -624,8 +626,10 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
       ln(`- คืนรถ ${d.ret ? esc(d.ret) + ' ' : ''}เวลา <span class="num">${d.et}</span>`);
     if (!d.total) h += `<div class="sec">สรุปค่าเช่า</div>` + ln(`<span class="miss">ยังไม่ได้ใส่ราคา กดปุ่มแก้ไข ✎ เพื่อใส่</span>`);
     else {
-      h += `<div class="sec">สรุปค่าเช่า</div>` + ln(d.rate ? `ค่าเช่า ${d.days} วัน <span class="num">${baht(d.rate)}</span>/วัน = <span class="num">${baht(d.total - d.ot)}</span> บาท` : `ค่าเช่า <span class="num">${baht(d.total - d.ot)}</span> บาท`);
+      h += `<div class="sec">สรุปค่าเช่า</div>` + ln(d.rate ? `ค่าเช่า ${d.days} วัน <span class="num">${baht(d.rate)}</span>/วัน = <span class="num">${baht(d.rent)}</span> บาท` : `ค่าเช่า <span class="num">${baht(d.rent)}</span> บาท`);
+      if (d.late) h += ln(`ค่าเลท ${d.lateH ? d.lateH + ' ชม. ' : ''}<span class="num">${baht(d.late)}</span> บาท`);
       if (d.ot) h += ln(`ค่าเกินเวลา <span class="num">${baht(d.ot)}</span> บาท`);
+      if (d.disc) h += ln(`ส่วนลด <span class="num">-${baht(d.disc)}</span> บาท`);
       if (d.dep) h += ln(`เงินมัดจำ <span class="num">${baht(d.dep)}</span> บาท`);
       if (d.paid) h += ln(`โอนจองมาแล้ว <span class="num">${baht(d.paid)}</span> บาท`);
       h += `<div class="sec">สรุป</div>` + ln(`<span class="num">${baht(d.total)}${d.paid ? '-' + baht(d.paid) : ''}${d.dep ? '+' + baht(d.dep) : ''}= ${baht(d.due)}</span> บาท`) +
@@ -650,6 +654,8 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
     if (+b.mileageOut) h += f('เลขไมล์ออก (กม.)', v(baht(b.mileageOut)), 'w');
     h += f('ราคาเช่า/วัน', v(money(d.rate), 'ยังไม่ใส่')) + f('ค่า OT (บาท)', v(money(d.ot), '0')) +
       f('เงินประกัน (บาท)', v(money(d.dep), '0')) + f('โอนจอง (บาท)', v(money(d.paid), '0'));
+    if (d.late || d.disc) h += f('ค่าเลท (บาท)', v(d.late ? `${baht(d.late)}${d.lateH ? ` <small>(${d.lateH} ชม.)</small>` : ''}` : '', '0')) + f('ส่วนลด (บาท)', v(money(d.disc), '0'));
+    if (+b.water || +b.carseat) h += f('💧 น้ำ (ชุด)', v(+b.water || '', '0')) + f('👶 Carseat (ตัว)', v(+b.carseat || '', '0'));
     h += d.total
       ? `<div class="sum"><span>🧾 รวม ${d.days} วัน = <b>฿${baht(d.total)}</b></span><small>ยอดที่ต้องชำระวันรับรถ ฿${baht(d.due)}${d.paid || d.dep ? ` (${baht(d.total)}${d.paid ? ' − ' + baht(d.paid) : ''}${d.dep ? ' + ประกัน ' + baht(d.dep) : ''})` : ''}</small></div>`
       : `<div class="sum"><small>ยังไม่ได้ใส่ราคา กดปุ่ม ✎ เพื่อใส่</small></div>`;
@@ -864,11 +870,11 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
   // Save one booking's new car/time to the app (phone storage + Google Sheet)
   // and offer undo. Price follows the day count, like the booking form.
   function commit(b, patch, msg) {
-    const before = { carId: b.carId, start: b.start, startTime: b.startTime, end: b.end, endTime: b.endTime, total: b.total };
-    const oldDays = daysBetween(b.start, b.end);
+    const before = { carId: b.carId, start: b.start, startTime: b.startTime, end: b.end, endTime: b.endTime, total: b.total, lateFee: b.lateFee };
+    const oldDays = priceBooking(b).days;
     Object.assign(b, patch);
-    const days = daysBetween(b.start, b.end);
-    if (days !== oldDays && b.rate) b.total = days * b.rate + (+b.otFee || 0);
+    const p = priceBooking(b), days = p.days;
+    if (b.rate) { b.lateFee = p.lateFee; b.total = p.total; }
     persist(b, [before.carId, b.carId]);
     undo = { b, before };
     flashId = b.id; closeSheet(); renderKeep();
