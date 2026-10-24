@@ -170,6 +170,12 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
 .bar .pl .spot em { font-size: .7em; padding: 1px 5px; }
 .when small { color: var(--text); opacity: .85; font-size: .85rem; line-height: 1.25; margin-top: 2px; }
 .bar small { font: 500 .68rem var(--mono); opacity: .9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar.done {
+  background: rgba(148, 156, 176, .16); border: 1px dashed rgba(200, 206, 222, .4); color: rgba(235, 238, 245, .62);
+  box-shadow: none; text-shadow: none;
+}
+.bar.done .pl { opacity: .7; }
+.bar .ok { color: #86efac; font-weight: 700; }
 .bar.clash {
   background: linear-gradient(180deg, rgba(239, 68, 68, .55), rgba(185, 28, 28, .5));
   border: 1.5px solid rgba(254, 202, 202, .95); color: #fff;
@@ -397,7 +403,8 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
         hue: ganttCarHue(c), off: c.status === 'maintenance' || c.status === 'blocked' };
     });
     const ids = new Set(CARS.map(c => c.id));
-    bookings = state.bookings.filter(x => x.status !== 'completed' && ids.has(x.carId) && x.start && x.end);
+    // Returned bookings stay on the table, greyed out, so the day's finished jobs are still visible.
+    bookings = state.bookings.filter(x => ids.has(x.carId) && x.start && x.end);
   }
   const who = x => (x && x.customer) || '-';
   const LANE = 58;
@@ -441,7 +448,11 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
   const stamp = (s, t) => dm(s) + (t ? ':' + t.replace(':', '.') : '');
   const moment = (s, t) => `${s}T${t || '10:00'}`;
   const overlaps = (a, b) => moment(a.start, a.startTime) < moment(b.end, b.endTime) && moment(b.start, b.startTime) < moment(a.end, a.endTime);
-  const clashFor = (b, carId, range = b) => bookings.find(o => o.id !== b.id && o.carId === carId && overlaps(range, o));
+  // A returned (completed) booking no longer holds the car: it never clashes and needs no prep time.
+  const isDone = o => o.status === 'completed';
+  const clashFor = (b, carId, range = b) => isDone(b) ? null : bookings.find(o => o.id !== b.id && !isDone(o) && o.carId === carId && overlaps(range, o));
+  const nowMoment = () => { const n = new Date(), p = x => String(x).padStart(2, '0'); return `${todayISO}T${p(n.getHours())}:${p(n.getMinutes())}`; };
+  const delivered = b => !isDone(b) && b.status === 'active' && moment(b.start, b.startTime) <= nowMoment();
   const mins = (a, b) => Math.round((Date.parse(b + ':00Z') - Date.parse(a + ':00Z')) / 60000);
   const GAP_WATCH = 3 * 24 * 60; // call out turnarounds under 3 days
   // Biggest sensible units: 45 นาที · 1 ชม. 30 นาที · 1 วัน 4 ชม.
@@ -460,7 +471,7 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
   function allTurnarounds(skipId) {
     const out = [];
     CARS.forEach(c => {
-      const list = bookings.filter(b => b.carId === c.id && b.id !== skipId)
+      const list = bookings.filter(b => b.carId === c.id && b.id !== skipId && !isDone(b))
         .sort((x, y) => moment(x.start, x.startTime).localeCompare(moment(y.start, y.startTime)));
       for (let i = 0; i + 1 < list.length; i++) {
         const from = moment(list[i].end, list[i].endTime), to = moment(list[i + 1].start, list[i + 1].startTime);
@@ -483,7 +494,8 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
   // before it and just after it, with the minutes left to clean/prepare the car.
   function neighbours(b, carId, range = b) {
     const s0 = moment(range.start, range.startTime), e0 = moment(range.end, range.endTime);
-    const others = bookings.filter(o => o.id !== b.id && o.carId === carId);
+    if (isDone(b)) return {};
+    const others = bookings.filter(o => o.id !== b.id && o.carId === carId && !isDone(o));
     const prev = others.filter(o => moment(o.end, o.endTime) <= s0).sort((x, y) => moment(y.end, y.endTime).localeCompare(moment(x.end, x.endTime)))[0];
     const next = others.filter(o => moment(o.start, o.startTime) >= e0).sort((x, y) => moment(x.start, x.startTime).localeCompare(moment(y.start, y.startTime)))[0];
     const out = {};
@@ -529,11 +541,11 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
         const s = Math.max(0, rs), e = Math.min(slots, Math.max(re, rs + 0.3));
         if (e <= s) return '';
         const clash = !!clashFor(b, c.id);
-        return `<button class="bar${clash ? ' clash' : ''}${b.id === flashId ? ' flash' : ''}" data-id="${b.id}"
+        return `<button class="bar${clash ? ' clash' : ''}${isDone(b) ? ' done' : ''}${b.id === flashId ? ' flash' : ''}" data-id="${b.id}"
           style="left:${s / slots * 100}%;width:${(e - s) / slots * 100}%;top:${5 + laneOf[b.id] * LANE}px;${hueVar(c)}"
           aria-label="${who(b)} ${dayText(b.start, b.startTime)} ถึง ${dayText(b.end, b.endTime)}">
           <span class="in"><span class="ln1"><b>${clash ? '⚠ ' : ''}${rs < 0 ? '‹ ' : ''}${who(b)}</b><span class="pl">${placeLine(b)}</span></span>
-          <small>${stamp(b.start, b.startTime)}-${stamp(b.end, b.endTime)}</small></span></button>`;
+          <small>${isDone(b) ? '<span class="ok">✓ คืนแล้ว</span> · ' : delivered(b) ? '<span class="ok">✓ ส่งแล้ว</span> · ' : ''}${stamp(b.start, b.startTime)}-${stamp(b.end, b.endTime)}</small></span></button>`;
       }).join('');
       // Turnaround chips: where one queue ends and the next one on this car starts soon after.
       const gaps = [];
