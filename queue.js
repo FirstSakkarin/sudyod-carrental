@@ -219,6 +219,26 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
 .conf a.tel { color: var(--brand); font-weight: 700; text-decoration: none; margin-left: 8px; padding: 2px 10px; border-radius: 999px; border: 1px solid rgba(253, 224, 71, .45); }
 .conf .due { margin-top: 8px; padding: 10px 12px; border-radius: 14px; font-weight: 700; font-size: 1.12rem;
   background: rgba(253, 224, 71, .16); border: 1px solid rgba(253, 224, 71, .42); }
+.fm { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 10px; }
+.fm .f { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.fm .f.w { grid-column: 1 / -1; }
+.fm label { color: var(--muted); font-size: .88rem; font-weight: 600; }
+.fm .v { min-height: 50px; border-radius: 14px; padding: 10px 14px; display: flex; align-items: center; gap: 8px; font-size: 1.05rem; line-height: 1.35;
+  background: var(--glass); border: 1px solid var(--glass-edge-soft); box-shadow: var(--specular); overflow-wrap: anywhere; }
+.fm .v.e { color: var(--muted); font-size: .95rem; }
+.fm .v.dt { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 0; background: none; border: 0; box-shadow: none; }
+.fm .v.dt span { min-height: 50px; border-radius: 14px; padding: 10px 12px; display: flex; align-items: center; font-variant-numeric: tabular-nums;
+  background: var(--glass); border: 1px solid var(--glass-edge-soft); box-shadow: var(--specular); }
+.fm .v.ph { justify-content: space-between; padding: 6px 6px 6px 14px; font-variant-numeric: tabular-nums; }
+.fm .v.ph span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.fm .v.ph a { color: var(--brand-ink); text-decoration: none; font-weight: 700; padding: 8px 12px; font-size: 1.05rem; border-radius: 999px; flex-shrink: 0;
+  background: linear-gradient(180deg, var(--brand), var(--brand-2)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6); }
+.fm .v small { font-size: 1rem; }
+.fm .v.memo2 { white-space: pre-wrap; align-items: flex-start; min-height: 70px; }
+.fm .sum { grid-column: 1 / -1; border-radius: 16px; padding: 14px 16px; font-weight: 700; display: flex; flex-direction: column; gap: 4px;
+  background: rgba(253, 224, 71, .12); border: 1px solid rgba(253, 224, 71, .42); }
+.fm .sum b { color: var(--brand); font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+.fm .sum small { color: var(--muted); font-weight: 600; font-size: .92rem; }
 .memo { border-radius: 18px; padding: 10px 12px; background: rgba(255, 255, 255, .05); border: 1px dashed var(--glass-edge-soft); color: var(--muted); white-space: pre-wrap; font-size: .95rem; line-height: 1.45; }
 .memo b { display: block; color: var(--text); font-size: .82rem; margin-bottom: 2px; }
 .when { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -598,6 +618,29 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
     const memo = String(b.note || '').trim();
     return `<div class="conf">${h}</div>` + (memo ? `<div class="memo"><b>บันทึกร้าน (ลูกค้าไม่เห็น)</b>${esc(memo)}</div>` : '');
   }
+  // Booking details laid out like the app's booking form (easy to scan), read-only; ✎ opens the real form.
+  function formHtml(b, c) {
+    const d = confirmData(b, c), digits = d.phone.replace(/[^\d+]/g, '');
+    const f = (label, inner, cls = '') => `<div class="f${cls.includes('w') ? ' w' : ''}"><label>${label}</label>${inner}</div>`;
+    const v = (x, empty = '-') => x !== '' && x != null ? `<div class="v">${x}</div>` : `<div class="v e">${empty}</div>`;
+    const dt = (date, time) => `<div class="v dt"><span>${thDate(date)}</span><span>${(time || '-').replace(':', '.')}</span></div>`;
+    const money = n => n ? `${baht(n)}` : '';
+    let h = f('รถ', v(esc(c.plate + " · " + c.name)), 'w') +
+      f('ชื่อลูกค้า', v(esc(who(b)))) +
+      f('เบอร์โทร', d.phone ? `<div class="v ph"><span>${esc(d.phone)}</span><a href="tel:${digits}" aria-label="โทรหาลูกค้า">📞</a></div>` : v('', 'ยังไม่มีเบอร์'));
+    if (b.customerAddress) h += f('ที่อยู่ลูกค้า', v(esc(b.customerAddress)), 'w');
+    h += f('วันรับรถ', dt(b.start, b.startTime)) + f('วันคืนรถ', dt(b.end, b.endTime)) +
+      f('สถานที่รับรถ', v(d.pick ? placeHtml(esc(d.pick)) : '', 'ยังไม่ระบุ')) + f('สถานที่คืนรถ', v(d.ret ? placeHtml(esc(d.ret)) : '', 'ยังไม่ระบุ'));
+    if (+b.mileageOut) h += f('เลขไมล์ออก (กม.)', v(baht(b.mileageOut)), 'w');
+    h += f('ราคาเช่า/วัน', v(money(d.rate), 'ยังไม่ใส่')) + f('ค่า OT (บาท)', v(money(d.ot), '0')) +
+      f('เงินประกัน (บาท)', v(money(d.dep), '0')) + f('โอนจอง (บาท)', v(money(d.paid), '0'));
+    h += d.total
+      ? `<div class="sum"><span>🧾 รวม ${d.days} วัน = <b>฿${baht(d.total)}</b></span><small>ยอดที่ต้องชำระวันรับรถ ฿${baht(d.due)}${d.paid || d.dep ? ` (${baht(d.total)}${d.paid ? ' − ' + baht(d.paid) : ''}${d.dep ? ' + ประกัน ' + baht(d.dep) : ''})` : ''}</small></div>`
+      : `<div class="sum"><small>ยังไม่ได้ใส่ราคา กดปุ่ม ✎ เพื่อใส่</small></div>`;
+    const memo = String(b.note || '').trim();
+    h += f('หมายเหตุ', memo ? `<div class="v memo2">${esc(memo)}</div>` : v('', '-'), 'w');
+    return `<div class="fm">${h}</div>`;
+  }
   function copyText(t) {
     const done = () => toast('คัดลอกข้อความแล้ว ไปวางในแชตลูกค้าได้เลย', false);
     const old = () => { const ta = document.createElement('textarea'); ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch (_) {} ta.remove(); };
@@ -614,7 +657,7 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
         <div class="hbtns"><button class="x ed" data-act="edit" aria-label="แก้ไขทั้งหมด" title="แก้ไขทั้งหมด"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button><button class="x" data-act="close" aria-label="ปิด">×</button></div></div>`;
     let body = '';
     if (sheet.view === 'main') {
-      body = `${confirmHtml(b, c)}
+      body = `${formHtml(b, c)}
         <button class="btn" data-act="copy">📋 คัดลอกข้อความยืนยัน</button>
         ${turnHtml(neighbours(b, b.carId))}
         <button class="btn main" data-act="view:car">⇄ ย้ายไปรถคันอื่น</button>
