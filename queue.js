@@ -207,6 +207,20 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
 .bs-head h2 { margin: 0; font-size: 1.45rem; font-weight: 700; letter-spacing: -.01em; }
 .bs-head p { margin: 0; color: var(--muted); font-size: .92rem; }
 .x { width: 52px; height: 52px; border-radius: 999px; border: 1px solid var(--glass-edge-soft); background: var(--glass-2); font-size: 1.5rem; line-height: 1; flex-shrink: 0; box-shadow: var(--specular); }
+.hbtns { display: flex; gap: 8px; flex-shrink: 0; }
+.x.ed { display: grid; place-items: center; }
+.x.ed svg { width: 22px; height: 22px; }
+.conf { border-radius: 20px; padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; font-size: 1.02rem; line-height: 1.5;
+  background: var(--glass); border: 1px solid var(--glass-edge-soft); box-shadow: var(--specular); }
+.conf h3 { margin: 0 0 2px; font-size: 1.08rem; font-weight: 700; }
+.conf .sec { margin-top: 10px; font-weight: 700; }
+.conf .num { font-variant-numeric: tabular-nums; }
+.conf .miss { color: var(--muted); }
+.conf a.tel { color: var(--brand); font-weight: 700; text-decoration: none; margin-left: 8px; padding: 2px 10px; border-radius: 999px; border: 1px solid rgba(253, 224, 71, .45); }
+.conf .due { margin-top: 8px; padding: 10px 12px; border-radius: 14px; font-weight: 700; font-size: 1.12rem;
+  background: rgba(253, 224, 71, .16); border: 1px solid rgba(253, 224, 71, .42); }
+.memo { border-radius: 18px; padding: 10px 12px; background: rgba(255, 255, 255, .05); border: 1px dashed var(--glass-edge-soft); color: var(--muted); white-space: pre-wrap; font-size: .95rem; line-height: 1.45; }
+.memo b { display: block; color: var(--text); font-size: .82rem; margin-bottom: 2px; }
 .when { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .when div, .phone, .car, .nudge, .confirm, .turn {
   background: var(--glass); border: 1px solid var(--glass-edge-soft); box-shadow: var(--specular);
@@ -537,6 +551,59 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
            (nb.next ? line('หลังคืนรถ', nb.next, `คิวต่อ ${who(nb.next.o)} รับ ${dayText(nb.next.o.start, nb.next.o.startTime)}`) : '');
   }
 
+  // Booking confirmation, laid out like the message the shop sends customers.
+  const esc = v => String(v == null ? '' : v).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+  const baht = n => (Math.round(+n || 0)).toLocaleString('en-US');
+  const thDate = s => { const [y, m, d] = s.split('-'); return `${+d}/${+m}/${String((+y + 543) % 100).padStart(2, '0')}`; };
+  const thTime = t => t ? `${t.replace(':', '.')} น.` : '';
+  function confirmData(b, c) {
+    const rate = +b.rate || 0, ot = +b.otFee || 0, dep = +b.deposit || 0, paid = +b.bookingDeposit || 0;
+    const nights = Math.max(1, Math.round((new Date(b.end) - new Date(b.start)) / 864e5));
+    const total = +b.total || rate * nights + ot;
+    const days = rate && total > ot ? Math.round((total - ot) / rate) : nights;
+    const name = String(who(b)).trim();
+    return { name: /^คุณ/.test(name) ? name : 'คุณ' + name, phone: b.phone || '', carTxt: `${c.name} ${c.plate}`.trim(),
+      range: `${thDate(b.start)}-${thDate(b.end)}`, pick: b.pickupLocation || '', ret: b.returnLocation || '',
+      st: thTime(b.startTime), et: thTime(b.endTime), rate, ot, dep, paid, total, days, due: total - paid + dep };
+  }
+  function confirmText(b, c) {
+    const d = confirmData(b, c), L = ['ยืนยันการจอง', `   - ${d.name}`];
+    if (d.phone) L.push(`- เบอร์โทร ${d.phone}`);
+    L.push(`- ${d.carTxt}`, `- ช่วงเวลาเช่า ${d.range}`, `- รับรถ ${d.pick ? d.pick + ' ' : ''}เวลา ${d.st}`, `- คืนรถ ${d.ret ? d.ret + ' ' : ''}เวลา ${d.et}`);
+    if (d.total) {
+      L.push('', 'สรุปค่าเช่า', d.rate ? `ค่าเช่า ${d.days} วัน ${baht(d.rate)}/วัน = ${baht(d.total - d.ot)} บาท` : `ค่าเช่า ${baht(d.total - d.ot)} บาท`);
+      if (d.ot) L.push(`ค่าเกินเวลา ${baht(d.ot)} บาท`);
+      if (d.dep) L.push(`เงินมัดจำ ${baht(d.dep)} บาท`);
+      if (d.paid) L.push(`โอนจองมาแล้ว ${baht(d.paid)} บาท`);
+      L.push('', 'สรุป', `${baht(d.total)}${d.paid ? '-' + baht(d.paid) : ''}${d.dep ? '+' + baht(d.dep) : ''}= ${baht(d.due)} บาท`, '', `ยอดที่ต้องชำระในวันรับรถ ${baht(d.due)} บาท`);
+    }
+    return L.join('\n');
+  }
+  function confirmHtml(b, c) {
+    const d = confirmData(b, c), digits = d.phone.replace(/[^\d+]/g, ''), ln = t => `<div>${t}</div>`;
+    let h = `<h3>ยืนยันการจอง</h3>` + ln(`- ${esc(d.name)}`) +
+      ln(d.phone ? `- เบอร์โทร <span class="num">${esc(d.phone)}</span><a class="tel" href="tel:${digits}">โทร</a>` : `- เบอร์โทร <span class="miss">ยังไม่มี</span>`) +
+      ln(`- ${esc(d.carTxt)}`) + ln(`- ช่วงเวลาเช่า <span class="num">${d.range}</span>`) +
+      ln(`- รับรถ ${d.pick ? esc(d.pick) + ' ' : ''}เวลา <span class="num">${d.st}</span>`) +
+      ln(`- คืนรถ ${d.ret ? esc(d.ret) + ' ' : ''}เวลา <span class="num">${d.et}</span>`);
+    if (!d.total) h += `<div class="sec">สรุปค่าเช่า</div>` + ln(`<span class="miss">ยังไม่ได้ใส่ราคา กดปุ่มแก้ไข ✎ เพื่อใส่</span>`);
+    else {
+      h += `<div class="sec">สรุปค่าเช่า</div>` + ln(d.rate ? `ค่าเช่า ${d.days} วัน <span class="num">${baht(d.rate)}</span>/วัน = <span class="num">${baht(d.total - d.ot)}</span> บาท` : `ค่าเช่า <span class="num">${baht(d.total - d.ot)}</span> บาท`);
+      if (d.ot) h += ln(`ค่าเกินเวลา <span class="num">${baht(d.ot)}</span> บาท`);
+      if (d.dep) h += ln(`เงินมัดจำ <span class="num">${baht(d.dep)}</span> บาท`);
+      if (d.paid) h += ln(`โอนจองมาแล้ว <span class="num">${baht(d.paid)}</span> บาท`);
+      h += `<div class="sec">สรุป</div>` + ln(`<span class="num">${baht(d.total)}${d.paid ? '-' + baht(d.paid) : ''}${d.dep ? '+' + baht(d.dep) : ''}= ${baht(d.due)}</span> บาท`) +
+        `<div class="due">ยอดที่ต้องชำระในวันรับรถ <span class="num">${baht(d.due)}</span> บาท</div>`;
+    }
+    const memo = String(b.note || '').trim();
+    return `<div class="conf">${h}</div>` + (memo ? `<div class="memo"><b>บันทึกร้าน (ลูกค้าไม่เห็น)</b>${esc(memo)}</div>` : '');
+  }
+  function copyText(t) {
+    const done = () => toast('คัดลอกข้อความแล้ว ไปวางในแชตลูกค้าได้เลย', false);
+    const old = () => { const ta = document.createElement('textarea'); ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch (_) {} ta.remove(); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done, old); else old();
+  }
+
   function renderSheet() {
     const host = L.getElementById('sheetHost');
     if (!sheet) { host.innerHTML = ''; return; }
@@ -544,16 +611,14 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
     const head = `<div class="grip"></div><div class="bs-head"><div class="who">
         <span class="chip-car" style="${hueVar(c)}">${c.no ? c.no + ' · ' : ''}${c.plate}</span>
         <h2>${who(b)}</h2><p>${c.spec}</p></div>
-        <button class="x" data-act="close" aria-label="ปิด">×</button></div>`;
+        <div class="hbtns"><button class="x ed" data-act="edit" aria-label="แก้ไขทั้งหมด" title="แก้ไขทั้งหมด"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button><button class="x" data-act="close" aria-label="ปิด">×</button></div></div>`;
     let body = '';
     if (sheet.view === 'main') {
-      const digits = (b.phone || '').replace(/[^\d+]/g, '');
-      body = `<div class="when"><div><span>ส่งรถ</span><strong>${dayText(b.start, b.startTime)}</strong>${placeHtml(b.pickupLocation)}</div><div><span>รับรถคืน</span><strong>${dayText(b.end, b.endTime)}</strong>${placeHtml(b.returnLocation)}</div></div>
+      body = `${confirmHtml(b, c)}
+        <button class="btn" data-act="copy">📋 คัดลอกข้อความยืนยัน</button>
         ${turnHtml(neighbours(b, b.carId))}
         <button class="btn main" data-act="view:car">⇄ ย้ายไปรถคันอื่น</button>
-        <button class="btn main" data-act="view:time">⏱ เลื่อนวัน / เวลา</button>
-        ${digits ? `<div class="phone"><span>${b.phone}</span><a href="tel:${digits}">โทร</a></div>` : ''}
-        <button class="btn" data-act="edit">แก้ไขทั้งหมด</button>`;
+        <button class="btn main" data-act="view:time">⏱ เลื่อนวัน / เวลา</button>`;
     } else if (sheet.view === 'car') {
       const others = CARS.filter(x => x.id !== c.id);
       const free = x => !clashFor(b, x.id);
@@ -833,6 +898,7 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
     if (act === 'backdrop') { if (e.target === t) closeSheet(); return; }
     if (act === 'close') closeSheet();
     else if (act === 'view') { sheet.view = a1; sheet.pendingCar = null; renderSheet(); }
+    else if (act === 'copy') { const b = bookings.find(x => x.id === sheet.id); copyText(confirmText(b, car(b.carId))); }
     else if (act === 'edit') { const id = sheet.id; closeSheet(); openEditBookingModal(id); }
     else if (act === 'hours') { const d = selDay; selDay = null; dayPill(); openGanttDay(d); }
     else if (act === 'car') {
