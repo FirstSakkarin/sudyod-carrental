@@ -235,6 +235,10 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
   background: linear-gradient(180deg, var(--brand), var(--brand-2)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6); }
 .fm .v small { font-size: 1rem; }
 .fm .v.memo2 { white-space: pre-wrap; align-items: flex-start; min-height: 70px; }
+.fm .f.go label { color: #86efac; }
+.fm .f.back label { color: #fdba74; }
+.fm .f.go .v:not(.dt), .fm .f.go .v.dt span { background: rgba(34, 197, 94, .16); border-color: rgba(134, 239, 172, .5); }
+.fm .f.back .v:not(.dt), .fm .f.back .v.dt span { background: rgba(249, 115, 22, .16); border-color: rgba(253, 186, 116, .5); }
 .fm .sum { grid-column: 1 / -1; border-radius: 16px; padding: 14px 16px; font-weight: 700; display: flex; flex-direction: column; gap: 4px;
   background: rgba(253, 224, 71, .12); border: 1px solid rgba(253, 224, 71, .42); }
 .fm .sum b { color: var(--brand); font-size: 1.35rem; font-variant-numeric: tabular-nums; }
@@ -621,7 +625,7 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
   // Booking details laid out like the app's booking form (easy to scan), read-only; ✎ opens the real form.
   function formHtml(b, c) {
     const d = confirmData(b, c), digits = d.phone.replace(/[^\d+]/g, '');
-    const f = (label, inner, cls = '') => `<div class="f${cls.includes('w') ? ' w' : ''}"><label>${label}</label>${inner}</div>`;
+    const f = (label, inner, cls = '') => `<div class="f ${cls}"><label>${label}</label>${inner}</div>`;
     const v = (x, empty = '-') => x !== '' && x != null ? `<div class="v">${x}</div>` : `<div class="v e">${empty}</div>`;
     const dt = (date, time) => `<div class="v dt"><span>${thDate(date)}</span><span>${(time || '-').replace(':', '.')}</span></div>`;
     const money = n => n ? `${baht(n)}` : '';
@@ -629,8 +633,8 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
       f('ชื่อลูกค้า', v(esc(who(b))), 'w') +
       f('เบอร์โทร', d.phone ? `<div class="v ph"><span>${esc(d.phone)}</span><a href="tel:${digits}">📞 โทร</a></div>` : v('', 'ยังไม่มีเบอร์'), 'w');
     if (b.customerAddress) h += f('ที่อยู่ลูกค้า', v(esc(b.customerAddress)), 'w');
-    h += f('วันรับรถ', dt(b.start, b.startTime)) + f('วันคืนรถ', dt(b.end, b.endTime)) +
-      f('สถานที่รับรถ', v(d.pick ? placeHtml(esc(d.pick)) : '', 'ยังไม่ระบุ')) + f('สถานที่คืนรถ', v(d.ret ? placeHtml(esc(d.ret)) : '', 'ยังไม่ระบุ'));
+    h += f('🟢 วันรับรถ', dt(b.start, b.startTime), 'go') + f('🟠 วันคืนรถ', dt(b.end, b.endTime), 'back') +
+      f('🟢 สถานที่รับรถ', v(d.pick ? placeHtml(esc(d.pick)) : '', 'ยังไม่ระบุ'), 'go') + f('🟠 สถานที่คืนรถ', v(d.ret ? placeHtml(esc(d.ret)) : '', 'ยังไม่ระบุ'), 'back');
     if (+b.mileageOut) h += f('เลขไมล์ออก (กม.)', v(baht(b.mileageOut)), 'w');
     h += f('ราคาเช่า/วัน', v(money(d.rate), 'ยังไม่ใส่')) + f('ค่า OT (บาท)', v(money(d.ot), '0')) +
       f('เงินประกัน (บาท)', v(money(d.dep), '0')) + f('โอนจอง (บาท)', v(money(d.paid), '0'));
