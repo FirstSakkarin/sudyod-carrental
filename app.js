@@ -2001,10 +2001,6 @@ function saveBooking() {
   const status = start <= today ? 'active' : 'upcoming';
 
   const mileageOut = +document.getElementById('bookingMileageOut').value || null;
-  if (status === 'active' && !mileageOut) {
-    showToast('กรุณากรอกเลขไมล์ออก (จำเป็นเมื่อรับรถวันนี้หรือก่อนหน้า)', 'error');
-    return;
-  }
 
   const conflict = findBookingConflict(carId, start, end, id || null);
   if (conflict) {

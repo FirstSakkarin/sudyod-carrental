@@ -502,13 +502,12 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--brand); outline
       if (k === 'back') { if (b.status !== 'completed') openReturnModal(b.id); return; }
       const before = { mileageOut: b.mileageOut, deliveredAt: b.deliveredAt || '', status: b.status };
       if (done[id]) { if (b.status === 'completed') return; b.deliveredAt = ''; undo = { b, before }; persist(b, 'ย้ายกลับไปงานที่ยังไม่ได้ส่ง', true); return; }
-      const car = getCarById(b.carId), cur = b.mileageOut || (car && car.mileage) || '';
-      const v = prompt(`เลขไมล์ออก ${plate}`, cur == null ? '' : String(cur));
+      const v = prompt(`เลขไมล์ออก ${plate} (ไม่กรอกก็ได้)`, b.mileageOut ? String(b.mileageOut) : '');
       if (v === null) return;
       const mi = +String(v).replace(/[^\d]/g, '');
-      if (!mi) { toast('ยังไม่ได้บันทึก ต้องใส่เลขไมล์ออกก่อน', false); return; }
-      b.mileageOut = mi; b.deliveredAt = nowISO(); if (b.status !== 'completed') b.status = 'active';
-      undo = { b, before }; persist(b, `ส่ง ${plate} เรียบร้อย · ไมล์ ${mi.toLocaleString()}`, true);
+      if (mi) b.mileageOut = mi;
+      b.deliveredAt = nowISO(); if (b.status !== 'completed') b.status = 'active';
+      undo = { b, before }; persist(b, `ส่ง ${plate} เรียบร้อย` + (mi ? ` · ไมล์ ${mi.toLocaleString()}` : ''), true);
     }
   };
   R.addEventListener('click', onClick); L.addEventListener('click', onClick);
