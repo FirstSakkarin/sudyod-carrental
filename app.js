@@ -828,9 +828,13 @@ function initGanttDragScroll() {
     // instead of the element actually tapped — which silently broke
     // "click a booking bar to view it" and any other bare click/tap.
 
-    const groupEl = e.target.closest('.gantt-model-group[data-group-car-ids]');
-    const labelEl = e.target.closest('.gantt-carlabel-draggable');
-    const barEl = e.target.closest('.gantt-bar[data-booking-id]');
+    // On a phone, dragging bars/rows by finger is too easy to trigger by
+    // accident and blocks scrolling, so touch always pans; moving a booking
+    // is done from the tap sheet (openGanttBookingSheet) instead.
+    const isMouse = e.pointerType === 'mouse';
+    const groupEl = isMouse ? e.target.closest('.gantt-model-group[data-group-car-ids]') : null;
+    const labelEl = isMouse ? e.target.closest('.gantt-carlabel-draggable') : null;
+    const barEl = isMouse ? e.target.closest('.gantt-bar[data-booking-id]') : null;
     if (groupEl) {
       mode = 'reorderGroup';
       dragGroupEl = groupEl;
@@ -1172,6 +1176,178 @@ function reassignBookingCar(bookingId, newCarId) {
   showToast(`ย้ายการจองไปที่ ${newCar.plate} เรียบร้อย`, 'success');
 }
 
+// ── Quick booking sheet (tap a bar in the queue) ─────────────────────
+// Big-button bottom sheet for phones held in portrait: move the booking to
+// another car, or nudge pickup/return by an hour or a day, without dragging.
+let ganttSheet = null; // { id, start, startTime, end, endTime, view }
+
+function ganttSheetDateText(date, time) {
+  const d = new Date(date);
+  const DOW = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+  return `${DOW[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}` + (time ? ` · ${time}` : '');
+}
+
+// Shift a date+time by minutes; a missing time is taken as 10:00 (the
+// shop's usual hand-over) so hour steps have something to start from.
+function ganttShiftMoment(date, time, minutes) {
+  const [h, m] = (time || '10:00').split(':').map(Number);
+  const dt = new Date(`${date}T00:00:00Z`);
+  dt.setUTCMinutes(h * 60 + m + minutes);
+  const pad = n => String(n).padStart(2, '0');
+  return {
+    date: dt.toISOString().slice(0, 10),
+    time: minutes % 1440 === 0 && !time ? '' : `${pad(dt.getUTCHours())}:${pad(dt.getUTCMinutes())}`,
+  };
+}
+
+function openGanttBookingSheet(bookingId) {
+  const b = state.bookings.find(x => x.id === bookingId);
+  if (!b) return;
+  ganttSheet = { id: b.id, start: b.start, startTime: b.startTime || '', end: b.end, endTime: b.endTime || '', view: 'main' };
+  renderGanttBookingSheet();
+}
+
+function closeGanttBookingSheet() {
+  ganttSheet = null;
+  const el = document.getElementById('ganttSheet');
+  if (el) el.remove();
+}
+
+function ganttSheetView(view) {
+  if (!ganttSheet) return;
+  ganttSheet.view = view;
+  renderGanttBookingSheet();
+}
+
+function ganttSheetNudge(which, minutes) {
+  if (!ganttSheet) return;
+  const key = which === 'start' ? 'start' : 'end';
+  const next = ganttShiftMoment(ganttSheet[key], ganttSheet[key + 'Time'], minutes);
+  ganttSheet[key] = next.date;
+  ganttSheet[key + 'Time'] = next.time;
+  renderGanttBookingSheet();
+}
+
+function renderGanttBookingSheet() {
+  if (!ganttSheet) return;
+  const b = state.bookings.find(x => x.id === ganttSheet.id);
+  const car = b ? getCarById(b.carId) : null;
+  if (!b || !car) { closeGanttBookingSheet(); return; }
+
+  let el = document.getElementById('ganttSheet');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'ganttSheet';
+    el.className = 'gsheet-overlay';
+    el.addEventListener('click', e => { if (e.target === el) closeGanttBookingSheet(); });
+    document.body.appendChild(el);
+  }
+
+  const head = `
+    <div class="gsheet-grip"></div>
+    <div class="gsheet-head">
+      <span class="gsheet-car" style="background:${ganttSheetCarColor(car)}">${car.orderNo ? car.orderNo + ' · ' : ''}${car.plate}</span>
+      <div class="gsheet-title">${b.customer || '-'}</div>
+      <div class="gsheet-sub">${car.brand} ${car.model}</div>
+      <button class="gsheet-x" onclick="closeGanttBookingSheet()" aria-label="ปิด"><i class="fa-solid fa-xmark"></i></button>
+    </div>`;
+
+  let body = '';
+  if (ganttSheet.view === 'main') {
+    const digits = String(b.phone || '').replace(/[^\d+]/g, '');
+    body = `
+      <div class="gsheet-when">
+        <div><span>รับรถ</span><strong>${ganttSheetDateText(b.start, b.startTime)}</strong></div>
+        <div><span>คืนรถ</span><strong>${ganttSheetDateText(b.end, b.endTime)}</strong></div>
+      </div>
+      <div class="gsheet-actions">
+        <button class="gsheet-btn gsheet-btn-main" onclick="ganttSheetView('car')"><i class="fa-solid fa-right-left"></i> ย้ายไปรถคันอื่น</button>
+        <button class="gsheet-btn gsheet-btn-main" onclick="ganttSheetView('time')"><i class="fa-regular fa-clock"></i> เลื่อนวัน / เวลา</button>
+        ${digits ? `<a class="gsheet-btn" href="tel:${digits}"><i class="fa-solid fa-phone"></i> โทร ${b.phone}</a>` : ''}
+        <button class="gsheet-btn" onclick="closeGanttBookingSheet(); openEditBookingModal('${b.id}')"><i class="fa-solid fa-pen"></i> แก้ไขทั้งหมด</button>
+      </div>`;
+  } else if (ganttSheet.view === 'car') {
+    const others = state.cars.filter(c => c.id !== car.id && c.type === car.type);
+    const isFree = c => c.status !== 'maintenance' && c.status !== 'blocked' && !findBookingConflict(c.id, b.start, b.end, b.id);
+    const sameModel = c => c.brand === car.brand && c.model === car.model;
+    const rank = c => (isFree(c) ? 0 : 2) + (sameModel(c) ? 0 : 1);
+    const list = [...others].sort((x, y) => rank(x) - rank(y) || (x.orderNo || 999) - (y.orderNo || 999));
+    body = `
+      <div class="gsheet-hint">${ganttSheetDateText(b.start, b.startTime)} → ${ganttSheetDateText(b.end, b.endTime)}</div>
+      <div class="gsheet-carlist">
+        ${list.map(c => {
+          const free = isFree(c);
+          const why = c.status === 'maintenance' ? 'ซ่อมอยู่' : c.status === 'blocked' ? 'งดให้บริการ' : 'ติดคิว';
+          return `<button class="gsheet-carbtn ${free ? '' : 'gsheet-carbtn-busy'}" onclick="ganttSheetMoveCar('${c.id}')">
+            <span class="gsheet-cardot" style="background:${ganttSheetCarColor(c)}"></span>
+            <span class="gsheet-carname">${c.orderNo ? c.orderNo + '. ' : ''}${c.plate}<small>${c.brand} ${c.model}${sameModel(c) ? ' · รุ่นเดียวกัน' : ''}</small></span>
+            <span class="gsheet-tag ${free ? 'gsheet-tag-free' : ''}">${free ? 'ว่าง' : why}</span>
+          </button>`;
+        }).join('') || '<p class="gsheet-hint">ไม่มีรถคันอื่นในหมวดนี้</p>'}
+      </div>
+      <button class="gsheet-btn" onclick="ganttSheetView('main')"><i class="fa-solid fa-arrow-left"></i> กลับ</button>`;
+  } else {
+    const changed = ganttSheet.start !== b.start || ganttSheet.startTime !== (b.startTime || '') ||
+      ganttSheet.end !== b.end || ganttSheet.endTime !== (b.endTime || '');
+    const bad = ganttSheet.end < ganttSheet.start ||
+      (ganttSheet.end === ganttSheet.start && ganttSheet.endTime && ganttSheet.startTime && ganttSheet.endTime <= ganttSheet.startTime);
+    const clash = bad ? null : findBookingConflict(b.carId, ganttSheet.start, ganttSheet.end, b.id);
+    const row = (which, label) => {
+      const d = ganttSheet[which], t = ganttSheet[which + 'Time'];
+      return `<div class="gsheet-nudge">
+        <div class="gsheet-nudge-label">${label}<strong>${ganttSheetDateText(d, t)}</strong></div>
+        <div class="gsheet-nudge-btns">
+          <button onclick="ganttSheetNudge('${which}',-1440)">− 1 วัน</button>
+          <button onclick="ganttSheetNudge('${which}',-60)">− 1 ชม.</button>
+          <button onclick="ganttSheetNudge('${which}',60)">+ 1 ชม.</button>
+          <button onclick="ganttSheetNudge('${which}',1440)">+ 1 วัน</button>
+        </div>
+      </div>`;
+    };
+    body = `
+      ${row('start', 'รับรถ')}
+      ${row('end', 'คืนรถ')}
+      ${bad ? '<div class="gsheet-warn">วันคืนรถต้องหลังวันรับรถ</div>' : ''}
+      ${clash ? `<div class="gsheet-warn">⚠ ชนกับคิว ${clash.customer} (${ganttSheetDateText(clash.start, clash.startTime)} → ${ganttSheetDateText(clash.end, clash.endTime)})</div>` : ''}
+      <div class="gsheet-row2">
+        <button class="gsheet-btn" onclick="ganttSheetView('main')">ยกเลิก</button>
+        <button class="gsheet-btn gsheet-btn-save" ${changed && !bad ? '' : 'disabled'} onclick="ganttSheetSaveTime()">บันทึกเวลาใหม่</button>
+      </div>`;
+  }
+
+  el.innerHTML = `<div class="gsheet">${head}${body}</div>`;
+}
+
+function ganttSheetMoveCar(newCarId) {
+  if (!ganttSheet) return;
+  const id = ganttSheet.id;
+  closeGanttBookingSheet();
+  reassignBookingCar(id, newCarId);
+}
+
+function ganttSheetSaveTime() {
+  if (!ganttSheet) return;
+  const b = state.bookings.find(x => x.id === ganttSheet.id);
+  if (!b) { closeGanttBookingSheet(); return; }
+  const clash = findBookingConflict(b.carId, ganttSheet.start, ganttSheet.end, b.id);
+  if (clash && !confirm(`เวลาใหม่ชนกับคิว ${clash.customer} ช่วง ${clash.start} – ${clash.end}\nบันทึกต่อหรือไม่?`)) return;
+
+  const oldDays = daysBetween(b.start, b.end);
+  b.start = ganttSheet.start; b.startTime = ganttSheet.startTime;
+  b.end = ganttSheet.end;     b.endTime = ganttSheet.endTime;
+  // Price follows the number of days, same formula as the booking form.
+  const days = daysBetween(b.start, b.end);
+  if (days !== oldDays && b.rate) b.total = days * b.rate + (b.otFee || 0);
+  b.updatedAt = nowISO();
+  syncCarActiveStatus(b.carId);
+
+  closeGanttBookingSheet();
+  saveToStorage();
+  renderCurrentPage();
+  pushToSheets(['bookings', 'cars']);
+  showToast(`เลื่อนคิว ${b.customer} เรียบร้อย` + (days !== oldDays ? ` · ${days} วัน ${(b.total || 0).toLocaleString()} ฿` : ''), 'success');
+}
+
 // Cars belonging to the active tab (รถยนต์/มอเตอร์ไซค์), minus any car
 // already tied up on a long-term booking — see GANTT_LONG_TERM_DAYS. Sorted
 // by model (then plate) rather than plate/insertion order — "รุ่นรถมาก่อน
@@ -1467,6 +1643,9 @@ function renderGanttWeekView() {
   const days        = Array.from({ length: WINDOW }, (_, i) => addDaysStr(windowStart, i));
   const DOW         = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
   const todayIdx    = days.indexOf(today);
+  const narrow      = window.matchMedia('(max-width: 768px)').matches;
+  const laneH       = narrow ? 40 : 32;
+  const rowMinH     = narrow ? 48 : 40;
 
   const headerCells = days.map(d => {
     const dt = new Date(d);
@@ -1577,15 +1756,15 @@ function renderGanttWeekView() {
         '\n\n💡 ลากแถบไปวางบนแถวรถคันอื่นเพื่อย้ายการจอง';
       return `<div class="gantt-bar gantt-sheet-bar ${statusClass}"
         data-booking-id="${b.id}"
-        style="left:${leftPct}%;width:${widthPct}%;top:${4 + laneOf[b.id] * 32}px;--bar-color:${barColor};"
+        style="left:${leftPct}%;width:${widthPct}%;top:${4 + laneOf[b.id] * laneH}px;--bar-color:${barColor};"
         title="${title.replace(/"/g, '&quot;')}"
-        onclick="openEditBookingModal('${b.id}')">
+        onclick="openGanttBookingSheet('${b.id}')">
         ${rawStart < 0 ? '<i class="fa-solid fa-caret-left"></i>&nbsp;' : ''}${isHardConflict ? '<i class="fa-solid fa-triangle-exclamation"></i>&nbsp;' : ''}${isSwappable ? '<i class="fa-solid fa-right-left"></i>&nbsp;' : ''}${text}
       </div>`;
     }).join('');
 
     return groupHeader + `
-      <div class="gantt-row" data-car-id="${car.id}" data-order-car-id="${car.id}" style="min-height:${Math.max(40, laneCount * 32 + 8)}px;">
+      <div class="gantt-row" data-car-id="${car.id}" data-order-car-id="${car.id}" style="min-height:${Math.max(rowMinH, laneCount * laneH + 8)}px;">
         ${noCell}${labelCell}
         <div class="gantt-track">${trackCols}${bars}</div>
       </div>`;
