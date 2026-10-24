@@ -1953,9 +1953,10 @@ function calcBookingTotal() {
   if (end < start) { box.style.display = 'none'; pickupBox.style.display = 'none'; document.getElementById('bookingBreakdown').style.display = 'none'; return; }
 
   const p = priceBooking({ carId, start, end, startTime: document.getElementById('bookingStartTime').value, endTime: document.getElementById('bookingEndTime').value,
-    rate: rateOverride, otFee, discount: +document.getElementById('bookingDiscount').value || 0 });
+    rate: rateOverride, otFee, discount: +document.getElementById('bookingDiscount').value || 0, carseat: +document.getElementById('bookingCarseat').value || 0 });
   const total = p.total, parts = [];
   if (p.lateFee) parts.push(`เลท ${p.lateH} ชม. × ${p.lateRate.toLocaleString()} = ${p.lateFee.toLocaleString()} ฿`);
+  if (p.seatFee) parts.push(`Carseat เพิ่ม ${p.seatFee / CARSEAT_FEE} ตัว × ${CARSEAT_FEE} = ${p.seatFee.toLocaleString()} ฿ (ตัวแรกฟรี)`);
   if (otFee) parts.push(`OT ${otFee.toLocaleString()} ฿`);
   if (p.discount) parts.push(`ส่วนลด −${p.discount.toLocaleString()} ฿`);
 
@@ -2015,7 +2016,7 @@ function saveBooking() {
   const rateOverride = +document.getElementById('bookingRate').value || 0;
   const otFee = +document.getElementById('bookingOtFee').value || 0;
   const discount = +document.getElementById('bookingDiscount').value || 0;
-  const p = priceBooking({ carId, start, end, startTime: document.getElementById('bookingStartTime').value || '', endTime: document.getElementById('bookingEndTime').value || '', rate: rateOverride, otFee, discount });
+  const p = priceBooking({ carId, start, end, startTime: document.getElementById('bookingStartTime').value || '', endTime: document.getElementById('bookingEndTime').value || '', rate: rateOverride, otFee, discount, carseat: +document.getElementById('bookingCarseat').value || 0 });
   const rate = p.rate, total = p.total, lateFee = p.lateFee;
 
   const data = {
@@ -3285,6 +3286,9 @@ function minutesBetween(date1, time1, date2, time2) {
 // car's late rate (100–200 ฿/h by model, default 100); more than 4 hours late
 // counts as one more day instead.
 const LATE_MAX_HOURS = 4;
+// Carseat: the first one is free, each extra one is 100 ฿ per rental.
+const CARSEAT_FREE = 1, CARSEAT_FEE = 100;
+function carseatFee(n) { return Math.max(0, (+n || 0) - CARSEAT_FREE) * CARSEAT_FEE; }
 function carLateRate(car) { return +(car && car.lateRate) || 100; }
 function rentalCharge(start, startTime, end, endTime) {
   const mins = minutesBetween(start, startTime || '00:00', end, endTime || startTime || '00:00');
@@ -3295,12 +3299,12 @@ function rentalCharge(start, startTime, end, endTime) {
   if (lateH <= LATE_MAX_HOURS) return { days: full, lateH };
   return { days: full + 1, lateH: 0 };
 }
-// Price of a booking-like object: { carId, start, startTime, end, endTime, rate, otFee, discount }.
+// Price of a booking-like object: { carId, start, startTime, end, endTime, rate, otFee, discount, carseat }.
 function priceBooking(b) {
   const car = getCarById(b.carId), rate = +b.rate || (car ? +car.dailyRate || 0 : 0);
   const r = rentalCharge(b.start, b.startTime, b.end, b.endTime), lateRate = carLateRate(car);
-  const lateFee = r.lateH * lateRate, otFee = +b.otFee || 0, discount = +b.discount || 0;
-  return { days: r.days, lateH: r.lateH, lateRate, lateFee, rate, otFee, discount, total: Math.max(0, r.days * rate + lateFee + otFee - discount) };
+  const lateFee = r.lateH * lateRate, otFee = +b.otFee || 0, discount = +b.discount || 0, seatFee = carseatFee(b.carseat);
+  return { days: r.days, lateH: r.lateH, lateRate, lateFee, seatFee, rate, otFee, discount, total: Math.max(0, r.days * rate + lateFee + seatFee + otFee - discount) };
 }
 
 function formatPrepTime(mins) {
