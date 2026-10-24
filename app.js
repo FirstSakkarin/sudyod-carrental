@@ -503,6 +503,9 @@ function openAddCarModal() {
   document.getElementById('carDailyRate').value = '';
   document.getElementById('carStatus').value    = 'available';
   document.getElementById('carOwnerName').value = '';
+  document.getElementById('carOrderNo').value   = '';
+  document.getElementById('carEngineCC').value  = '';
+  document.getElementById('carSeats').value     = '';
   document.getElementById('carNote').value      = '';
   showModal('carModal');
 }
@@ -528,6 +531,9 @@ function openEditCarModal(id) {
   document.getElementById('carDailyRate').value          = car.dailyRate;
   document.getElementById('carStatus').value             = car.status;
   document.getElementById('carOwnerName').value          = car.ownerName || '';
+  document.getElementById('carOrderNo').value            = car.orderNo ?? '';
+  document.getElementById('carEngineCC').value           = car.engineCC ?? '';
+  document.getElementById('carSeats').value              = car.seats ?? '';
   document.getElementById('carNote').value               = car.note || '';
   closeModal('carDetailModal');
   showModal('carModal');
@@ -550,6 +556,9 @@ function saveCar() {
     dailyRate:   +document.getElementById('carDailyRate').value || 0,
     status:      document.getElementById('carStatus').value,
     ownerName:   document.getElementById('carOwnerName').value.trim(),
+    orderNo:     +document.getElementById('carOrderNo').value || null,
+    engineCC:    +document.getElementById('carEngineCC').value || null,
+    seats:       +document.getElementById('carSeats').value || null,
     note:        document.getElementById('carNote').value.trim(),
     photo:       document.getElementById('carPhotoData').value || null,
     updatedAt:   nowISO(),
@@ -674,6 +683,32 @@ function applyGanttVisibility() {
 
 function setGanttVehicleType(type) { ganttVehicleType = type; renderGanttChart(); }
 
+// How the queue's car rows are ordered. 'no' = the shop's own car number
+// (orderNo, the ลำดับ column of the paper queue sheet), 'custom' = the
+// drag-to-reorder order saved on this device. Remembered per device.
+const GANTT_SORTS = [
+  { key: 'no',    label: 'ลำดับรถ' },
+  { key: 'brand', label: 'ยี่ห้อ' },
+  { key: 'model', label: 'รุ่น' },
+  { key: 'cc',    label: 'เครื่องยนต์' },
+  { key: 'seats', label: 'ที่นั่ง' },
+];
+let ganttSort = localStorage.getItem('ganttSort') || 'no';
+function setGanttSort(key) {
+  ganttSort = key;
+  localStorage.setItem('ganttSort', key);
+  renderGanttChart();
+}
+function renderGanttSortTabs() {
+  const el = document.getElementById('ganttSortTabs');
+  if (!el) return;
+  const sorts = hasCustomGanttOrder() ? [...GANTT_SORTS, { key: 'custom', label: 'จัดเอง' }] : GANTT_SORTS;
+  if (ganttSort === 'custom' && !hasCustomGanttOrder()) ganttSort = 'no';
+  el.innerHTML = `<span class="gantt-sort-label">เรียงรถตาม</span>` + sorts.map(s =>
+    `<button class="gantt-sort-chip ${ganttSort === s.key ? 'active' : ''}" onclick="setGanttSort('${s.key}')">${s.label}</button>`
+  ).join('');
+}
+
 function renderGanttTypeTabs() {
   const el = document.getElementById('ganttTypeTabs');
   if (!el) return;
@@ -739,6 +774,7 @@ function renderGanttChart() {
   if (!document.getElementById('ganttChart')) return;
   applyGanttVisibility();
   renderGanttTypeTabs();
+  renderGanttSortTabs();
   renderGanttControls();
   if (ganttDayView) renderGanttDayView(ganttDayView);
   else renderGanttWeekView();
@@ -1151,11 +1187,19 @@ function ganttOrderKey() { return 'ganttOrder_' + ganttVehicleType; }
 function loadGanttOrder() {
   try { return JSON.parse(localStorage.getItem(ganttOrderKey()) || '{}'); } catch { return {}; }
 }
-function saveGanttOrder(orderMap) { localStorage.setItem(ganttOrderKey(), JSON.stringify(orderMap)); }
+function saveGanttOrder(orderMap) {
+  localStorage.setItem(ganttOrderKey(), JSON.stringify(orderMap));
+  // Dragging a row means "I want my own order" — switch to it so the drop
+  // is actually visible instead of being re-sorted away.
+  ganttSort = 'custom';
+  localStorage.setItem('ganttSort', 'custom');
+}
 function hasCustomGanttOrder() { return Object.keys(loadGanttOrder()).length > 0; }
 function resetGanttOrder() {
-  if (!confirm('รีเซ็ตลำดับรถกลับเป็นเรียงตามยี่ห้อ/รุ่นอัตโนมัติ?')) return;
+  if (!confirm('ลบลำดับที่จัดเองบนเครื่องนี้ แล้วกลับไปเรียงตามลำดับรถ?')) return;
   localStorage.removeItem(ganttOrderKey());
+  ganttSort = 'no';
+  localStorage.setItem('ganttSort', 'no');
   renderGanttChart();
 }
 
@@ -1164,13 +1208,20 @@ function ganttCarsInScope() {
     (ganttVehicleType === 'motorcycle' ? car.type === 'motorcycle' : car.type !== 'motorcycle') &&
     !hasLongTermBooking(car.id)
   );
-  const defaultSorted = [...filtered].sort((a, b) =>
+  const byBrandModel = (a, b) =>
     (a.brand || '').localeCompare(b.brand || '') ||
     (a.model || '').localeCompare(b.model || '') ||
-    a.plate.localeCompare(b.plate)
-  );
+    a.plate.localeCompare(b.plate);
+  // Missing numbers sort last, so a car nobody has filled in yet doesn't jump to the top.
+  const num = (v, missing) => (v === null || v === undefined || v === '' || isNaN(+v)) ? missing : +v;
+  const byOrderNo = (a, b) => num(a.orderNo, Infinity) - num(b.orderNo, Infinity) || byBrandModel(a, b);
+  const defaultSorted = [...filtered].sort(byBrandModel);
+  if (ganttSort === 'no')    return [...filtered].sort(byOrderNo);
+  if (ganttSort === 'model') return [...filtered].sort((a, b) => (a.model || '').localeCompare(b.model || '') || byOrderNo(a, b));
+  if (ganttSort === 'cc')    return [...filtered].sort((a, b) => num(a.engineCC, Infinity) - num(b.engineCC, Infinity) || byOrderNo(a, b));
+  if (ganttSort === 'seats') return [...filtered].sort((a, b) => num(b.seats, -Infinity) - num(a.seats, -Infinity) || byOrderNo(a, b));
   const order = loadGanttOrder();
-  if (!Object.keys(order).length) return defaultSorted;
+  if (ganttSort !== 'custom' || !Object.keys(order).length) return defaultSorted;
   const ranked   = defaultSorted.filter(c => order[c.id] !== undefined).sort((a, b) => order[a.id] - order[b.id]);
   const unranked = defaultSorted.filter(c => order[c.id] === undefined);
   return [...ranked, ...unranked];
@@ -1236,6 +1287,17 @@ function ganttCarColor(car) {
 // the eye can trace one car's row all the way across a wide date range.
 function ganttCarRowBg(car) {
   return `hsla(${ganttCarHue(car)}, 70%, 55%, 0.09)`;
+}
+
+// Queue row label: the shop's car number, plate, and model/engine/seats,
+// matching how the paper queue sheet names each row.
+function ganttCarLabelHtml(car) {
+  const spec = [car.model, car.engineCC ? (+car.engineCC).toFixed(1) : '', car.seats ? car.seats + ' ที่' : '']
+    .filter(Boolean).join(' · ');
+  return `<i class="fa-solid fa-grip-vertical gantt-drag-handle"></i>` +
+    (car.orderNo ? `<span class="gantt-orderno">${car.orderNo}</span>` : '') +
+    `<span class="gantt-carlabel-text"><span class="gantt-carlabel-plate">${vehicleTypeIcon(car.type)} ${car.plate}</span>` +
+    (spec ? `<span class="gantt-carlabel-spec">${spec}</span>` : '') + `</span>`;
 }
 
 // Cars relevant to a specific day = have a pickup or return event that day.
@@ -1411,7 +1473,8 @@ function renderGanttWeekView() {
 
   const rows = carsToShow.map(car => {
     const modelKey = `${car.brand}|||${car.model}`;
-    const groupHeader = (modelKey !== lastModelKey && modelCounts[modelKey] > 1)
+    const grouped = ganttSort === 'brand' || ganttSort === 'model' || ganttSort === 'custom';
+    const groupHeader = (grouped && modelKey !== lastModelKey && modelCounts[modelKey] > 1)
       ? `<div class="gantt-model-group gantt-model-group-draggable" data-group-car-ids="${modelCarIds[modelKey].join(',')}" title="ลากเพื่อย้ายทั้งกลุ่ม · ${car.brand} ${car.model}">
           <i class="fa-solid fa-grip-vertical gantt-drag-handle"></i><i class="fa-solid fa-layer-group"></i> ${car.brand} ${car.model} <span class="gantt-model-group-count">· ${modelCounts[modelKey]} คัน</span>
         </div>`
@@ -1424,7 +1487,7 @@ function renderGanttWeekView() {
       const label = car.status === 'maintenance' ? 'ซ่อมบำรุง' : 'งดให้บริการ';
       return groupHeader + `
         <div class="gantt-row" data-order-car-id="${car.id}" style="border-left:4px solid ${carColor};background:${ganttCarRowBg(car)};">
-          <div class="gantt-carlabel gantt-carlabel-draggable" title="ลากเพื่อเรียงลำดับ · ${car.plate}"><i class="fa-solid fa-grip-vertical gantt-drag-handle"></i>${vehicleTypeIcon(car.type)} ${car.plate}</div>
+          <div class="gantt-carlabel gantt-carlabel-draggable" title="ลากเพื่อเรียงลำดับ · ${car.plate}">${ganttCarLabelHtml(car)}</div>
           <div class="gantt-track gantt-track-disabled">
             ${trackCols}
             <span class="pill pill-${car.status}" style="position:relative;">${label}</span>
@@ -1486,7 +1549,7 @@ function renderGanttWeekView() {
 
     return groupHeader + `
       <div class="gantt-row" data-car-id="${car.id}" data-order-car-id="${car.id}" style="min-height:${Math.max(44, laneCount * 32 + 12)}px;border-left:4px solid ${carColor};background:${ganttCarRowBg(car)};">
-        <div class="gantt-carlabel gantt-carlabel-draggable" title="ลากเพื่อเรียงลำดับ · ${car.plate}"><i class="fa-solid fa-grip-vertical gantt-drag-handle"></i>${vehicleTypeIcon(car.type)} ${car.plate}</div>
+        <div class="gantt-carlabel gantt-carlabel-draggable" title="ลากเพื่อเรียงลำดับ · ${car.plate}">${ganttCarLabelHtml(car)}</div>
         <div class="gantt-track">${trackCols}${bars}</div>
       </div>`;
   }).join('');
