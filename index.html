@@ -152,6 +152,7 @@
               <div class="gantt-type-tabs" id="ganttTypeTabs"></div>
               <div id="ganttControls" style="display:flex;gap:.4rem;align-items:center;"></div>
             </div>
+            <div class="gantt-sort-bar" id="ganttSortTabs"></div>
             <div id="ganttChart" class="gantt-wrap"></div>
           </div>
         </div>
@@ -480,6 +481,20 @@
               <option value="maintenance">ซ่อมบำรุง</option>
               <option value="blocked">ปิดตา</option>
             </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>ลำดับรถ</label>
+            <input type="number" id="carOrderNo" min="1" placeholder="เช่น 1" />
+          </div>
+          <div class="form-group">
+            <label>เครื่องยนต์ (ลิตร)</label>
+            <input type="number" id="carEngineCC" step="0.1" min="0" placeholder="เช่น 1.2" />
+          </div>
+          <div class="form-group">
+            <label>ที่นั่ง</label>
+            <input type="number" id="carSeats" min="1" placeholder="เช่น 5" />
           </div>
         </div>
         <div class="form-group">

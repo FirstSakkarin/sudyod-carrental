@@ -681,7 +681,7 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
 .gantt-header-row, .gantt-row { display: flex; align-items: stretch; }
 .gantt-header-row { padding-bottom: .5rem; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: .35rem; }
 .gantt-carlabel-head, .gantt-carlabel {
-  width: 132px;
+  width: 168px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -691,6 +691,22 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
   font-weight: 700;
 }
 .gantt-carlabel { color: var(--gray-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gantt-carlabel-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.gantt-carlabel-plate, .gantt-carlabel-spec { overflow: hidden; text-overflow: ellipsis; }
+.gantt-carlabel-spec { font-size: .66rem; font-weight: 500; color: var(--gray-500); }
+.gantt-orderno {
+  flex-shrink: 0; min-width: 1.5rem; height: 1.5rem; padding: 0 .25rem; box-sizing: border-box;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: .4rem; background: var(--gray-200); color: var(--gray-800);
+  font-size: .72rem; font-weight: 800;
+}
+.gantt-sort-bar { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; padding: 0 1.25rem .25rem; }
+.gantt-sort-label { font-size: .78rem; color: var(--gray-500); margin-right: .2rem; }
+.gantt-sort-chip {
+  padding: .4rem .85rem; border-radius: 999px; font-size: .78rem; font-weight: 700; font-family: inherit;
+  color: var(--gray-700); background: transparent; border: 1px solid var(--gray-300); cursor: pointer;
+}
+.gantt-sort-chip.active { background: var(--primary); color: #1a1a1a; border-color: var(--primary); }
 .gantt-carlabel-draggable { cursor: grab; gap: .3rem; }
 .gantt-drag-handle { font-size: .68rem; color: var(--gray-500); opacity: .55; flex-shrink: 0; }
 .gantt-carlabel-draggable:hover .gantt-drag-handle { opacity: 1; color: var(--primary); }
