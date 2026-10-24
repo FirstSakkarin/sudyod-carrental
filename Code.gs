@@ -504,7 +504,7 @@ function arrayToSheet(ss, name, data, headers) {
   // its time component when read back (sheetToArray formats Dates as
   // yyyy-MM-dd), corrupting the value. Force these columns to Plain Text so
   // the string is stored literally and never auto-parsed.
-  var TEXT_COLUMNS = ['startTime', 'endTime', 'returnTime', 'updatedAt', 'deliveredAt', 'staffOut', 'staffIn', 'teamNote', 'returnExtras'];
+  var TEXT_COLUMNS = ['phone', 'startTime', 'endTime', 'returnTime', 'updatedAt', 'deliveredAt', 'staffOut', 'staffIn', 'teamNote', 'returnExtras'];
   headers.forEach(function(h, i) {
     if (TEXT_COLUMNS.indexOf(h) !== -1) {
       sheet.getRange(1, i + 1, resetRows, 1).setNumberFormat('@');

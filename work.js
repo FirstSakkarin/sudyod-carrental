@@ -322,7 +322,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--brand); outline
         <textarea data-tnote="${j.id}" rows="2" placeholder="เช่น ลูกค้ารอประตู 3, โทรก่อนถึง 10 นาที">${esc(pr.note || '')}</textarea></label>`;
   }
   function card(j, isLate) {
-    const b = j.b, [plate, model] = CARS[b.carId], isDone = !!done[j.id], digits = (b.phone || '').replace(/[^\d+]/g, '');
+    const b = j.b, [plate, model] = CARS[b.carId], isDone = !!done[j.id], digits = String(b.phone || '').replace(/[^\d+]/g, '');
     const lateMin = nowMin() - j.at, x = extras[j.id];
     const phone = b.phone
       ? `<div class="phone"><span class="num">${esc(b.phone)}</span><a href="tel:${digits}" target="_blank" rel="noopener">📞 โทร</a></div>`
