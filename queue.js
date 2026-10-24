@@ -626,8 +626,8 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
     const dt = (date, time) => `<div class="v dt"><span>${thDate(date)}</span><span>${(time || '-').replace(':', '.')}</span></div>`;
     const money = n => n ? `${baht(n)}` : '';
     let h = f('รถ', v(esc(c.plate + " · " + c.name)), 'w') +
-      f('ชื่อลูกค้า', v(esc(who(b)))) +
-      f('เบอร์โทร', d.phone ? `<div class="v ph"><span>${esc(d.phone)}</span><a href="tel:${digits}" aria-label="โทรหาลูกค้า">📞</a></div>` : v('', 'ยังไม่มีเบอร์'));
+      f('ชื่อลูกค้า', v(esc(who(b))), 'w') +
+      f('เบอร์โทร', d.phone ? `<div class="v ph"><span>${esc(d.phone)}</span><a href="tel:${digits}">📞 โทร</a></div>` : v('', 'ยังไม่มีเบอร์'), 'w');
     if (b.customerAddress) h += f('ที่อยู่ลูกค้า', v(esc(b.customerAddress)), 'w');
     h += f('วันรับรถ', dt(b.start, b.startTime)) + f('วันคืนรถ', dt(b.end, b.endTime)) +
       f('สถานที่รับรถ', v(d.pick ? placeHtml(esc(d.pick)) : '', 'ยังไม่ระบุ')) + f('สถานที่คืนรถ', v(d.ret ? placeHtml(esc(d.ret)) : '', 'ยังไม่ระบุ'));
