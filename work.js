@@ -208,6 +208,30 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--brand); outline
 
 .wk { border-radius: 26px; background: var(--app); background-image: radial-gradient(60% 40% at 10% 0%, rgba(253, 224, 71, .10), transparent 70%), radial-gradient(50% 40% at 100% 30%, rgba(56, 189, 248, .08), transparent 70%); border: 1px solid var(--edge); overflow: hidden; }
 .acts .main:disabled { opacity: .7; cursor: default; }
+/* Uncle Pod's hospital trips (shop's own trips, purple) */
+.job.pod { background: linear-gradient(180deg, rgba(168,85,247,.16), rgba(255,255,255,.04)); border-color: rgba(216,180,254,.45); }
+.pod .kind { background: #c084fc; color: #2e1065; }
+.pod .acts .main { background: linear-gradient(180deg, #d8b4fe, #a855f7); color: #2e1065; }
+.podbtn { width: 100%; min-height: 44px; border-radius: 14px; border: 1px solid rgba(216,180,254,.45); background: rgba(168,85,247,.14); color: #e9d5ff; font-weight: 700; font-size: .95rem; }
+.pform { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
+.pform label { display: flex; flex-direction: column; gap: 4px; font-size: .85rem; color: var(--muted); }
+.pform .w { grid-column: 1 / -1; }
+.pform input { min-height: 46px; border-radius: 14px; border: 1px solid var(--edge-2); background: rgba(0,0,0,.3); color: var(--text); font: inherit; font-size: 1.02rem; padding: 8px 12px; width: 100%; box-sizing: border-box; }
+.pstaff { display: flex; flex-direction: column; gap: 6px; }
+.pstaff .r { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pstaff .r > span:first-child { min-width: 74px; font-weight: 700; }
+.pstaff button { min-height: 42px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--edge-2); background: var(--glass-2); color: var(--text); font-weight: 700; }
+.pstaff button[aria-pressed="true"].p-Top { background: #22c55e; color: #052e16; }
+.pstaff button[aria-pressed="true"].p-Jay { background: #ef4444; color: #fff; }
+.pstaff small { color: var(--muted); font-size: .78rem; }
+.pstaff small.busy { color: #fca5a5; }
+.pcars { display: flex; flex-direction: column; gap: 6px; }
+.pcars button { display: flex; align-items: center; gap: 8px; text-align: left; min-height: 50px; padding: 6px 12px; border-radius: 14px; border: 1px solid var(--edge-2); background: var(--glass-2); color: var(--text); font: inherit; }
+.pcars button[aria-pressed="true"] { border-color: #c084fc; background: rgba(168,85,247,.22); box-shadow: 0 0 0 1px #c084fc inset; }
+.pcars b { font-size: 1rem; } .pcars .m { color: var(--muted); font-size: .85rem; flex: 1; }
+.pcars .e { font-size: .82rem; font-weight: 700; color: #86efac; white-space: nowrap; }
+.pcars .rec { font-size: .72rem; font-weight: 800; padding: 2px 7px; border-radius: 99px; background: #c084fc; color: #2e1065; }
+.pnone { color: #fca5a5; font-size: .92rem; }
 `;
 
   function create(R, L) {
@@ -307,9 +331,73 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--brand); outline
 
   const STAFF = ['Top', 'Mink', 'Jay'], HEART = { Top: '💚', Mink: '💛', Jay: '❤️' };
   const staffOf = id => (prep[id] && prep[id].staff) || [];
+  // ---------- Uncle Pod's hospital trips ----------
+  // A trip is an ordinary booking for "ลุงป๊อด" (total 0), so it holds the car
+  // in the queue like any rental. Its start = take him to hospital, its end =
+  // bring him back; staffOut / staffIn say who drives each leg.
+  const POD = 'ลุงป๊อด', POD_STAFF = ['Top', 'Jay'];
+  const isPod = b => /ลุงป๊อด/.test(String(b.customer || ''));
+  // Rough km per litre by model; car.kmpl (if ever set) wins. eHEV cars first.
+  const KMPL = [[/e:?HEV|HEV|hybrid|ไฮบริด/i, 25], [/Yaris Ativ/i, 23], [/Yaris/i, 22], [/City/i, 22], [/Almera|March|Mirage|Attrage/i, 22], [/Vios/i, 20], [/Jazz/i, 20], [/Corolla Cross/i, 17], [/MG ?5/i, 16], [/Veloz/i, 15], [/Mazda ?3/i, 12]];
+  const kmpl = c => +c.kmpl || (c.type === 'ehev' ? 25 : 0) || ((KMPL.find(([re]) => re.test(`${c.model || ''} ${c.note || ''}`)) || [])[1]) || 14;
+  const BUF = 30; // minutes kept free around another booking
+  function freeCars(d, t1, t2, skipId) {
+    const s0 = mins(d, t1), e0 = mins(d, t2);
+    return (state.cars || []).filter(c => c.type !== 'motorcycle' && c.type !== 'ev' && !/maintenance|blocked/.test(c.status || ''))
+      .filter(c => !(state.bookings || []).some(b => b.carId === c.id && b.id !== skipId && b.status !== 'cancelled' && b.status !== 'completed' && b.start && b.end &&
+        mins(b.start, b.startTime) < e0 + BUF && mins(b.end, b.endTime) > s0 - BUF))
+      .sort((a, z) => kmpl(z) - kmpl(a) || String(a.plate).localeCompare(String(z.plate)));
+  }
+  // Other jobs this person already has within an hour of time t on day d.
+  function busyAt(n, d, t, skipId) {
+    const at = mins(d, t), out = [];
+    bookings.forEach(b => { if (b.id === skipId) return;
+      if (b.start === d && csv(b.staffOut).includes(n) && Math.abs(mins(b.start, b.startTime) - at) < 60) out.push(`${b.startTime.replace(':', '.')} ${isPod(b) ? 'ลุงป๊อด' : 'ส่งรถ'}`);
+      if (b.end === d && csv(b.staffIn).includes(n) && Math.abs(mins(b.end, b.endTime) - at) < 60) out.push(`${b.endTime.replace(':', '.')} ${isPod(b) ? 'ลุงป๊อด' : 'รับรถ'}`);
+    });
+    return out;
+  }
+  const pickFree = (d, t, skip, avoid) => POD_STAFF.find(n => n !== avoid && !busyAt(n, d, t, skip).length) || POD_STAFF.find(n => !busyAt(n, d, t, skip).length) || 'Top';
+  function openPod() {
+    const last = [...(state.bookings || [])].reverse().find(b => isPod(b) && b.pickupLocation);
+    const p = { pod: true, date: day, go: '08:00', back: '12:00', place: last ? last.pickupLocation : '' };
+    p.sOut = pickFree(p.date, p.go); p.sIn = pickFree(p.date, p.back);
+    sheet = p; drawSheet();
+  }
+  function drawPod() {
+    const p = sheet, host = L.getElementById('sheetHost');
+    const cars = p.back > p.go ? freeCars(p.date, p.go, p.back) : [];
+    if (!cars.some(c => c.id === p.carId)) p.carId = cars[0] ? cars[0].id : '';
+    const who = (leg, t) => `<div class="r"><span>${leg} ${t.replace(':', '.')}</span>${POD_STAFF.map(n => {
+      const bz = busyAt(n, p.date, t); return `<button class="p-${n}" data-podstaff="${leg === 'ไปส่ง' ? 'sOut' : 'sIn'}:${n}" aria-pressed="${p[leg === 'ไปส่ง' ? 'sOut' : 'sIn'] === n}">${n}</button><small class="${bz.length ? 'busy' : ''}">${bz.length ? 'ติด ' + bz.join(', ') : 'ว่าง'}</small>`; }).join('')}</div>`;
+    host.innerHTML = `<div class="ov" data-close="bg"><div class="bs" role="dialog" aria-modal="true" aria-label="นัดลุงป๊อดไปโรงพยาบาล">
+      <div class="grip"></div>
+      <div class="bs-h"><div><h2>🏥 นัดลุงป๊อด</h2><p>พาไปโรงพยาบาลและรับกลับ</p></div><button class="x" data-close="x" aria-label="ปิด">×</button></div>
+      <div class="pform">
+        <label class="w">วันที่นัด<input type="date" id="pd-date" value="${p.date}"></label>
+        <label>ไปส่ง (ออกจากร้าน)<input type="time" id="pd-go" value="${p.go}"></label>
+        <label>ไปรับกลับ<input type="time" id="pd-back" value="${p.back}"></label>
+        <label class="w">โรงพยาบาล<input id="pd-place" value="${esc(p.place)}" placeholder="เช่น รพ.นครพิงค์"></label>
+      </div>
+      <label>👤 ใครไป</label>
+      <div class="pstaff">${who('ไปส่ง', p.go)}${who('ไปรับ', p.back)}</div>
+      <label>🚗 รถที่ว่าง (ประหยัดน้ำมันสุดอยู่บน)</label>
+      <div class="pcars">${p.back <= p.go ? '<div class="pnone">เวลาไปรับต้องหลังเวลาไปส่ง</div>' : cars.length ? cars.slice(0, 6).map((c, i) => `<button data-podcar="${c.id}" aria-pressed="${c.id === p.carId}"><b>${esc(c.plate)}</b><span class="m">${esc([c.model, c.type === 'ehev' ? 'eHEV' : ''].filter(Boolean).join(' '))}</span><span class="e">⛽ ~${kmpl(c)} กม./ลิตร</span>${i === 0 ? '<span class="rec">แนะนำ</span>' : ''}</button>`).join('') : '<div class="pnone">ช่วงเวลานี้ไม่มีรถว่างเลย</div>'}</div>
+      <button class="save" data-podsave="1"${p.carId ? '' : ' disabled'}>บันทึกนัด</button>
+    </div></div>`;
+  }
+  function savePod() {
+    const p = sheet; if (!p.carId) return;
+    const b = { id: 'p' + Date.now(), carId: p.carId, customer: POD, phone: '', start: p.date, startTime: p.go, end: p.date, endTime: p.back,
+      pickupLocation: p.place.trim(), returnLocation: p.place.trim(), rate: 0, otFee: 0, total: 0, deposit: 0, bookingDeposit: 0,
+      status: p.date <= todayISO ? 'active' : 'upcoming', note: '', extra: 0, staffOut: p.sOut, staffIn: p.sIn, updatedAt: nowISO() };
+    state.bookings.push(b); sheet = null; drawSheet();
+    if (p.date === todayISO || p.date === D(1)) day = p.date;
+    persist(b, `นัดลุงป๊อด ${dayName(p.date)} ${p.go.replace(':', '.')} · ${(CARS[b.carId] || [''])[0] || getCarById(b.carId).plate} · ${p.sOut}`, false);
+  }
   function staffHtml(j) {
     const st = staffOf(j.id);
-    return `<div class="staff"><span class="pl">👤 ใครทำ</span><div class="sopts">${STAFF.map(n => `<button class="p-${n}" data-staff="${n}" data-j="${j.id}" aria-pressed="${st.includes(n)}">${n}</button>`).join('')}</div></div>`;
+    return `<div class="staff"><span class="pl">👤 ใครทำ</span><div class="sopts">${(isPod(j.b) ? POD_STAFF : STAFF).map(n => `<button class="p-${n}" data-staff="${n}" data-j="${j.id}" aria-pressed="${st.includes(n)}">${n}</button>`).join('')}</div></div>`;
   }
   function prepHtml(j) {
     const pr = prep[j.id] || {}, w = +pr.water || 0, cs = +pr.cs || 0;
@@ -321,7 +409,24 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--brand); outline
       <label class="tn"><span>🗒 โน้ตทีม <small>(ทีมเห็นกันเอง · ติดไปตอนคัดลอก)</small></span>
         <textarea data-tnote="${j.id}" rows="2" placeholder="เช่น ลูกค้ารอประตู 3, โทรก่อนถึง 10 นาที">${esc(pr.note || '')}</textarea></label>`;
   }
+  function podCard(j, isLate) {
+    const b = j.b, [plate, model] = CARS[b.carId], isDone = !!done[j.id], st = staffOf(j.id), isOpen = !!opened[j.id], go = j.k === 'go';
+    return `<article class="job pod${isDone ? ' done' : ''}${isLate ? ' isLate' : ''}${isOpen ? ' open' : ''}">
+      <button class="sum" data-open="${j.id}" aria-expanded="${isOpen}">
+        <span class="r1"><span class="t">${j.time.replace(':', '.')}</span><span class="plate">${plate}</span><span class="model">${model}</span><span class="kind">${isDone ? '✓ ' : ''}${go ? '🏥 ไปส่งลุง' : '🏥 รับลุงกลับ'}</span><span class="chev">${isOpen ? '▴' : '▾'}</span></span>
+        <span class="r2">${st.length ? `<span class="who3">${st.map(n => `<span class="pb p-${n}">${n}</span>`).join('')}</span>` : '<span class="mini nost">👤 ?</span>'}<span class="who">ลุงป๊อด</span><span class="where">${placeHtml(j.place)}</span>${isLate ? `<span class="mini bad">เลย ${gapText(nowMin() - j.at)}</span>` : ''}</span>
+      </button>
+      ${isOpen ? `<div class="more">
+      ${staffHtml(j)}
+      <div class="chips"><span class="chip">${go ? `🏥 พาลุงป๊อดไป${esc(j.place || 'โรงพยาบาล')} · รับกลับ ${b.endTime.replace(':', '.')}` : `🏥 รับลุงป๊อดกลับจาก${esc(j.place || 'โรงพยาบาล')}`}</span>${b.note ? `<span class="chip">📝 ${esc(b.note)}</span>` : ''}</div>
+      <div class="acts">
+        <a class="${j.place ? '' : 'off'}" href="${j.place ? mapUrl(j.place) : '#'}" target="_blank" rel="noopener">🧭 นำทาง</a>
+        <button class="main" data-done="${j.id}"${isDone && !go ? ' disabled' : ''}>${isDone ? (go ? '↺ ยังไม่ได้ไป' : '✓ ลุงถึงบ้านแล้ว') : go ? '✓ ส่งลุงถึงแล้ว' : '✓ รับลุงกลับแล้ว'}</button>
+      </div></div>` : ''}
+    </article>`;
+  }
   function card(j, isLate) {
+    if (isPod(j.b)) return podCard(j, isLate);
     const b = j.b, [plate, model] = CARS[b.carId], isDone = !!done[j.id], digits = String(b.phone || '').replace(/[^\d+]/g, '');
     const lateMin = nowMin() - j.at, x = extras[j.id];
     const phone = b.phone
@@ -372,6 +477,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--brand); outline
   function drawSheet() {
     const host = L.getElementById('sheetHost');
     if (!sheet) { host.innerHTML = ''; return; }
+    if (sheet.pod) { drawPod(); return; }
     const b = sheet.b, m = moneyLines(b, sheet);
     host.innerHTML = `<div class="ov" data-close="bg"><div class="bs" role="dialog" aria-modal="true" aria-label="บันทึกเพิ่มตอนรับรถคืน">
       <div class="grip"></div>
@@ -388,9 +494,15 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--brand); outline
     </div></div>`;
   }
   const sumHtml = m => `<div class="r"><span>รวมเก็บเพิ่ม</span><b>฿${baht(m.tot)}</b></div>${m.dep ? `<div class="r"><span>เงินประกัน</span><b>฿${baht(m.dep)}</b></div>` : ''}${m.line ? `<div class="big">${m.line}</div>` : ''}`;
+  L.addEventListener('change', e => {
+    if (!sheet || !sheet.pod) return;
+    const t = e.target, k = { 'pd-date': 'date', 'pd-go': 'go', 'pd-back': 'back' }[t.id]; if (!k || !t.value) return;
+    sheet[k] = t.value; drawPod();
+  });
   L.addEventListener('input', e => {
     if (!sheet) return;
     const t = e.target;
+    if (sheet.pod) { if (t.id === 'pd-place') sheet.place = t.value; return; }
     if (t.id === 'xmemo') sheet.memo = t.value;
     else if (t.dataset.k != null) { const it = sheet.items[+t.dataset.k]; if (t.dataset.fld === 'amt') { t.value = t.value.replace(/[^\d]/g, ''); it.amt = +t.value || 0; } else it.label = t.value; }
     L.getElementById('sumbox').innerHTML = sumHtml(moneyLines(sheet.b, sheet));
@@ -398,13 +510,20 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--brand); outline
   // Whole day's jobs as plain text, ready to paste into the shop's LINE group.
   function daySummary(d) {
     const J = jobsFor(d), pad = d.split('-'), yy = String((+pad[0] + 543) % 100).padStart(2, '0');
-    const nGo = J.filter(j => j.k === 'go').length;
-    const L = [`📋 งานส่ง-รับรถ ${dayName(d)}/${yy}`, `🟢 ส่ง ${nGo} · 🟠 รับคืน ${J.length - nGo}`];
+    const nPod = J.filter(j => isPod(j.b)).length, nGo = J.filter(j => j.k === 'go' && !isPod(j.b)).length;
+    const L = [`📋 งานส่ง-รับรถ ${dayName(d)}/${yy}`, `🟢 ส่ง ${nGo} · 🟠 รับคืน ${J.length - nGo - nPod}${nPod ? ` · 🏥 ลุงป๊อด ${nPod}` : ''}`];
     if (!J.length) L.push('', 'ไม่มีงาน');
     J.forEach(j => {
       const b = j.b, [plate, model] = CARS[b.carId], p4 = (plate.match(/\d+(?=\D*$)/) || [plate])[0], short = model.replace(/^(Toyota|Honda|MG|Mazda|Mitsubishi|Nissan|Isuzu)\s+/, ''), mdl = /^\d+$/.test(short) ? model : short;
-      L.push('', `${done[j.id] ? '✅' : j.k === 'go' ? '🟢' : '🟠'} ${j.time.replace(':', '.')} ${j.k === 'go' ? 'ส่งรถ' : 'รับรถคืน'} ${mdl} ${p4}`);
       const st = staffOf(j.id);
+      if (isPod(b)) {
+        L.push('', `${done[j.id] ? '✅' : '🏥'} ${j.time.replace(':', '.')} ${j.k === 'go' ? 'ไปส่งลุงป๊อด' : 'รับลุงป๊อดกลับ'} ${mdl} ${p4}`);
+        L.push(`   👷 ${st.length ? st.map(n => HEART[n] + n).join(' ') : 'ยังไม่มีคน'}`);
+        if (j.place) L.push(`   📍 ${j.place}`);
+        if (b.note) L.push(`   📝 ${b.note}`);
+        return;
+      }
+      L.push('', `${done[j.id] ? '✅' : j.k === 'go' ? '🟢' : '🟠'} ${j.time.replace(':', '.')} ${j.k === 'go' ? 'ส่งรถ' : 'รับรถคืน'} ${mdl} ${p4}`);
       L.push(`   👷 ${st.length ? st.map(n => HEART[n] + n).join(' ') : 'ยังไม่มีคน'}`);
       L.push(`   ${name(b)}${b.phone ? ' ' + b.phone : ''}`);
       if (j.place) L.push(`   📍 ${j.place}`);
@@ -447,7 +566,8 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--brand); outline
         <button class="stat back" data-f="back" aria-pressed="${filter === 'back'}"><b>${nBack}</b><span>🟠 รับคืน</span></button>
       </div>
       <div class="prog" aria-hidden="true"><i style="width:${J.length ? nDone / J.length * 100 : 0}%"></i></div>
-      ${next ? `<div class="next">ถัดไป <b>${next.time.replace(':', '.')} ${next.k === 'go' ? 'ส่ง' : 'รับคืน'} ${CARS[next.b.carId][0]}</b><span>${placeHtml(next.place)}</span></div>` : J.length ? '<div class="next"><b>เสร็จครบทุกงานแล้ว 🎉</b></div>' : ''}`;
+      <button class="podbtn" data-pod="1">🏥 นัดลุงป๊อดไปโรงพยาบาล</button>
+      ${next ? `<div class="next">ถัดไป <b>${next.time.replace(':', '.')} ${isPod(next.b) ? (next.k === 'go' ? 'ไปส่งลุงป๊อด' : 'รับลุงป๊อดกลับ') : next.k === 'go' ? 'ส่ง' : 'รับคืน'} ${CARS[next.b.carId][0]}</b><span>${placeHtml(next.place)}</span></div>` : J.length ? '<div class="next"><b>เสร็จครบทุกงานแล้ว 🎉</b></div>' : ''}`;
 
     const shown = J.filter(j => filter === 'all' || j.k === filter);
     const late = isToday ? shown.filter(j => !done[j.id] && j.at < t) : [];
@@ -472,8 +592,12 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--brand); outline
     clearTimeout(toast.t); toast.t = setTimeout(() => { host.innerHTML = ''; undo = null; }, 5000);
   }
   const onClick = e => {
-    const t = e.target.closest('[data-w],[data-cs],[data-staff],[data-open],[data-done],[data-day],[data-f],[data-undo],[data-copy],[data-copyday],[data-extra],[data-close],[data-q],[data-rm],[data-save]'); if (!t) return;
+    const t = e.target.closest('[data-w],[data-cs],[data-staff],[data-open],[data-done],[data-day],[data-f],[data-undo],[data-copy],[data-copyday],[data-extra],[data-close],[data-q],[data-rm],[data-save],[data-pod],[data-podstaff],[data-podcar],[data-podsave]'); if (!t) return;
     if (t.dataset.close) { if (t.dataset.close === 'x' || e.target === t) { sheet = null; drawSheet(); } return; }
+    if (t.dataset.pod) { openPod(); return; }
+    if (t.dataset.podstaff) { const [leg, n] = t.dataset.podstaff.split(':'); sheet[leg] = n; drawPod(); return; }
+    if (t.dataset.podcar) { sheet.carId = t.dataset.podcar; drawPod(); return; }
+    if (t.dataset.podsave) { savePod(); return; }
     if (t.dataset.w) { const id = t.dataset.j, pr = prep[id] || (prep[id] = {}); pr.water = Math.max(0, (+pr.water || 0) + +t.dataset.w); savePrep(id); render(); return; }
     if (t.dataset.staff) { const id = t.dataset.j, pr = prep[id] || (prep[id] = {}), n = t.dataset.staff, cur = pr.staff || []; pr.staff = cur.includes(n) ? cur.filter(x => x !== n) : STAFF.filter(x => x === n || cur.includes(x)); savePrep(id); render(); return; }
     if (t.dataset.cs) { const id = t.dataset.j, pr = prep[id] || (prep[id] = {}); pr.cs = Math.max(0, (+pr.cs || 0) + +t.dataset.cs);
@@ -499,6 +623,12 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--brand); outline
     else if (t.dataset.done) {
       const id = t.dataset.done, k = id.split(':')[1], b = bookingOf(id); if (!b) return;
       const plate = (CARS[b.carId] || ['-'])[0];
+      if (isPod(b)) {
+        const before = { deliveredAt: b.deliveredAt || '', status: b.status, returnDate: b.returnDate || '', returnTime: b.returnTime || '' };
+        if (k === 'back') { if (b.status === 'completed') return; Object.assign(b, { status: 'completed', returnDate: b.end, returnTime: b.endTime, deliveredAt: b.deliveredAt || nowISO() }); undo = { b, before }; persist(b, `รับลุงป๊อดกลับแล้ว · ${plate} ว่าง`, true); return; }
+        if (done[id]) { if (b.status === 'completed') return; b.deliveredAt = ''; } else { b.deliveredAt = nowISO(); b.status = 'active'; }
+        undo = { b, before }; persist(b, done[id] ? 'ย้ายกลับไปงานที่ยังไม่ได้ทำ' : 'ส่งลุงป๊อดถึงแล้ว', true); return;
+      }
       if (k === 'back') { if (b.status !== 'completed') openReturnModal(b.id); return; }
       const before = { mileageOut: b.mileageOut, deliveredAt: b.deliveredAt || '', status: b.status };
       if (done[id]) { if (b.status === 'completed') return; b.deliveredAt = ''; undo = { b, before }; persist(b, 'ย้ายกลับไปงานที่ยังไม่ได้ส่ง', true); return; }

@@ -3193,7 +3193,7 @@ function getCarById(id) { return state.cars.find(c => c.id === id); }
 
 const TYPE_LABEL = {
   sedan: 'Sedan', hatchback: 'Hatchback', suv: 'SUV', mpv: 'MPV', ppv: 'PPV',
-  van: 'รถตู้', pickup: 'กระบะ', ev: 'EV', motorcycle: 'มอเตอร์ไซค์',
+  van: 'รถตู้', pickup: 'กระบะ', ev: 'EV', ehev: 'eHEV', motorcycle: 'มอเตอร์ไซค์',
 };
 const EXPENSE_TYPE_LABEL = {
   insurance: 'ประกันภัย', tax: 'ภาษีรถ', fuel: 'น้ำมัน',
