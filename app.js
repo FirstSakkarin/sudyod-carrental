@@ -506,15 +506,18 @@ function handleCarPhotoUpload(event) {
   reader.onload = () => {
     const img = new Image();
     img.onload = () => {
-      const size = 240;
+      // Small landscape thumbnail: it is saved in the Sheet (one cell, sent
+      // to every phone on each sync), so keep it to roughly 10 KB of text.
+      const W = 184, H = 116;
       const canvas = document.createElement('canvas');
-      canvas.width = size;
-      canvas.height = size;
+      canvas.width = W;
+      canvas.height = H;
       const ctx = canvas.getContext('2d');
-      const scale = Math.max(size / img.width, size / img.height);
+      const scale = Math.max(W / img.width, H / img.height);
       const dw = img.width * scale, dh = img.height * scale;
-      ctx.drawImage(img, (size - dw) / 2, (size - dh) / 2, dw, dh);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+      ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+      let q = 0.7, dataUrl = canvas.toDataURL('image/jpeg', q);
+      while (dataUrl.length > 12000 && q > 0.3) { q -= 0.1; dataUrl = canvas.toDataURL('image/jpeg', q); }
       document.getElementById('carPhotoData').value = dataUrl;
       document.getElementById('carPhotoPreview').innerHTML = `<img src="${dataUrl}" alt="" />`;
     };
