@@ -6,7 +6,7 @@
   <title>สุดยอด รถเช่า เชียงใหม่</title>
   <link rel="icon" type="image/jpeg" href="logo.jpg" />
   <link rel="apple-touch-icon" href="logo.jpg" />
-  <link rel="stylesheet" href="styles.css?v=20261025k" />
+  <link rel="stylesheet" href="styles.css?v=20261025l" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 </head>
 <body>
@@ -472,21 +472,21 @@
         <div class="form-row">
           <div class="form-group">
             <label>เลขไมล์ปัจจุบัน (กม.)</label>
-            <input type="number" id="carMileage" placeholder="เช่น 45000" />
+            <input type="number" inputmode="numeric" id="carMileage" placeholder="เช่น 45000" />
           </div>
           <div class="form-group">
             <label>ซ่อมครั้งถัดไปที่ (กม.)</label>
-            <input type="number" id="carNextService" placeholder="เช่น 50000" />
+            <input type="number" inputmode="numeric" id="carNextService" placeholder="เช่น 50000" />
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
             <label>ราคาเช่า/วัน (บาท)</label>
-            <input type="number" id="carDailyRate" placeholder="เช่น 800" />
+            <input type="number" inputmode="numeric" id="carDailyRate" placeholder="เช่น 800" />
           </div>
           <div class="form-group">
             <label>ค่าเลท/ชม. (บาท)</label>
-            <input type="number" id="carLateRate" placeholder="100–200 (ว่าง = 100)" />
+            <input type="number" inputmode="numeric" id="carLateRate" placeholder="100–200 (ว่าง = 100)" />
           </div>
           <div class="form-group">
             <label>สถานะ</label>
@@ -501,15 +501,15 @@
         <div class="form-row">
           <div class="form-group">
             <label>ลำดับรถ</label>
-            <input type="number" id="carOrderNo" min="1" placeholder="เช่น 1" />
+            <input type="number" inputmode="numeric" id="carOrderNo" min="1" placeholder="เช่น 1" />
           </div>
           <div class="form-group">
             <label>เครื่องยนต์ (ลิตร)</label>
-            <input type="number" id="carEngineCC" step="0.1" min="0" placeholder="เช่น 1.2" />
+            <input type="number" inputmode="decimal" id="carEngineCC" step="0.1" min="0" placeholder="เช่น 1.2" />
           </div>
           <div class="form-group">
             <label>ที่นั่ง</label>
-            <input type="number" id="carSeats" min="1" placeholder="เช่น 5" />
+            <input type="number" inputmode="numeric" id="carSeats" min="1" placeholder="เช่น 5" />
           </div>
         </div>
         <div class="form-group">
@@ -572,7 +572,7 @@
           </div>
           <div class="form-group">
             <label>เบอร์โทร</label>
-            <input type="text" id="bookingPhone" placeholder="08X-XXX-XXXX" />
+            <input type="tel" inputmode="tel" id="bookingPhone" placeholder="08X-XXX-XXXX" />
           </div>
         </div>
         <div class="form-group">
@@ -607,42 +607,42 @@
         </div>
         <div class="form-group">
           <label>เลขไมล์ออก (กม.) <span id="mileageOutHint" style="display:none;"></span></label>
-          <input type="number" id="bookingMileageOut" placeholder="เลขไมล์ตอนออกรถ" />
+          <input type="number" inputmode="numeric" id="bookingMileageOut" placeholder="เลขไมล์ตอนออกรถ" />
         </div>
         <div class="form-row-2col">
           <div class="form-group">
             <label>ราคาเช่า/วัน <small>(ว่างไว้ = ราคาปกติ)</small></label>
-            <input type="number" id="bookingRate" placeholder="บาท/วัน" oninput="calcBookingTotal()" />
+            <input type="number" inputmode="numeric" id="bookingRate" placeholder="บาท/วัน" oninput="calcBookingTotal()" />
           </div>
           <div class="form-group">
             <label>ค่า OT (บาท) <span id="otHint" class="hint-note" style="display:none;"></span></label>
-            <input type="number" id="bookingOtFee" placeholder="0" oninput="calcBookingTotal()" />
+            <input type="number" inputmode="numeric" id="bookingOtFee" placeholder="0" oninput="calcBookingTotal()" />
           </div>
         </div>
         <div class="form-row-2col">
           <div class="form-group">
             <label>เงินประกัน (บาท)</label>
-            <input type="number" id="bookingDeposit" placeholder="0" oninput="calcBookingTotal()" />
+            <input type="number" inputmode="numeric" id="bookingDeposit" placeholder="0" oninput="calcBookingTotal()" />
           </div>
           <div class="form-group">
             <label>โอนจอง (บาท)</label>
-            <input type="number" id="bookingAdvance" placeholder="0" oninput="calcBookingTotal()" />
+            <input type="number" inputmode="numeric" id="bookingAdvance" placeholder="0" oninput="calcBookingTotal()" />
           </div>
         </div>
         <div class="form-row-2col">
           <div class="form-group">
             <label>ส่วนลด (บาท)</label>
-            <input type="number" id="bookingDiscount" placeholder="0" oninput="calcBookingTotal()" />
+            <input type="number" inputmode="numeric" id="bookingDiscount" placeholder="0" oninput="calcBookingTotal()" />
           </div>
           <div class="form-group">
             <label>💧 น้ำ (ชุด)</label>
-            <input type="number" id="bookingWater" placeholder="0" min="0" />
+            <input type="number" inputmode="numeric" id="bookingWater" placeholder="0" min="0" />
           </div>
         </div>
         <div class="form-row-2col">
           <div class="form-group">
             <label>👶 Carseat (ตัว)</label>
-            <input type="number" id="bookingCarseat" placeholder="ตัวแรกฟรี · ต่อไปวันละ 100" min="0" oninput="calcBookingTotal()" />
+            <input type="number" inputmode="numeric" id="bookingCarseat" placeholder="ตัวแรกฟรี · ต่อไปวันละ 100" min="0" oninput="calcBookingTotal()" />
           </div>
           <div class="form-group"></div>
         </div>
@@ -690,13 +690,13 @@
           </div>
           <div class="form-group">
             <label>เลขไมล์ตอนคืน (กม.)</label>
-            <input type="number" id="returnMileage" placeholder="เลขไมล์ตอนคืน" oninput="updateReturnKmPreview()" />
+            <input type="number" inputmode="numeric" id="returnMileage" placeholder="เลขไมล์ตอนคืน" oninput="updateReturnKmPreview()" />
             <div id="returnKmPreview" class="return-km-preview"></div>
           </div>
         </div>
         <div class="form-group">
           <label>ค่าใช้จ่ายเพิ่มเติม (บาท) <small>(ทำความสะอาด, น้ำมัน, OT คืนดึก ฯลฯ)</small></label>
-          <input type="number" id="returnExtra" value="0" placeholder="ค่าทำความสะอาด, น้ำมัน, ค่า OT ฯลฯ" />
+          <input type="number" inputmode="numeric" id="returnExtra" value="0" placeholder="ค่าทำความสะอาด, น้ำมัน, ค่า OT ฯลฯ" />
         </div>
         <div class="form-group">
           <label>หมายเหตุการคืน</label>
@@ -746,17 +746,17 @@
           </div>
           <div class="form-group">
             <label>เลขไมล์ตอนซ่อม (กม.)</label>
-            <input type="number" id="maintenanceMileage" placeholder="เช่น 45000" />
+            <input type="number" inputmode="numeric" id="maintenanceMileage" placeholder="เช่น 45000" />
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
             <label>ค่าซ่อม (บาท) *</label>
-            <input type="number" id="maintenanceCost" placeholder="0" />
+            <input type="number" inputmode="numeric" id="maintenanceCost" placeholder="0" />
           </div>
           <div class="form-group">
             <label>ซ่อมครั้งถัดไปที่ (กม.)</label>
-            <input type="number" id="maintenanceNextService" placeholder="เช่น 50000" />
+            <input type="number" inputmode="numeric" id="maintenanceNextService" placeholder="เช่น 50000" />
           </div>
         </div>
         <div class="form-group">
@@ -804,7 +804,7 @@
           </div>
           <div class="form-group">
             <label>จำนวนเงิน (บาท) *</label>
-            <input type="number" id="expenseAmount" placeholder="0" />
+            <input type="number" inputmode="numeric" id="expenseAmount" placeholder="0" />
           </div>
         </div>
         <div class="form-group">
@@ -840,7 +840,7 @@
           </div>
           <div class="form-group">
             <label>จำนวนเงิน (บาท) *</label>
-            <input type="number" id="extraIncomeAmount" placeholder="0" />
+            <input type="number" inputmode="numeric" id="extraIncomeAmount" placeholder="0" />
           </div>
         </div>
         <div class="form-row">
@@ -992,9 +992,9 @@
   <!-- Custom select dropdown panel (native <select> popups can't be restyled) -->
   <div id="customSelectPanel" class="custom-select-panel"></div>
 
-  <script src="app.js?v=20261025k"></script>
-  <script src="queue.js?v=20261025k"></script>
-  <script src="work.js?v=20261025k"></script>
-  <script src="cars.js?v=20261025k"></script>
+  <script src="app.js?v=20261025l"></script>
+  <script src="queue.js?v=20261025l"></script>
+  <script src="work.js?v=20261025l"></script>
+  <script src="cars.js?v=20261025l"></script>
 </body>
 </html>
