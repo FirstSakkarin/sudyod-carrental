@@ -113,10 +113,34 @@ function buildVehicleCatalog(rows) {
   return catalog;
 }
 
+// Hybrid (eHEV) versions, always offered next to their base model even when
+// the Sheet's VehicleCatalog doesn't list them.
+const HYBRID_MODELS = {
+  'Toyota':     { 'Yaris Ativ': ['Yaris Cross HEV'], 'Corolla Altis': ['Corolla Altis Hybrid'], 'Corolla Cross': ['Corolla Cross Hybrid'], 'Camry': ['Camry Hybrid'] },
+  'Honda':      { 'City': ['City e:HEV', 'City Hatchback e:HEV'], 'Civic': ['Civic e:HEV'], 'Accord': ['Accord e:HEV'], 'HR-V': ['HR-V e:HEV'], 'CR-V': ['CR-V e:HEV'] },
+  'MG':         { 'ZS': ['VS HEV', 'ZS HEV'], 'HS': ['HS PHEV'] },
+  'Nissan':     { 'Note': ['Note e-POWER'], 'Kicks': ['Kicks e-POWER'] },
+  'Mitsubishi': { 'Xpander': ['Xpander HEV'] },
+};
+function withHybrids(cat) {
+  const out = {};
+  Object.keys(cat).forEach(brand => {
+    const list = [...cat[brand]], add = HYBRID_MODELS[brand] || {};
+    Object.keys(add).forEach(base => {
+      const fresh = add[base].filter(m => !list.includes(m));
+      if (!fresh.length) return;
+      const i = list.indexOf(base);
+      if (i < 0) list.push(...fresh); else list.splice(i + 1, 0, ...fresh);
+    });
+    out[brand] = list;
+  });
+  return out;
+}
+
 function catalogForType(type) {
   const hasSynced = state.catalog && (Object.keys(state.catalog.car).length || Object.keys(state.catalog.motorcycle).length);
   const catalog = hasSynced ? state.catalog : DEFAULT_VEHICLE_CATALOG;
-  return type === 'motorcycle' ? catalog.motorcycle : catalog.car;
+  return type === 'motorcycle' ? catalog.motorcycle : withHybrids(catalog.car);
 }
 
 // ── Auto-init (no login) ───────────────────────────────────────────────

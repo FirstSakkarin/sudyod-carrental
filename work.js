@@ -338,7 +338,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--brand); outline
   const POD = 'ลุงป๊อด', POD_STAFF = ['Top', 'Jay'];
   const isPod = b => /ลุงป๊อด/.test(String(b.customer || ''));
   // Rough km per litre by model; car.kmpl (if ever set) wins. eHEV cars first.
-  const KMPL = [[/e:?HEV|HEV|hybrid|ไฮบริด/i, 25], [/Yaris Ativ/i, 23], [/Yaris/i, 22], [/City/i, 22], [/Almera|March|Mirage|Attrage/i, 22], [/Vios/i, 20], [/Jazz/i, 20], [/Corolla Cross/i, 17], [/MG ?5/i, 16], [/Veloz/i, 15], [/Mazda ?3/i, 12]];
+  const KMPL = [[/e:?HEV|HEV|hybrid|ไฮบริด|e-POWER/i, 25], [/Yaris Ativ/i, 23], [/Yaris/i, 22], [/City/i, 22], [/Almera|March|Mirage|Attrage/i, 22], [/Vios/i, 20], [/Jazz/i, 20], [/Corolla Cross/i, 17], [/MG ?5/i, 16], [/Veloz/i, 15], [/Mazda ?3/i, 12]];
   const kmpl = c => +c.kmpl || (c.type === 'ehev' ? 25 : 0) || ((KMPL.find(([re]) => re.test(`${c.model || ''} ${c.note || ''}`)) || [])[1]) || 14;
   const BUF = 30; // minutes kept free around another booking
   function freeCars(d, t1, t2, skipId) {
