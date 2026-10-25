@@ -22,9 +22,9 @@
 .cp-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; min-width: 0; box-sizing: border-box; padding: 8px 10px; border-radius: 16px; border: 1px solid rgba(255,255,255,.08); border-left: 4px solid var(--st); background: rgba(255,255,255,.04); color: inherit; font: inherit; cursor: pointer; }
 .cp-row:active { background: rgba(255,255,255,.08); }
 .cp-row.s-available { --st: var(--available); } .cp-row.s-rented { --st: var(--rented); } .cp-row.s-maintenance { --st: var(--maintenance); } .cp-row.s-blocked { --st: var(--blocked); }
-.cp-ic { flex-shrink: 0; width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; font-size: 1.15rem; background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.1); overflow: hidden; position: relative; }
+.cp-ic { flex-shrink: 0; width: 92px; height: 58px; border-radius: 14px; display: grid; place-items: center; background: radial-gradient(120% 90% at 50% 100%, rgba(255,255,255,.10), rgba(0,0,0,.35)); border: 1px solid rgba(255,255,255,.1); overflow: hidden; }
 .cp-ic img { width: 100%; height: 100%; object-fit: cover; }
-.cp-ic .dot { position: absolute; right: 3px; bottom: 3px; width: 11px; height: 11px; border-radius: 99px; border: 2px solid #111; }
+.cp-ic svg { width: 88px; height: 48px; display: block; filter: drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
 .cp-mid { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .cp-plate { font-weight: 800; font-size: 1.05rem; color: var(--gray-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cp-model { font-size: .86rem; color: var(--gray-600); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -60,16 +60,42 @@
     return late ? { s: 'rented', b: late, late: true } : { s: 'available', next };
   }
 
+  // Side-view drawing in the vehicle's own colour, shaped by body type.
+  const BODY = {
+    sedan: ['M6 44V37Q7 31 17 30L34 28L46 18Q50 15 57 15H79Q86 15 91 20L100 28L110 30Q116 32 116 38V44Z', 'M41 28L49 19Q52 17 57 17H67V28Z', 'M71 17H79Q84 17 88 21L94 28H71Z'],
+    hatchback: ['M8 44V31Q8 22 14 19L28 15H74Q81 15 87 20L97 28L109 30Q116 32 116 38V44Z', 'M15 28L17 22Q18 19 22 18L33 17H51V28Z', 'M55 17H73Q79 17 83 21L90 28H55Z'],
+    suv: ['M6 46V27Q6 14 15 13H78Q86 13 92 19L100 27L110 29Q116 31 116 38V46Z', 'M12 27V19Q12 16 16 16H48V27Z', 'M52 16H77Q83 16 87 20L94 27H52Z'],
+    mpv: ['M6 46V19Q6 10 15 10H83Q91 10 97 18L104 26L112 28Q116 30 116 37V46Z', 'M12 25V16Q12 13 15 13H40V25Z', 'M44 13H68V25H44Z', 'M72 13H83Q89 13 93 18L99 25H72Z'],
+    pickup: ['M6 44V31H50V17Q50 13 55 13H78Q86 13 92 19L100 27L110 29Q116 31 116 38V44Z', 'M55 16H77Q83 16 87 20L93 27H55Z'],
+  };
+  const BODY_OF = { sedan: 'sedan', ehev: 'sedan', ev: 'sedan', hatchback: 'hatchback', suv: 'suv', ppv: 'suv', mpv: 'mpv', van: 'mpv', pickup: 'pickup' };
+  const wheel = x => `<circle cx="${x}" cy="45" r="9.5" fill="#0b0b0b" stroke="#3f3f46" stroke-width="2"/><circle cx="${x}" cy="45" r="3.8" fill="#a1a1aa"/>`;
+  function carSvg(type, hex) {
+    if (type === 'motorcycle') return `<svg viewBox="0 0 120 60" aria-hidden="true">
+      <path d="M30 44L46 26H62L70 20H84L92 30L98 44" fill="none" stroke="#52525b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M40 30Q44 22 58 22L68 24Q72 30 66 34H44Q38 34 40 30Z" fill="${hex}" stroke="rgba(255,255,255,.35)"/>
+      <path d="M62 22Q70 16 82 18L88 24Q86 30 78 30L66 28Z" fill="${hex}" stroke="rgba(255,255,255,.35)"/>
+      <path d="M44 22H60" stroke="#18181b" stroke-width="5" stroke-linecap="round"/>
+      <path d="M84 18L90 10" stroke="#a1a1aa" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="28" cy="44" r="11" fill="#0b0b0b" stroke="#3f3f46" stroke-width="3"/><circle cx="28" cy="44" r="3.5" fill="#a1a1aa"/>
+      <circle cx="96" cy="44" r="11" fill="#0b0b0b" stroke="#3f3f46" stroke-width="3"/><circle cx="96" cy="44" r="3.5" fill="#a1a1aa"/></svg>`;
+    const [body, ...wins] = BODY[BODY_OF[type] || 'sedan'];
+    return `<svg viewBox="0 0 122 58" aria-hidden="true">
+      <path d="${body}" fill="${hex}" stroke="rgba(255,255,255,.35)" stroke-width="1"/>
+      ${wins.map(w => `<path d="${w}" fill="#0f172a" opacity=".85"/>`).join('')}
+      <path d="M110 33h5" stroke="#fde68a" stroke-width="3" stroke-linecap="round"/><path d="M7 35h4" stroke="#ef4444" stroke-width="3" stroke-linecap="round"/>
+      ${wheel(30)}${wheel(93)}</svg>`;
+  }
   function rowHtml(c, L) {
-    const hex = (typeof CAR_COLOR_HEX !== 'undefined' && CAR_COLOR_HEX[c.color]) || '#555';
-    const icon = c.photo ? `<img src="${esc(c.photo)}" alt="">` : (c.type === 'motorcycle' ? '🏍️' : '🚗');
+    const hex = (typeof CAR_COLOR_HEX !== 'undefined' && CAR_COLOR_HEX[c.color]) || '#9ca3af';
+    const icon = c.photo ? `<img src="${esc(c.photo)}" alt="">` : carSvg(c.type, hex);
     let info = '';
     if (L.s === 'rented') info = L.late ? `<b>เลยกำหนดคืน ${dm(L.b.end, L.b.endTime)}</b> · ${esc(L.b.customer || '')}` : `คืน <b>${dm(L.b.end, L.b.endTime)}</b> · ${esc(L.b.customer || '')}`;
     else if (L.s === 'available') info = L.next ? `คิวถัดไป <b>${dm(L.next.start, L.next.startTime)}</b> · ${esc(L.next.customer || '')}` : 'ยังไม่มีคิว';
     else info = esc(c.blockedReason || c.note || '');
     const model = [c.brand, c.model].filter(Boolean).join(' ') + (c.color ? ` · ${c.color}` : '');
     return `<button class="cp-row s-${L.s}" onclick="openCarDetail('${c.id}')">
-      <span class="cp-ic">${icon}<span class="dot" style="background:${hex}"></span></span>
+      <span class="cp-ic">${icon}</span>
       <span class="cp-mid"><span class="cp-plate">${esc(c.plate)}${isHybrid(c) ? '<span class="cp-hev">HEV</span>' : ''}</span>
         <span class="cp-model">${esc(model)}${c.ownerName ? ` · ${esc(c.ownerName)}` : ''}</span>
         ${info ? `<span class="cp-info">${info}</span>` : ''}</span>
