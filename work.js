@@ -4,6 +4,28 @@
 // navigate button and a big done button. "📋 คัดลอก" copies the whole day as
 // text for LINE. Drawn in shadow roots so its styles never touch the app's.
 // Loaded after app.js and queue.js; replaces the dashboard's two old lists.
+// Like prompt(), but the phone shows the number pad. Resolves to the text, or null on cancel.
+function numPrompt(title, value) {
+  return new Promise(done => {
+    const o = document.createElement('div');
+    o.style.cssText = 'position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px';
+    o.innerHTML = `<form style="width:100%;max-width:340px;background:#1c1d24;color:#fff;border:1px solid rgba(255,255,255,.15);border-radius:20px;padding:18px;display:flex;flex-direction:column;gap:12px;font-family:inherit">
+      <b style="font-size:1.05rem"></b>
+      <input inputmode="numeric" pattern="[0-9]*" autocomplete="off" style="min-height:50px;border-radius:14px;border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.3);color:#fff;font-size:1.3rem;padding:0 14px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <button type="button" data-x style="min-height:48px;border-radius:14px;border:1px solid rgba(255,255,255,.2);background:transparent;color:#fff;font:inherit;font-weight:700">ยกเลิก</button>
+        <button type="submit" style="min-height:48px;border-radius:14px;border:0;background:#facc15;color:#1a1400;font:inherit;font-weight:800">ตกลง</button>
+      </div></form>`;
+    o.querySelector('b').textContent = title;
+    const inp = o.querySelector('input'); inp.value = value || '';
+    const end = v => { o.remove(); done(v); };
+    o.querySelector('form').onsubmit = e => { e.preventDefault(); end(inp.value); };
+    o.querySelector('[data-x]').onclick = () => end(null);
+    o.addEventListener('click', e => { if (e.target === o) end(null); });
+    document.body.appendChild(o); setTimeout(() => inp.focus(), 30);
+  });
+}
+
 (function () {
   const CSS = `:host { display: block; color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.45; -webkit-tap-highlight-color: transparent; }
 
@@ -632,12 +654,13 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--brand); outline
       if (k === 'back') { if (b.status !== 'completed') openReturnModal(b.id); return; }
       const before = { mileageOut: b.mileageOut, deliveredAt: b.deliveredAt || '', status: b.status };
       if (done[id]) { if (b.status === 'completed') return; b.deliveredAt = ''; undo = { b, before }; persist(b, 'ย้ายกลับไปงานที่ยังไม่ได้ส่ง', true); return; }
-      const v = prompt(`เลขไมล์ออก ${plate} (ไม่กรอกก็ได้)`, b.mileageOut ? String(b.mileageOut) : '');
-      if (v === null) return;
-      const mi = +String(v).replace(/[^\d]/g, '');
-      if (mi) b.mileageOut = mi;
-      b.deliveredAt = nowISO(); if (b.status !== 'completed') b.status = 'active';
-      undo = { b, before }; persist(b, `ส่ง ${plate} เรียบร้อย` + (mi ? ` · ไมล์ ${mi.toLocaleString()}` : ''), true);
+      numPrompt(`เลขไมล์ออก ${plate} (ไม่กรอกก็ได้)`, b.mileageOut ? String(b.mileageOut) : '').then(v => {
+        if (v === null) return;
+        const mi = +String(v).replace(/[^\d]/g, '');
+        if (mi) b.mileageOut = mi;
+        b.deliveredAt = nowISO(); if (b.status !== 'completed') b.status = 'active';
+        undo = { b, before }; persist(b, `ส่ง ${plate} เรียบร้อย` + (mi ? ` · ไมล์ ${mi.toLocaleString()}` : ''), true);
+      });
     }
   };
   R.addEventListener('click', onClick); L.addEventListener('click', onClick);
