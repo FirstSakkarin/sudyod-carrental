@@ -23,7 +23,10 @@
 .cp-row:active { background: rgba(255,255,255,.08); }
 .cp-row.s-available { --st: var(--available); } .cp-row.s-rented { --st: var(--rented); } .cp-row.s-maintenance { --st: var(--maintenance); } .cp-row.s-blocked { --st: var(--blocked); }
 .cp-ic { flex-shrink: 0; width: 92px; height: 58px; border-radius: 14px; display: grid; place-items: center; background: radial-gradient(120% 90% at 50% 100%, rgba(255,255,255,.10), rgba(0,0,0,.35)); border: 1px solid rgba(255,255,255,.1); overflow: hidden; }
-.cp-ic img { width: 100%; height: 100%; object-fit: cover; }
+.cp-ic { position: relative; border-bottom: 6px solid var(--cc, #9ca3af); }
+.cp-ic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.cp-credit { margin: 16px 2px 4px; font-size: .74rem; color: var(--gray-500); }
+.cp-credit a { color: inherit; }
 .cp-ic svg { width: 88px; height: 48px; display: block; filter: drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
 .cp-mid { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .cp-plate { font-weight: 800; font-size: 1.05rem; color: var(--gray-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -86,16 +89,30 @@
       <path d="M110 33h5" stroke="#fde68a" stroke-width="3" stroke-linecap="round"/><path d="M7 35h4" stroke="#ef4444" stroke-width="3" stroke-linecap="round"/>
       ${wheel(30)}${wheel(93)}</svg>`;
   }
+  // Model photos from Wikimedia Commons (free licence; credit shown under the list).
+  const PHOTOS = [
+    [/City.*Hatch/i, '2020 Honda City Hatchback RS.jpg'], [/City/i, 'Honda City SV 2020.jpg'],
+    [/All New Yaris Ativ/i, '2022 Toyota Yaris ATIV 1.2 Premium Luxury.jpg'], [/Yaris Ativ/i, '2021 Toyota Yaris ATIV Sport Premium (Two-Tone).jpg'],
+    [/Yaris/i, '2017-2018 Toyota Yaris (XP150) E Hatchback (21-09-2018) 03.jpg'], [/Veloz/i, '2022 Toyota Veloz Premium.jpg'],
+    [/Corolla Cross.*(HEV|Hybrid)/i, 'Toyota Corolla Cross 1.8 GR-S HEV 2023 (1).jpg'], [/Corolla Cross/i, 'Toyota Corolla Cross 1.8 G 2020.jpg'],
+    [/Altis/i, 'Toyota Corolla Altis (E210) white in Taichung 20210214.jpg'], [/Vios/i, '2018 Toyota Vios (XP150) 1.5 E CVT Sedan (2018-04-13) front view.jpg'],
+    [/MG ?5/i, 'MG5 SECOND GENERATION China.jpg'], [/VS HEV|ZS.*H/i, 'MG ZS 1.5 Hybrid+ Sloan Silver Metallic 01.jpg'],
+    [/Mazda ?3/i, '2011 Mazda3 i Sport sedan -- 07-07-2011.jpg'], [/HR-V/i, '2022 Honda HR-V RS Turbo Indonesia.jpg'],
+    [/Civic/i, 'Honda Civic Sedan (FE1-FE4) Washington DC Metro Area, USA.jpg'],
+    [/Click/i, '2022 Honda Click 125.jpg'], [/Scoopy/i, '2021 Honda Scoopy Prestige 110 (20220216).jpg'], [/Nouvo/i, 'Yamaha Nouvo 115cc Thailand Right.jpg'],
+  ];
+  const photoOf = c => { const f = (PHOTOS.find(([re]) => re.test(c.model || '')) || [])[1]; return f ? `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(f)}?width=320` : ''; };
   function rowHtml(c, L) {
     const hex = (typeof CAR_COLOR_HEX !== 'undefined' && CAR_COLOR_HEX[c.color]) || '#9ca3af';
-    const icon = c.photo ? `<img src="${esc(c.photo)}" alt="">` : carSvg(c.type, hex);
+    const web = c.photo ? '' : photoOf(c);
+    const icon = carSvg(c.type, hex) + (c.photo ? `<img src="${esc(c.photo)}" alt="">` : web ? `<img src="${web}" alt="" loading="lazy" onerror="this.remove()">` : '');
     let info = '';
     if (L.s === 'rented') info = L.late ? `<b>เลยกำหนดคืน ${dm(L.b.end, L.b.endTime)}</b> · ${esc(L.b.customer || '')}` : `คืน <b>${dm(L.b.end, L.b.endTime)}</b> · ${esc(L.b.customer || '')}`;
     else if (L.s === 'available') info = L.next ? `คิวถัดไป <b>${dm(L.next.start, L.next.startTime)}</b> · ${esc(L.next.customer || '')}` : 'ยังไม่มีคิว';
     else info = esc(c.blockedReason || c.note || '');
     const model = [c.brand, c.model].filter(Boolean).join(' ') + (c.color ? ` · ${c.color}` : '');
     return `<button class="cp-row s-${L.s}" onclick="openCarDetail('${c.id}')">
-      <span class="cp-ic">${icon}</span>
+      <span class="cp-ic" style="--cc:${hex}">${icon}</span>
       <span class="cp-mid"><span class="cp-plate">${esc(c.plate)}${isHybrid(c) ? '<span class="cp-hev">HEV</span>' : ''}</span>
         <span class="cp-model">${esc(model)}${c.ownerName ? ` · ${esc(c.ownerName)}` : ''}</span>
         ${info ? `<span class="cp-info">${info}</span>` : ''}</span>
@@ -130,6 +147,7 @@
       rows.sort((a, z) => s === 'rented' ? at(a.L.b.end, a.L.b.endTime) - at(z.L.b.end, z.L.b.endTime) : String(a.c.plate).localeCompare(String(z.c.plate), 'th'));
       h += `<div class="cp-sec s-${s}"><i></i>${t} (${rows.length})</div><div class="cp-list">${rows.map(x => rowHtml(x.c, x.L)).join('')}</div>`;
     });
+    if (shown.some(x => !x.c.photo && photoOf(x.c))) h += '<div class="cp-credit">รูปตัวอย่างรุ่นรถจาก <a href="https://commons.wikimedia.org" target="_blank" rel="noopener">Wikimedia Commons</a> (CC BY-SA) · แถบสีใต้รูปคือสีจริงของรถคันนั้น</div>';
     box.innerHTML = h;
   };
 
