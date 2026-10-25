@@ -387,7 +387,6 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
   const TOP = `<div class="top"><div class="controls">
       <div class="nav"><button id="prev" aria-label="ย้อนไป">‹</button><button id="today">วันนี้</button><button id="next" aria-label="ถัดไป">›</button></div>
       <div class="seg" role="group" aria-label="จำนวนวันที่แสดง"><button id="span3" aria-pressed="false">3 วัน</button><button id="span7" aria-pressed="false">7 วัน</button><button id="span30" aria-pressed="false">เดือน</button></div>
-      <div class="nav"><button id="imp" class="impbtn" title="นำเข้าคิวจากไฟล์ที่ยูทำให้">⇪ นำเข้าคิว</button></div>
       <input type="file" id="impFile" accept=".json,application/json,text/plain" hidden>
     </div></div>`;
   const LEGEND = `<div class="legend">
@@ -1121,7 +1120,7 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
   R.getElementById('today').onclick = () => goTo(0);
   // ---------- import bookings from a file (e.g. the shop's queue Sheet, converted by Yu) ----------
   const impFile = R.getElementById('impFile');
-  R.getElementById('imp').onclick = () => { impFile.value = ''; impFile.click(); };
+  const impBtn = R.getElementById('imp'); if (impBtn) impBtn.onclick = () => { impFile.value = ''; impFile.click(); };
   impFile.onchange = async () => {
     const f = impFile.files && impFile.files[0]; if (!f) return;
     let list;
