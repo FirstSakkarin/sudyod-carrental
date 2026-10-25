@@ -1968,3 +1968,9 @@ body.is-owner .owner-only { display: flex; }
   .stat-num { font-size: 1rem; }
   .stat-label { font-size: .6rem; margin-top: 0; }
 }
+
+/* Phone: the dashboard queue table runs edge to edge (no card gutters) */
+@media (max-width: 600px) {
+  #page-dashboard .section-card:has(#ganttChart) { margin-left: -1rem; margin-right: -1rem; border-radius: 0; border-left: 0; border-right: 0; }
+  #ganttChart.gantt-wrap { padding: .5rem 0 .75rem; }
+}

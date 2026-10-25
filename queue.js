@@ -78,7 +78,7 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
   border-radius: 22px; overflow: clip; min-width: 100%; box-shadow: var(--specular), var(--lift);
 }
 /* width follows the zoom: 146px of car columns + one --dw per day */
-.sheet { width: calc(146px + var(--dw, 90px) * var(--nd, 42)); min-width: 0; }
+.sheet { width: calc(var(--cc, 146px) + var(--dw, 90px) * var(--nd, 42)); min-width: 0; }
 .dh .d .mini, .dh .d .mon { display: none; }
 .hrow .lab .curmon { color: var(--brand); font-size: .72rem; font-weight: 700; }
 .sheet.z-s .dh .h span, .sheet.z-s .bar small { display: none; }
@@ -126,7 +126,7 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
 .dh .h span + span { border-left: 1px solid var(--rule); }
 /* tapped day: a lit glass column through the whole table */
 .sheet { position: relative; }
-.daysel { position: absolute; top: 0; bottom: 0; left: calc(146px + var(--dw) * var(--di)); width: var(--dw); pointer-events: none;
+.daysel { position: absolute; top: 0; bottom: 0; left: calc(var(--cc, 146px) + var(--dw) * var(--di)); width: var(--dw); pointer-events: none;
   background: linear-gradient(180deg, rgba(96, 165, 250, .20), rgba(96, 165, 250, .12));
   box-shadow: inset 2px 0 0 rgba(147, 197, 253, .85), inset -2px 0 0 rgba(147, 197, 253, .85), 0 0 24px rgba(96, 165, 250, .25); }
 .dh { cursor: pointer; }
@@ -364,11 +364,29 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
 .daypill .hrs { min-width: 0; padding: 0 12px; font-size: .85rem; font-weight: 700; }
 .top { margin-bottom: 4px; }
 .legend { margin-top: 10px; font-size: .78rem; }
+/* phone: edge-to-edge table, slimmer car columns and rows so more days fit */
+@media (max-width: 600px) {
+  .top, .legend, .pinchtip { padding: 0 12px; }
+  .nav button { min-width: 42px; min-height: 42px; padding: 0 12px; font-size: .95rem; }
+  .seg button { padding: 8px 13px; min-height: 38px; }
+  .wrap { border-radius: 0; margin-top: 10px; }
+  .sheet { border-radius: 0; border-left: 0; border-right: 0; }
+  .no { width: 22px; font-size: .7rem; }
+  .hrow .no { font-size: 0; }
+  .lab { left: 22px; width: 84px; padding: 3px 6px; }
+  .lab b { font-size: .8rem; }
+  .lab small { font-size: .66rem; }
+  .hrow .lab { font-size: .72rem; }
+  .bar { height: 42px; border-radius: 11px; padding: 2px 8px; }
+  .bar b { font-size: .8rem; }
+  .bar .pl { font-size: .85rem; }
+  .bar small { font-size: .62rem; }
+  .dh .d { font-size: .78rem; padding: 5px 0 2px; }
+}
 `;
   const TOP = `<div class="top"><div class="controls">
       <div class="nav"><button id="prev" aria-label="ย้อนไป">‹</button><button id="today">วันนี้</button><button id="next" aria-label="ถัดไป">›</button></div>
       <div class="seg" role="group" aria-label="จำนวนวันที่แสดง"><button id="span3" aria-pressed="false">3 วัน</button><button id="span7" aria-pressed="false">7 วัน</button><button id="span30" aria-pressed="false">เดือน</button></div>
-      <div class="nav"><button id="imp" class="impbtn" title="นำเข้าคิวจากไฟล์ที่ยูทำให้">⇪ นำเข้าคิว</button></div>
       <input type="file" id="impFile" accept=".json,application/json,text/plain" hidden>
     </div></div>`;
   const LEGEND = `<div class="legend">
@@ -407,7 +425,10 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
     bookings = state.bookings.filter(x => ids.has(x.carId) && x.start && x.end);
   }
   const who = x => (x && x.customer) || '-';
-  const LANE = 58;
+  const PHONE = matchMedia('(max-width: 600px)').matches;
+  const LANE = PHONE ? 46 : 58;
+  // phone: plate without the province ("จง4054 เชียงใหม่" → "จง4054")
+  const shortPlate = p => String(p || '').replace(/\s+(กรุงเทพมหานคร|กทม\.?|[ก-๙]{3,})$/, '').trim();
   // Regular drop-off spots become an icon (plus a short tag for the Arcade bus terminals); anything else stays as 📍 text.
   const SPOTS = [
     [/สนามบิน|airport|cnx/i, '✈️', ''],
@@ -429,7 +450,7 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
   let offset = 0;
   // Zoom like Google Sheets on a phone: one day = dw px. A 6-week window is drawn
   // (1 week back, 5 ahead) and re-centred when you scroll near its edge.
-  const DAYS = 42, BACK = 7, CARCOLS = 146, DW_MIN = 9, DW_MAX = 260;
+  const DAYS = 42, BACK = 7, CARCOLS = PHONE ? 106 : 146, DW_MIN = 9, DW_MAX = 260;
   const wrapEl = () => R.getElementById('wrap');
   const fitDw = n => Math.max(DW_MIN, Math.min(DW_MAX, (Math.min(wrapEl().clientWidth || innerWidth, 1200) - CARCOLS) / n));
   let dw = +store.get('qlab.dw', 0);
@@ -556,13 +577,13 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
         const x = (xe + xs) / 2;
         if (x < 0 || x > slots) return;
         const lane = laneOf[n.o.id] ?? laneOf[b.id] ?? 0;
-        gaps.push(`<span class="gap ${n.level}" style="left:${Math.min(Math.max(x / slots * 100, .4), 99.6)}%;top:${5 + lane * LANE + 62}px">⏱ ${gapText(n.m)}${n.together > 1 ? ` · ${n.together} คัน` : ''}</span>`);
+        gaps.push(`<span class="gap ${n.level}" style="left:${Math.min(Math.max(x / slots * 100, .4), 99.6)}%;top:${5 + lane * LANE + LANE + 4}px">⏱ ${gapText(n.m)}${n.together > 1 ? ` · ${n.together} คัน` : ''}</span>`);
       });
       // Chips hang just under the bar line, bridging the two queues without covering their text.
-      const rowH = Math.max(66, lanes.length * LANE + 8) + (gaps.length ? 18 : 0);
+      const rowH = Math.max(PHONE ? 52 : 66, lanes.length * LANE + 8) + (gaps.length ? 18 : 0);
       return `<div class="row${c.off ? ' off' : ''}" data-car="${c.id}" style="min-height:${rowH}px">
         <div class="no">${c.no}</div>
-        <div class="lab" style="${hueVar(c)}"><b>${c.plate}</b><small>${c.spec}</small></div>
+        <div class="lab" style="${hueVar(c)}"><b>${PHONE ? shortPlate(c.plate) : c.plate}</b><small>${c.spec}</small></div>
         <div class="track">${cols}${bars}${gaps.join('')}</div></div>`;
     }).join('');
 
@@ -1001,6 +1022,7 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
   function applyZoom() {
     const sh = wrapEl().querySelector('.sheet'); if (!sh) return;
     wrapEl().style.setProperty('--dw', dw + 'px');
+    wrapEl().style.setProperty('--cc', CARCOLS + 'px');
     sh.classList.toggle('z-s', dw < 60);
     sh.classList.toggle('z-xs', dw < 40);
     sh.classList.toggle('z-xxs', dw < 20);
@@ -1098,7 +1120,7 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
   R.getElementById('today').onclick = () => goTo(0);
   // ---------- import bookings from a file (e.g. the shop's queue Sheet, converted by Yu) ----------
   const impFile = R.getElementById('impFile');
-  R.getElementById('imp').onclick = () => { impFile.value = ''; impFile.click(); };
+  const impBtn = R.getElementById('imp'); if (impBtn) impBtn.onclick = () => { impFile.value = ''; impFile.click(); };
   impFile.onchange = async () => {
     const f = impFile.files && impFile.files[0]; if (!f) return;
     let list;
