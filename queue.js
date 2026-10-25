@@ -792,7 +792,7 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
     const row = under && under.closest('.row[data-car]');
     R.querySelectorAll('.row.drop').forEach(r => r.classList.remove('drop', 'bad'));
     d.carId = row ? row.dataset.car : d.b.carId;
-    d.halves = Math.round((x - d.x0) / d.slotW);
+    d.halves = Math.round((x - d.x0 + (wrapEl().scrollLeft - d.sl0)) / d.slotW);
     const plan = dropPlan(d);
     if (row) { row.classList.add('drop'); if (plan.clash) row.classList.add('bad'); }
     d.ghost.classList.toggle('clash', !!plan.clash);
@@ -806,9 +806,11 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
   // Keep the dragged bar reachable: nudge the table/page when the finger nears an edge.
   function autoScroll() {
     if (!drag || !drag.active) return;
+    // table hidden (page changed) or bar redrawn away: drop the drag instead of leaving the ghost on screen
+    if (!alive() || !drag.el.isConnected || !wrapEl().offsetParent) { endDrag(false); return; }
     const wrap = R.getElementById('wrap'), r = wrap.getBoundingClientRect(), E = 48;
     let moved = false;
-    if (drag.x < r.left + 150 && wrap.scrollLeft > 0) { wrap.scrollLeft -= 8; moved = true; }
+    if (drag.x < r.left + CARCOLS + 4 && wrap.scrollLeft > 0) { wrap.scrollLeft -= 8; moved = true; }
     if (drag.x > r.right - E) { wrap.scrollLeft += 8; moved = true; }
     if (drag.y < E + 60) { window.scrollBy(0, -10); moved = true; }
     if (drag.y > innerHeight - E) { window.scrollBy(0, 10); moved = true; }
@@ -824,6 +826,7 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
     d.offX = d.x0 - r.left; d.offY = d.y0 - r.top;
     const track = d.el.closest('.track');
     d.slotW = track.getBoundingClientRect().width / (DAYS * 2);
+    d.sl0 = wrapEl().scrollLeft;
     d.ghost = d.el.cloneNode(true);
     d.ghost.classList.add('ghost'); d.ghost.classList.remove('flash');
     Object.assign(d.ghost.style, { width: r.width + 'px', left: r.left + 'px', top: r.top + 'px' });
@@ -837,11 +840,12 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
     d.raf = requestAnimationFrame(autoScroll);
   }
 
+  function flushRedraw() { if (redrawAfterDrag) { redrawAfterDrag = false; renderKeep(); } }
   function endDrag(commit) {
     const d = drag; if (!d) return;
     clearTimeout(d.timer);
     d.el.classList.remove('lifting', 'src');
-    if (!d.active) { drag = null; return; }
+    if (!d.active) { drag = null; flushRedraw(); return; }
     cancelAnimationFrame(d.raf);
     d.ghost.remove(); d.tip.remove();
     document.body.classList.remove('dragging');
@@ -849,7 +853,7 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
     suppressClick = true; setTimeout(() => { suppressClick = false; }, 350);
     const plan = dropPlan(d);
     drag = null;
-    if (!commit || !plan.changed) return;
+    if (!commit || !plan.changed) { flushRedraw(); return; }
     if (plan.pickTime) { openTimePick(d.b, plan); return; }
     if (plan.clash) {
       sheet = { id: d.b.id, view: 'drop', plan, start: d.b.start, startTime: d.b.startTime, end: d.b.end, endTime: d.b.endTime };
@@ -942,8 +946,10 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
     drag.x = e.clientX; drag.y = e.clientY;
     updateDrag(e.clientX, e.clientY);
   });
-  document.addEventListener('pointerup', e => { if (!alive()) return; if (drag && e.pointerId === drag.pid) endDrag(true); });
-  document.addEventListener('pointercancel', e => { if (!alive()) return; if (drag && e.pointerId === drag.pid) endDrag(false); });
+  document.addEventListener('pointerup', e => { if (drag && e.pointerId === drag.pid) endDrag(alive()); });
+  document.addEventListener('pointercancel', e => { if (drag && e.pointerId === drag.pid) endDrag(false); });
+  // a new touch while a bar seems lifted means its release was lost: drop it
+  document.addEventListener('pointerdown', e => { if (drag && drag.active && e.pointerId !== drag.pid) endDrag(false); }, true);
   // Once a bar is lifted, stop the page from scrolling under the finger.
   document.addEventListener('touchmove', e => { if (!alive()) return; if (drag && drag.active) e.preventDefault(); }, { passive: false });
   R.addEventListener('contextmenu', e => { if (e.target.closest('.bar')) e.preventDefault(); });
@@ -1164,7 +1170,8 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
   document.addEventListener('keydown', e => { if (!alive()) return; if (e.key === 'Escape' && sheet) closeSheet(); });
   function first() { if (!dw) dw = fitDw(matchMedia('(max-width: 700px)').matches ? 3 : 7); goTo(0); }
   // Redraw in place (after a save or a tab/sort change) without losing the scroll position.
-  function renderKeep() { const w = wrapEl(), sl = w.scrollLeft; render(); w.scrollLeft = sl; }
+  let redrawAfterDrag = false;
+  function renderKeep() { if (drag) { redrawAfterDrag = true; return; } const w = wrapEl(), sl = w.scrollLeft; render(); w.scrollLeft = sl; }
   addEventListener('resize', () => { if (alive()) applyZoom(); });
   return { first, renderKeep, closeSheet: () => closeSheet() };
   }
@@ -1192,6 +1199,7 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
       chart.appendChild(host);
       const R = host.attachShadow({ mode: 'open' });
       R.innerHTML = `<style>${CSS}</style>${TOP}<div class="wrap" id="wrap"></div>${LEGEND}`;
+      layer().querySelectorAll('.ghost, .dragtip').forEach(n => n.remove()); document.body.classList.remove('dragging');
       inst = create(R, layer(), () => host.isConnected);
       inst.first();
     } else inst.renderKeep();
