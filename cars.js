@@ -22,9 +22,11 @@
 .cp-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; min-width: 0; box-sizing: border-box; padding: 8px 10px; border-radius: 16px; border: 1px solid rgba(255,255,255,.08); border-left: 4px solid var(--st); background: rgba(255,255,255,.04); color: inherit; font: inherit; cursor: pointer; }
 .cp-row:active { background: rgba(255,255,255,.08); }
 .cp-row.s-available { --st: var(--available); } .cp-row.s-rented { --st: var(--rented); } .cp-row.s-maintenance { --st: var(--maintenance); } .cp-row.s-blocked { --st: var(--blocked); }
-.cp-ic { flex-shrink: 0; width: 92px; height: 58px; border-radius: 14px; display: grid; place-items: center; background: radial-gradient(120% 90% at 50% 100%, rgba(255,255,255,.10), rgba(0,0,0,.35)); border: 1px solid rgba(255,255,255,.1); overflow: hidden; }
+.cp-ic { flex-shrink: 0; width: 64px; height: 56px; border-radius: 14px; display: grid; place-items: center; background: radial-gradient(120% 90% at 50% 100%, rgba(255,255,255,.10), rgba(0,0,0,.35)); border: 1px solid rgba(255,255,255,.1); overflow: hidden; }
 .cp-ic img { width: 100%; height: 100%; object-fit: cover; }
 .cp-ic svg { width: 88px; height: 48px; display: block; filter: drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
+.cp-ic .fa-solid { font-size: 2rem; color: var(--cc); filter: drop-shadow(0 0 1px rgba(255,255,255,.7)) drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
+.cp-ic .fa-motorcycle { font-size: 1.9rem; }
 .cp-mid { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .cp-plate { font-weight: 800; font-size: 1.05rem; color: var(--gray-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cp-model { font-size: .86rem; color: var(--gray-600); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -88,14 +90,14 @@
   }
   function rowHtml(c, L) {
     const hex = (typeof CAR_COLOR_HEX !== 'undefined' && CAR_COLOR_HEX[c.color]) || '#9ca3af';
-    const icon = c.photo ? `<img src="${esc(c.photo)}" alt="">` : carSvg(c.type, hex);
+    const icon = c.photo ? `<img src="${esc(c.photo)}" alt="">` : `<i class="fa-solid ${c.type === 'motorcycle' ? 'fa-motorcycle' : c.type === 'pickup' ? 'fa-truck-pickup' : c.type === 'van' || c.type === 'mpv' ? 'fa-van-shuttle' : 'fa-car-side'}" aria-hidden="true"></i>`;
     let info = '';
     if (L.s === 'rented') info = L.late ? `<b>เลยกำหนดคืน ${dm(L.b.end, L.b.endTime)}</b> · ${esc(L.b.customer || '')}` : `คืน <b>${dm(L.b.end, L.b.endTime)}</b> · ${esc(L.b.customer || '')}`;
     else if (L.s === 'available') info = L.next ? `คิวถัดไป <b>${dm(L.next.start, L.next.startTime)}</b> · ${esc(L.next.customer || '')}` : 'ยังไม่มีคิว';
     else info = esc(c.blockedReason || c.note || '');
     const model = [c.brand, c.model].filter(Boolean).join(' ') + (c.color ? ` · ${c.color}` : '');
     return `<button class="cp-row s-${L.s}" onclick="openCarDetail('${c.id}')">
-      <span class="cp-ic">${icon}</span>
+      <span class="cp-ic" style="--cc:${hex}">${icon}</span>
       <span class="cp-mid"><span class="cp-plate">${esc(c.plate)}${isHybrid(c) ? '<span class="cp-hev">HEV</span>' : ''}</span>
         <span class="cp-model">${esc(model)}${c.ownerName ? ` · ${esc(c.ownerName)}` : ''}</span>
         ${info ? `<span class="cp-info">${info}</span>` : ''}</span>
