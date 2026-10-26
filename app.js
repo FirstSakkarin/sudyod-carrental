@@ -618,11 +618,28 @@ function openEditCarModal(id) {
   showModal('carModal');
 }
 
+// Red frame on required fields left empty; scroll to the first one.
+function flagMissing(ids) {
+  const els = ids.map(id => document.getElementById(id)).filter(el => el && (!String(el.value || '').trim() || (el.type === 'number' && !+el.value)));
+  els.forEach(el => {
+    const box = el.closest('.custom-select-wrap') || el;
+    box.classList.add('field-missing');
+    const clear = () => { box.classList.remove('field-missing'); el.removeEventListener('input', clear); el.removeEventListener('change', clear); };
+    el.addEventListener('input', clear); el.addEventListener('change', clear);
+  });
+  if (els.length) {
+    const first = els[0].closest('.custom-select-wrap') || els[0];
+    first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (first === els[0] && els[0].type !== 'date') setTimeout(() => els[0].focus({ preventScroll: true }), 300);
+  }
+  showToast('กรุณากรอกข้อมูลที่จำเป็น (กรอบสีแดง)', 'error');
+}
+
 function saveCar() {
   const plate = document.getElementById('carPlate').value.trim();
   const brand = document.getElementById('carBrand').value.trim();
   const model = document.getElementById('carModel').value.trim();
-  if (!plate || !brand || !model) { showToast('กรุณากรอกข้อมูลที่จำเป็น', 'error'); return; }
+  if (!plate || !brand || !model) { flagMissing(['carPlate', 'carBrand', 'carModel']); return; }
 
   const ordNo = +document.getElementById('carOrderNo').value || 0;
   const dup = ordNo && orderPeers().find(c => c.no === ordNo);
@@ -2071,7 +2088,7 @@ function saveBooking() {
   const customer = document.getElementById('bookingCustomer').value.trim();
   const start    = document.getElementById('bookingStart').value;
   const end      = document.getElementById('bookingEnd').value;
-  if (!carId || !customer || !start || !end) { showToast('กรุณากรอกข้อมูลที่จำเป็น', 'error'); return; }
+  if (!carId || !customer || !start || !end) { flagMissing(['bookingCar', 'bookingCustomer', 'bookingStart', 'bookingEnd']); return; }
   if (end < start) { showToast('วันคืนรถต้องไม่ก่อนวันรับรถ', 'error'); return; }
 
   const id    = document.getElementById('bookingModalId').value;
@@ -2677,7 +2694,7 @@ function saveExpense() {
   const carId  = document.getElementById('expenseCar').value;
   const date   = document.getElementById('expenseDate').value;
   const amount = +document.getElementById('expenseAmount').value || 0;
-  if (!carId || !date || !amount) { showToast('กรุณากรอกข้อมูลที่จำเป็น', 'error'); return; }
+  if (!carId || !date || !amount) { flagMissing(['expenseCar', 'expenseDate', 'expenseAmount']); return; }
 
   const data = {
     carId, date, amount,

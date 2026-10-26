@@ -1981,3 +1981,6 @@ body.is-owner .owner-only { display: flex; }
   background: var(--primary); color: #000; font: inherit; font-size: .75rem; font-weight: 600;
   cursor: pointer; white-space: nowrap;
 }
+
+/* Required field left empty */
+.field-missing:not(.custom-select-wrap), .custom-select-wrap.field-missing .custom-select-trigger { border-color: #ef4444 !important; box-shadow: 0 0 0 3px rgba(239,68,68,.28) !important; }
