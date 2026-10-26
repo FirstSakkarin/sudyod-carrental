@@ -5,8 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>สุดยอด รถเช่า เชียงใหม่</title>
   <link rel="icon" type="image/jpeg" href="logo.jpg" />
-  <link rel="apple-touch-icon" href="logo.jpg" />
-  <link rel="stylesheet" href="styles.css?v=20261025m" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  <meta name="apple-mobile-web-app-title" content="สุดยอดรถเช่า" />
+  <link rel="stylesheet" href="styles.css?v=20261026a" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 </head>
 <body>
@@ -59,6 +65,9 @@
           </div>
         </div>
         <div class="sidebar-actions">
+          <button class="icon-btn pwa-install-btn" onclick="installPwa()" style="display:none;" title="ติดตั้งแอปลงเครื่อง">
+            <i class="fa-solid fa-download"></i>
+          </button>
           <button class="icon-btn" onclick="openSettingsModal()" title="ตั้งค่า Google Sheets">
             <i class="fa-solid fa-gear"></i>
           </button>
@@ -73,6 +82,9 @@
         <span class="topbar-title" id="topbarTitle">ภาพรวม</span>
       </div>
       <div class="topbar-right">
+        <button class="pwa-install-btn" onclick="installPwa()" style="display:none;" title="ติดตั้งแอปลงเครื่อง">
+          <i class="fa-solid fa-download"></i> ติดตั้งแอป
+        </button>
         <span class="topbar-date" id="topbarDate"></span>
         <button id="syncStatus" class="sync-badge sync-off" onclick="refreshApp()" style="border:none;background:none;font-family:inherit;cursor:pointer;">
           <i class="fa-solid fa-circle"></i> ออฟไลน์
@@ -992,9 +1004,10 @@
   <!-- Custom select dropdown panel (native <select> popups can't be restyled) -->
   <div id="customSelectPanel" class="custom-select-panel"></div>
 
-  <script src="app.js?v=20261025m"></script>
-  <script src="queue.js?v=20261025m"></script>
-  <script src="work.js?v=20261025m"></script>
-  <script src="cars.js?v=20261025m"></script>
+  <script src="app.js?v=20261026a"></script>
+  <script src="queue.js?v=20261026a"></script>
+  <script src="work.js?v=20261026a"></script>
+  <script src="cars.js?v=20261026a"></script>
+  <script src="pwa.js?v=20261026a"></script>
 </body>
 </html>
