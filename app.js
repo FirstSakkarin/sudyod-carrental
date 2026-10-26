@@ -3368,12 +3368,16 @@ function syncCarActiveStatus(carId) {
 function populateCarSelect(selectId, availableOnly) {
   const el = document.getElementById(selectId);
   el.innerHTML = '<option value="">— เลือกรถ —</option>';
-  state.cars
-    .filter(c => !availableOnly || (c.status !== 'rented' && c.status !== 'blocked'))
+  // Every car is listed (a car out on rent today can still be booked for later
+  // dates; clashes are checked on save). Same order as the queue (ลำดับ).
+  const ord = c => (c.orderNo === '' || c.orderNo == null || isNaN(+c.orderNo)) ? 1e9 : +c.orderNo;
+  const TAG = { maintenance: ' (ซ่อมบำรุง)', blocked: ' (ปิดตา)' };
+  [...state.cars]
+    .sort((a, b) => ord(a) - ord(b) || String(a.plate).localeCompare(String(b.plate), 'th'))
     .forEach(c => {
       const opt = document.createElement('option');
       opt.value = c.id;
-      opt.textContent = `${c.type === 'motorcycle' ? '🏍️ ' : ''}${c.plate} · ${c.brand} ${c.model}`;
+      opt.textContent = `${c.type === 'motorcycle' ? '🏍️ ' : ''}${c.plate} · ${c.brand} ${c.model}${availableOnly ? (TAG[c.status] || '') : ''}`;
       el.appendChild(opt);
     });
 }
