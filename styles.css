@@ -139,6 +139,7 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
 }
 .topbar-logo-wrap {
   flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: .5rem;
@@ -277,6 +278,10 @@ input, select, textarea { font-family: inherit; font-size: .95rem; }
 }
 .topbar-title {
   flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-weight: 700;
   font-size: 1rem;
   color: #fff;
@@ -1980,4 +1985,11 @@ body.is-owner .owner-only { display: flex; }
   border: none; border-radius: 999px; padding: .3rem .65rem;
   background: var(--primary); color: #000; font: inherit; font-size: .75rem; font-weight: 600;
   cursor: pointer; white-space: nowrap;
+}
+/* Phones: keep the top bar on one line. Date already shows on the overview page,
+   and the install button becomes a round icon. */
+@media (max-width: 520px) {
+  .topbar-date { display: none; }
+  .topbar .pwa-install-btn { padding: 0; width: 32px; height: 32px; font-size: .9rem; display: inline-flex; align-items: center; justify-content: center; }
+  .topbar .pwa-install-btn .pwa-install-label { display: none; }
 }
