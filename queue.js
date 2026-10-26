@@ -377,7 +377,9 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
   .lab b { font-size: .8rem; }
   .lab small { font-size: .66rem; }
   .hrow .lab { font-size: .72rem; }
-  .bar { height: 42px; border-radius: 11px; padding: 2px 8px; }
+  .bar { height: 34px; border-radius: 10px; padding: 1px 7px; line-height: 1.1; }
+  .gap { font-size: .62rem; padding: 1px 6px; }
+  .lab { line-height: 1.1; }
   .bar b { font-size: .8rem; }
   .bar .pl { font-size: .85rem; }
   .bar small { font-size: .62rem; }
@@ -426,7 +428,7 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
   }
   const who = x => (x && x.customer) || '-';
   const PHONE = matchMedia('(max-width: 600px)').matches;
-  const LANE = PHONE ? 46 : 58;
+  const LANE = PHONE ? 38 : 58;
   // phone: plate without the province ("จง4054 เชียงใหม่" → "จง4054")
   const shortPlate = p => String(p || '').replace(/\s+(กรุงเทพมหานคร|กทม\.?|[ก-๙]{3,})$/, '').trim();
   // Regular drop-off spots become an icon (plus a short tag for the Arcade bus terminals); anything else stays as 📍 text.
@@ -580,7 +582,7 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
         gaps.push(`<span class="gap ${n.level}" style="left:${Math.min(Math.max(x / slots * 100, .4), 99.6)}%;top:${5 + lane * LANE + LANE + 4}px">⏱ ${gapText(n.m)}${n.together > 1 ? ` · ${n.together} คัน` : ''}</span>`);
       });
       // Chips hang just under the bar line, bridging the two queues without covering their text.
-      const rowH = Math.max(PHONE ? 52 : 66, lanes.length * LANE + 8) + (gaps.length ? 18 : 0);
+      const rowH = Math.max(PHONE ? 44 : 66, lanes.length * LANE + 8) + (gaps.length ? (PHONE ? 15 : 18) : 0);
       return `<div class="row${c.off ? ' off' : ''}" data-car="${c.id}" style="min-height:${rowH}px">
         <div class="no">${c.no}</div>
         <div class="lab" style="${hueVar(c)}"><b>${PHONE ? shortPlate(c.plate) : c.plate}</b><small>${c.spec}</small></div>
