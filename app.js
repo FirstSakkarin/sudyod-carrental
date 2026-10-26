@@ -498,6 +498,36 @@ function populateModelSelect(selectedModel) {
 function onCarTypeChange() {
   populateBrandSelect();
   populateModelSelect();
+  updateOrderHint();
+}
+
+// Car form: show the order numbers around the one being typed so two cars
+// don't get the same number. Motorcycles and cars are numbered separately
+// (they sit on separate queue tabs).
+const escOrd = v => String(v).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+function orderPeers() {
+  const id = document.getElementById('carModalId').value;
+  const moto = document.getElementById('carType').value === 'motorcycle';
+  return state.cars
+    .filter(c => c.id !== id && (c.type === 'motorcycle') === moto && +c.orderNo > 0)
+    .map(c => ({ no: +c.orderNo, plate: c.plate || '-' }))
+    .sort((a, b) => a.no - b.no);
+}
+function updateOrderHint() {
+  const el = document.getElementById('carOrderHint'); if (!el) return;
+  const peers = orderPeers(), n = +document.getElementById('carOrderNo').value || 0;
+  const label = c => `<b>${c.no}</b> ${escOrd(c.plate)}`;
+  const nextFree = () => { let k = 1; const used = new Set(peers.map(c => c.no)); while (used.has(k)) k++; return k; };
+  if (!peers.length) { el.innerHTML = 'ยังไม่มีคันไหนตั้งลำดับ เริ่มที่ 1 ได้เลย'; return; }
+  if (!n) {
+    const last = peers[peers.length - 1];
+    el.innerHTML = `ลำดับล่าสุด ${label(last)} · เลขว่างถัดไป <b>${nextFree()}</b>`;
+    return;
+  }
+  const same = peers.filter(c => c.no === n);
+  const prev = [...peers].reverse().find(c => c.no < n), next = peers.find(c => c.no > n);
+  el.innerHTML = (same.length ? `<span style="color:var(--danger);font-weight:700;">⚠ ซ้ำกับ ${same.map(c => escOrd(c.plate)).join(', ')} · เลขว่างถัดไป ${nextFree()}</span><br>` : '<span style="color:var(--available);">✓ ไม่ซ้ำ</span><br>') +
+    `ก่อนหน้า: ${prev ? label(prev) : '–'} · ถัดไป: ${next ? label(next) : '–'}`;
 }
 function onCarBrandChange() {
   populateModelSelect();
@@ -550,6 +580,7 @@ function openAddCarModal() {
   document.getElementById('carStatus').value    = 'available';
   document.getElementById('carOwnerName').value = '';
   document.getElementById('carOrderNo').value   = '';
+  updateOrderHint();
   document.getElementById('carEngineCC').value  = '';
   document.getElementById('carSeats').value     = '';
   document.getElementById('carNote').value      = '';
@@ -579,6 +610,7 @@ function openEditCarModal(id) {
   document.getElementById('carStatus').value             = car.status;
   document.getElementById('carOwnerName').value          = car.ownerName || '';
   document.getElementById('carOrderNo').value            = car.orderNo ?? '';
+  updateOrderHint();
   document.getElementById('carEngineCC').value           = car.engineCC ?? '';
   document.getElementById('carSeats').value              = car.seats ?? '';
   document.getElementById('carNote').value               = car.note || '';
@@ -592,6 +624,9 @@ function saveCar() {
   const model = document.getElementById('carModel').value.trim();
   if (!plate || !brand || !model) { showToast('กรุณากรอกข้อมูลที่จำเป็น', 'error'); return; }
 
+  const ordNo = +document.getElementById('carOrderNo').value || 0;
+  const dup = ordNo && orderPeers().find(c => c.no === ordNo);
+  if (dup && !confirm(`ลำดับ ${ordNo} ซ้ำกับ ${dup.plate} อยู่แล้ว\nต้องการบันทึกซ้ำต่อหรือไม่?`)) return;
   const id = document.getElementById('carModalId').value;
   const data = {
     plate, brand, model,

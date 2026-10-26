@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black" />
   <meta name="apple-mobile-web-app-title" content="สุดยอดรถเช่า" />
-  <link rel="stylesheet" href="styles.css?v=20261026b" />
+  <link rel="stylesheet" href="styles.css?v=20261026c" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 </head>
 <body>
@@ -513,7 +513,8 @@
         <div class="form-row">
           <div class="form-group">
             <label>ลำดับรถ</label>
-            <input type="number" inputmode="numeric" id="carOrderNo" min="1" placeholder="เช่น 1" />
+            <input type="number" inputmode="numeric" id="carOrderNo" min="1" placeholder="เช่น 1" oninput="updateOrderHint()" />
+            <div id="carOrderHint" class="hint-note" style="font-size:.8rem;margin-top:.3rem;line-height:1.45;"></div>
           </div>
           <div class="form-group">
             <label>เครื่องยนต์ (ลิตร)</label>
@@ -1004,10 +1005,10 @@
   <!-- Custom select dropdown panel (native <select> popups can't be restyled) -->
   <div id="customSelectPanel" class="custom-select-panel"></div>
 
-  <script src="app.js?v=20261026b"></script>
-  <script src="queue.js?v=20261026b"></script>
-  <script src="work.js?v=20261026b"></script>
-  <script src="cars.js?v=20261026b"></script>
-  <script src="pwa.js?v=20261026b"></script>
+  <script src="app.js?v=20261026c"></script>
+  <script src="queue.js?v=20261026c"></script>
+  <script src="work.js?v=20261026c"></script>
+  <script src="cars.js?v=20261026c"></script>
+  <script src="pwa.js?v=20261026c"></script>
 </body>
 </html>
