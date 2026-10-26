@@ -267,7 +267,8 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--brand); outline
     [/(อาเขต|ขนส่ง)\s*(1|๑)/, '🚌', 'อาเขต1'], [/(อาเขต|ขนส่ง)\s*(2|๒)/, '🚌', 'อาเขต2'], [/อาเขต|สถานีขนส่ง|บขส/, '🚌', 'อาเขต'], [/หน้าร้าน|^ร้าน/, '🏠', 'ร้าน']];
   const esc = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const placeHtml = p => { if (!p) return '<span style="color:var(--muted)">ยังไม่ระบุที่</span>'; const m = SPOTS.find(([re]) => re.test(p));
-    return m ? `${m[1]}${m[2] ? `<em>${m[2]}</em>` : ''} ${m[2] && p.replace(/\s/g, '') === m[2] ? '' : esc(p)}` : `📍 ${esc(p)}`; };
+    const t = (window.placeLabel ? placeLabel(p) : p) || 'มีลิงก์แผนที่';
+    return m ? `${m[1]}${m[2] ? `<em>${m[2]}</em>` : ''} ${m[2] && t.replace(/\s/g, '') === m[2] ? '' : esc(t)}` : `📍 ${esc(t)}`; };
   const mapUrl = p => { const u = String(p || '').match(/https?:\/\/\S+/); return u ? u[0] : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p)}`; };
   const opened = {};
   const name = b => String(b.customer || '-');

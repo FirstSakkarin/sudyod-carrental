@@ -117,5 +117,39 @@
     window.renderBookingsPage();
   });
 
+
+  // Booking form: when a location is a pasted map link, ask for the place name
+  // beside it so cards show the name. Saved as "name link" in the same field.
+  const LOC_CSS = `.loc-name { margin-top: 6px; } .loc-name input { border-color: rgba(74,222,128,.45) !important; }
+.loc-name small { display: block; font-size: .74rem; color: var(--gray-500); margin: 0 2px 3px; }`;
+  const st2 = document.createElement('style'); st2.textContent = LOC_CSS; document.head.appendChild(st2);
+  const URL_RE = /https?:\/\/\S+/;
+  function wireLoc(id) {
+    const main = document.getElementById(id); if (!main || main.dataset.locWired) return;
+    main.dataset.locWired = '1';
+    const box = document.createElement('div'); box.className = 'loc-name'; box.hidden = true;
+    box.innerHTML = '<small>📍 ชื่อสถานที่นี้</small><input type="text" placeholder="เช่น ระรินจินดา">';
+    main.insertAdjacentElement('afterend', box);
+    const nameEl = box.querySelector('input');
+    const sync = () => {
+      const m = main.value.match(URL_RE);
+      box.hidden = !m;
+      if (m && document.activeElement !== nameEl) nameEl.value = main.value.replace(m[0], '').trim();
+    };
+    main.addEventListener('input', sync);
+    nameEl.addEventListener('input', () => {
+      const m = main.value.match(URL_RE); if (!m) return;
+      main.value = (nameEl.value.trim() ? nameEl.value.trim() + ' ' : '') + m[0];
+    });
+    main._locSync = sync;
+  }
+  const LOCS = ['bookingPickupLocation', 'bookingReturnLocation'];
+  LOCS.forEach(wireLoc);
+  const syncLocs = () => LOCS.forEach(id => { const el = document.getElementById(id); el && el._locSync && el._locSync(); });
+  ['openAddBookingModal', 'openEditBookingModal'].forEach(fn => {
+    const orig = window[fn]; if (typeof orig !== 'function') return;
+    window[fn] = function () { const r = orig.apply(this, arguments); syncLocs(); return r; };
+  });
+
   if (typeof currentPage !== 'undefined' && currentPage === 'bookings') window.renderBookingsPage();
 })();
