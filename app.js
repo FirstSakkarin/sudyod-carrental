@@ -53,7 +53,12 @@ function mergeById(local, remote, collection) {
     if (!r || r.id == null) return;
     const cur = map[r.id];
     if (!cur) { map[r.id] = r; return; }
-    map[r.id] = ((r.updatedAt || '') >= (cur.updatedAt || '')) ? r : cur;
+    if ((r.updatedAt || '') < (cur.updatedAt || '')) return;
+    // Sheet wins, but a field the Sheet has no column for (an older Apps
+    // Script) must not wipe what this phone already knows, e.g. orderNo.
+    const keep = {};
+    Object.keys(cur).forEach(k => { if (!(k in r)) keep[k] = cur[k]; });
+    map[r.id] = { ...keep, ...r };
   });
   const tomb = state.tombstones[collection] || {};
   return Object.values(map).filter(r => {
