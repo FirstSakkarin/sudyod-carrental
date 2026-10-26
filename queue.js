@@ -442,10 +442,11 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
     [/อาเขต|สถานีขนส่ง|บขส/, '🚌', 'อาเขต'],
     [/หน้าร้าน|^ร้าน/, '🏠', 'ร้าน'],
   ];
+  const plabel = p => (window.placeLabel ? placeLabel(p) : p) || 'มีลิงก์แผนที่';
   const spot = p => { if (!p) return null; const m = SPOTS.find(([re]) => re.test(p)); return m ? { icon: m[1], tag: m[2] } : null; };
-  const placeShort = p => { const k = spot(p); return !p ? '–' : k ? `<span class="spot">${k.icon}${k.tag ? `<em>${k.tag}</em>` : ''}</span>` : `📍 ${p}`; };
+  const placeShort = p => { const k = spot(p); return !p ? '–' : k ? `<span class="spot">${k.icon}${k.tag ? `<em>${k.tag}</em>` : ''}</span>` : `📍 ${plabel(p)}`; };
   const placeLine = b => { const a = b.pickupLocation || '', z = b.returnLocation || ''; return a === z ? placeShort(a) : `${placeShort(a)} → ${placeShort(z)}`; };
-  const placeHtml = p => { if (!p) return ''; const k = spot(p); return `<small>${k ? `<span class="spot">${k.icon}${k.tag ? `<em>${k.tag}</em>` : ''}</span> ` : '📍 '}${k && k.tag && p.replace(/\s/g, '') === k.tag ? '' : p}</small>`; };
+  const placeHtml = p => { if (!p) return ''; const k = spot(p); return `<small>${k ? `<span class="spot">${k.icon}${k.tag ? `<em>${k.tag}</em>` : ''}</span> ` : '📍 '}${k && k.tag && plabel(p).replace(/\s/g, '') === k.tag ? '' : plabel(p)}</small>`; };
 
   // ---------- view state ----------
   const store = { get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch { return d; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };

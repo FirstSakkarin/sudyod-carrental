@@ -3303,11 +3303,31 @@ function telLink(phone) {
 // Accepts either a pasted Maps URL (used as-is; leftover text becomes the
 // label) or a plain place name (turned into a Maps search so it still
 // navigates). stopPropagation keeps clickable rows from also firing.
+// Place name to show for a location: the typed text, or the name inside a long
+// Google Maps link. '' when it is only a short link with no name.
+function escapeHtmlLite(v) { return String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+function placeLabel(loc) {
+  const s = String(loc || '');
+  const m = s.match(/https?:\/\/\S+/);
+  if (!m) return s.trim();
+  const rest = s.replace(m[0], '').trim();
+  if (rest) return rest;
+  try {
+    const u = new URL(m[0]);
+    const pm = u.pathname.match(/\/place\/([^/]+)/);
+    if (pm) return decodeURIComponent(pm[1].replace(/\+/g, ' '));
+    const q = u.searchParams.get('q') || u.searchParams.get('query');
+    if (q && !/^-?\d/.test(q)) return q;
+  } catch (_) {}
+  return '';
+}
+
 function mapLink(loc) {
   if (!loc) return '-';
   const urlMatch = String(loc).match(/https?:\/\/\S+/);
   const url   = urlMatch ? urlMatch[0] : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc)}`;
-  const label = urlMatch ? (String(loc).replace(urlMatch[0], '').trim() || 'นำทาง') : loc;
+  const label = escapeHtmlLite(placeLabel(loc) || 'แผนที่ (ยังไม่ใส่ชื่อ)');
   return `<a href="${url}" target="_blank" rel="noopener" class="map-link" onclick="event.stopPropagation()"><i class="fa-solid fa-location-dot"></i> ${label}</a>`;
 }
 
