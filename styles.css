@@ -1974,3 +1974,10 @@ body.is-owner .owner-only { display: flex; }
   #page-dashboard .section-card:has(#ganttChart) { margin-left: -1rem; margin-right: -1rem; border-radius: 0; border-left: 0; border-right: 0; }
   #ganttChart.gantt-wrap { padding: .5rem 0 .75rem; }
 }
+
+/* PWA install button (mobile topbar) */
+.topbar .pwa-install-btn {
+  border: none; border-radius: 999px; padding: .3rem .65rem;
+  background: var(--primary); color: #000; font: inherit; font-size: .75rem; font-weight: 600;
+  cursor: pointer; white-space: nowrap;
+}
