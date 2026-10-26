@@ -104,9 +104,8 @@
       <span class="cp-pill">${LABEL[L.s] || L.s}</span></button>`;
   }
 
-  window.renderCarsPage = function () {
-    const box = document.getElementById('carsTableContainer'); if (!box) return;
-    const q = (document.getElementById('carSearch')?.value || '').toLowerCase().trim();
+  // One list used by both the cars page and the dashboard, so they look the same.
+  function listHtml(q) {
     const now = Date.now();
     const all = (state.cars || []).map(c => ({ c, L: liveOf(c, now) }));
     const moto = x => x.c.type === 'motorcycle';
@@ -115,8 +114,6 @@
     const grp = s => s === 'off' ? ['maintenance', 'blocked'] : [s];
     const n = s => hit.filter(x => grp(s).includes(x.L.s)).length;
     const shown = hit.filter(x => !filt || grp(filt).includes(x.L.s));
-    document.getElementById('carsCount').textContent = `รถยนต์ ${all.filter(x => !moto(x)).length} คัน · มอเตอร์ไซค์ ${all.filter(moto).length} คัน`;
-
     let h = `<div class="cp-tabs" role="group" aria-label="ประเภทรถ">
         <button data-cptab="car" aria-pressed="${tab === 'car'}">🚗 รถยนต์<small>${all.filter(x => !moto(x)).length}</small></button>
         <button data-cptab="moto" aria-pressed="${tab === 'moto'}">🏍️ มอเตอร์ไซค์<small>${all.filter(moto).length}</small></button></div>
@@ -132,15 +129,38 @@
       rows.sort((a, z) => s === 'rented' ? at(a.L.b.end, a.L.b.endTime) - at(z.L.b.end, z.L.b.endTime) : String(a.c.plate).localeCompare(String(z.c.plate), 'th'));
       h += `<div class="cp-sec s-${s}"><i></i>${t} (${rows.length})</div><div class="cp-list">${rows.map(x => rowHtml(x.c, x.L)).join('')}</div>`;
     });
+    return { h, all, moto };
+  }
+
+  window.renderCarsPage = function () {
+    const box = document.getElementById('carsTableContainer'); if (!box) return;
+    const q = (document.getElementById('carSearch')?.value || '').toLowerCase().trim();
+    const { h, all, moto } = listHtml(q);
+    document.getElementById('carsCount').textContent = `รถยนต์ ${all.filter(x => !moto(x)).length} คัน · มอเตอร์ไซค์ ${all.filter(moto).length} คัน`;
     box.innerHTML = h;
   };
+
+  // Dashboard: same list, and the top tiles count what each car is doing now.
+  function renderDashCars() {
+    const box = document.getElementById('dashboardCarList'); if (!box) return;
+    box.classList.remove('car-grid');
+    box.innerHTML = listHtml('').h;
+    const now = Date.now(), L = (state.cars || []).map(c => liveOf(c, now).s);
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set('statAvailable', L.filter(s => s === 'available').length);
+    set('statRented', L.filter(s => s === 'rented').length);
+    set('statMaintenance', L.filter(s => s === 'maintenance').length);
+  }
+  const origDash = window.renderDashboard;
+  if (typeof origDash === 'function') window.renderDashboard = function () { const r = origDash.apply(this, arguments); renderDashCars(); return r; };
 
   document.addEventListener('click', e => {
     const t = e.target.closest('[data-cptab],[data-cpf]'); if (!t) return;
     if (t.dataset.cptab) { tab = t.dataset.cptab; filt = ''; store.set('carsTab', tab); }
     else filt = t.dataset.cpf;
-    window.renderCarsPage();
+    if (t.closest('#dashboardCarList')) renderDashCars(); else window.renderCarsPage();
   });
 
   if (typeof currentPage !== 'undefined' && currentPage === 'cars') window.renderCarsPage();
+  if (typeof currentPage !== 'undefined' && currentPage === 'dashboard') renderDashCars();
 })();
