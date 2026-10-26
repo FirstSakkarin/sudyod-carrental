@@ -131,6 +131,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--brand); outline
 .acts .main { grid-column: 1 / -1; min-height: 58px !important; font-size: 1.12rem !important; }
 .acts .addx { border-color: var(--back-edge) !important; color: #fed7aa !important; }
 .acts a, .acts button { min-height: 54px; white-space: nowrap; border-radius: 16px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 14px; font-weight: 700; font-size: 1rem; text-decoration: none; color: var(--text); border: 1px solid var(--edge-2); background: var(--glass-2); box-shadow: var(--specular); }
+.acts a { min-width: 0; } .navto { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .acts .main { border: 0; }
 .go .acts .main { background: linear-gradient(180deg, #86efac, #22c55e); color: var(--go-ink); }
 .back .acts .main { background: linear-gradient(180deg, #fdba74, #f97316); color: var(--back-ink); }
@@ -269,6 +270,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--brand); outline
   const placeHtml = p => { if (!p) return '<span style="color:var(--muted)">ยังไม่ระบุที่</span>'; const m = SPOTS.find(([re]) => re.test(p));
     const t = (window.placeLabel ? placeLabel(p) : p) || 'มีลิงก์แผนที่';
     return m ? `${m[1]}${m[2] ? `<em>${m[2]}</em>` : ''} ${m[2] && t.replace(/\s/g, '') === m[2] ? '' : esc(t)}` : `📍 ${esc(t)}`; };
+  const navText = p => { const t = window.placeLabel ? placeLabel(p) : ''; return t ? `🧭 <span class="navto">นำทางไป ${esc(t)}</span>` : '🧭 นำทาง'; };
   const mapUrl = p => { const u = String(p || '').match(/https?:\/\/\S+/); return u ? u[0] : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p)}`; };
   const opened = {};
   const name = b => String(b.customer || '-');
@@ -443,7 +445,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--brand); outline
       ${staffHtml(j)}
       <div class="chips"><span class="chip">${go ? `🏥 พาลุงป๊อดไป${esc(j.place || 'โรงพยาบาล')} · รับกลับ ${b.endTime.replace(':', '.')}` : `🏥 รับลุงป๊อดกลับจาก${esc(j.place || 'โรงพยาบาล')}`}</span>${b.note ? `<span class="chip">📝 ${esc(b.note)}</span>` : ''}</div>
       <div class="acts">
-        <a class="${j.place ? '' : 'off'}" href="${j.place ? mapUrl(j.place) : '#'}" target="_blank" rel="noopener">🧭 นำทาง</a>
+        <a class="${j.place ? '' : 'off'}" href="${j.place ? mapUrl(j.place) : '#'}" target="_blank" rel="noopener">${navText(j.place)}</a>
         <button class="main" data-done="${j.id}"${isDone && !go ? ' disabled' : ''}>${isDone ? (go ? '↺ ยังไม่ได้ไป' : '✓ ลุงถึงบ้านแล้ว') : go ? '✓ ส่งลุงถึงแล้ว' : '✓ รับลุงกลับแล้ว'}</button>
       </div></div>` : ''}
     </article>`;
@@ -471,7 +473,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--brand); outline
       <div class="chips">${chipsFor(j)}</div>
       ${j.k === 'back' && x ? xlistHtml(b, x) : ''}
       <div class="acts">
-        <a class="${j.place ? '' : 'off'}" href="${j.place ? mapUrl(j.place) : '#'}" target="_blank" rel="noopener"${j.k === 'go' ? ' style="grid-column:1/-1"' : ''}>🧭 นำทาง</a>
+        <a class="${j.place ? '' : 'off'}" href="${j.place ? mapUrl(j.place) : '#'}" target="_blank" rel="noopener"${j.k === 'go' ? ' style="grid-column:1/-1"' : ''}>${navText(j.place)}</a>
         ${j.k === 'back' ? `<button class="addx" data-extra="${j.id}">${x ? '✎ แก้บันทึก' : '➕ บันทึกเพิ่ม'}</button>` : ''}
         <button class="main" data-done="${j.id}"${isDone && (j.k === 'back' || b.status === 'completed') ? ' disabled' : ''}>${isDone ? (j.k === 'back' || b.status === 'completed' ? '✓ คืนรถแล้ว' : '↺ ยังไม่ได้ส่ง') : j.k === 'go' ? '✓ ส่งรถแล้ว' : '✓ รับคืนแล้ว'}</button>
       </div></div>` : ''}
