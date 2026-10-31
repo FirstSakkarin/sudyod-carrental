@@ -621,12 +621,13 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
   function confirmData(b, c) {
     const rate = +b.rate || 0, ot = +b.otFee || 0, dep = +b.deposit || 0, paid = +b.bookingDeposit || 0;
     const p = priceBooking(b), late = +b.lateFee || 0, disc = +b.discount || 0, seat = carseatFee(b.carseat, p.days);
-    const total = +b.total || p.total;
-    const days = rate && total - ot - late - seat + disc > 0 ? Math.round((total - ot - late - seat + disc) / rate) : p.days;
+    const total = +b.total || p.total, send = +b.deliveryFee || 0, back = +b.collectFee || 0;
+    const rentAmt = total - ot - late - seat - send - back + disc;
+    const days = rate && rentAmt > 0 ? Math.round(rentAmt / rate) : p.days;
     const name = String(who(b)).trim();
     return { name: /^คุณ/.test(name) ? name : 'คุณ' + name, phone: formatPhone(b.phone || ''), carTxt: `${c.name} ${c.plate}`.trim(),
       range: `${thDate(b.start)}-${thDate(b.end)}`, pick: b.pickupLocation || '', ret: b.returnLocation || '',
-      st: thTime(b.startTime), et: thTime(b.endTime), rate, ot, dep, paid, total, days, late, lateH: late && p.lateRate ? Math.round(late / p.lateRate) : 0, disc, seat, rent: total - ot - late - seat + disc, due: total - paid + dep };
+      st: thTime(b.startTime), et: thTime(b.endTime), rate, ot, dep, paid, total, days, late, lateH: late && p.lateRate ? Math.round(late / p.lateRate) : 0, disc, seat, send, back, rent: rentAmt, due: total - paid + dep };
   }
   function confirmText(b, c) {
     const d = confirmData(b, c), L = ['ยืนยันการจอง', `   - ${d.name}`];
@@ -636,6 +637,8 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
       L.push('', 'สรุปค่าเช่า', d.rate ? `ค่าเช่า ${d.days} วัน ${baht(d.rate)}/วัน = ${baht(d.rent)} บาท` : `ค่าเช่า ${baht(d.rent)} บาท`);
       if (d.late) L.push(`ค่าเลท ${d.lateH ? d.lateH + ' ชม. ' : ''}${baht(d.late)} บาท`);
       if (d.ot) L.push(`ค่าเกินเวลา ${baht(d.ot)} บาท`);
+      if (d.send) L.push(`ค่าส่งรถ ${baht(d.send)} บาท`);
+      if (d.back) L.push(`ค่าคืนรถ ${baht(d.back)} บาท`);
       if (d.seat) L.push(`Carseat เพิ่ม ${extraSeats(b.carseat)} ตัว ${baht(d.seat)} บาท`);
       if (d.disc) L.push(`ส่วนลด -${baht(d.disc)} บาท`);
       if (d.dep) L.push(`เงินมัดจำ ${baht(d.dep)} บาท`);
@@ -656,6 +659,8 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
       h += `<div class="sec">สรุปค่าเช่า</div>` + ln(d.rate ? `ค่าเช่า ${d.days} วัน <span class="num">${baht(d.rate)}</span>/วัน = <span class="num">${baht(d.rent)}</span> บาท` : `ค่าเช่า <span class="num">${baht(d.rent)}</span> บาท`);
       if (d.late) h += ln(`ค่าเลท ${d.lateH ? d.lateH + ' ชม. ' : ''}<span class="num">${baht(d.late)}</span> บาท`);
       if (d.ot) h += ln(`ค่าเกินเวลา <span class="num">${baht(d.ot)}</span> บาท`);
+      if (d.send) h += ln(`ค่าส่งรถ <span class="num">${baht(d.send)}</span> บาท`);
+      if (d.back) h += ln(`ค่าคืนรถ <span class="num">${baht(d.back)}</span> บาท`);
       if (d.seat) h += ln(`Carseat เพิ่ม ${extraSeats(b.carseat)} ตัว <span class="num">${baht(d.seat)}</span> บาท`);
       if (d.disc) h += ln(`ส่วนลด <span class="num">-${baht(d.disc)}</span> บาท`);
       if (d.dep) h += ln(`เงินมัดจำ <span class="num">${baht(d.dep)}</span> บาท`);
@@ -682,6 +687,7 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
     if (+b.mileageOut) h += f('เลขไมล์ออก (กม.)', v(baht(b.mileageOut)), 'w');
     h += f('ราคาเช่า/วัน', v(money(d.rate), 'ยังไม่ใส่')) + f('ค่า OT (บาท)', v(money(d.ot), '0')) +
       f('เงินประกัน (บาท)', v(money(d.dep), '0')) + f('โอนจอง (บาท)', v(money(d.paid), '0'));
+    if (d.send || d.back) h += f('🚗 ค่าส่งรถ (บาท)', v(money(d.send), '0')) + f('🏁 ค่าคืนรถ (บาท)', v(money(d.back), '0'));
     if (d.late || d.disc) h += f('ค่าเลท (บาท)', v(d.late ? `${baht(d.late)}${d.lateH ? ` <small>(${d.lateH} ชม.)</small>` : ''}` : '', '0')) + f('ส่วนลด (บาท)', v(money(d.disc), '0'));
     if (+b.water || +b.carseat) h += f('💧 น้ำ (ชุด)', v(+b.water || '', '0')) + f('👶 Carseat (ตัว)', v(+b.carseat || '', '0'));
     h += d.total
