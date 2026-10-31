@@ -112,7 +112,7 @@
       lines.push(['ค่ารถ + คนขับ เหมาวัน', '', +t.dayRate || 0]);
       lines.push(['ค่าน้ำมันเส้นทางลูกค้า', `${+t.km || 0} กม. ${kl}`, fuelCost(t.km)]);
     } else if (t.mode === 'hour') {
-      lines.push(['ในเมือง รายชั่วโมง (รวมน้ำมันแล้ว)', `${+t.hours || 0} ชม. × ${t.hourRate} ฿`, (+t.hours || 0) * t.hourRate]);
+      lines.push(['ในเมือง รายชั่วโมง (รวมน้ำมันแล้ว)', `${+t.hours || 0} ชม. × ${+t.hourRate || 0} ฿`, (+t.hours || 0) * (+t.hourRate || 0)]);
     } else {
       lines.push(['ราคา Grab อ้างอิง', '', +t.grab || 0]);
       lines.push(['บวกเพิ่ม', '', +t.grabAdd || 0]);
@@ -190,7 +190,8 @@
          <div class="dj-f"><label>น้ำมัน</label><input disabled value="${baht(fuelCost(t.km))} ฿"></div>`
       : t.mode === 'hour'
       ? `<div class="dj-f"><label for="dj-h${i}">ชั่วโมง</label><input id="dj-h${i}" type="number" step="0.5" inputmode="decimal" data-i="${i}" data-k="hours" value="${t.hours}"></div>
-         <div class="dj-f" style="grid-column:span 2"><span class="dj-lbl">฿ ต่อชั่วโมง</span><div class="dj-chips">${[200, 250, 300].map(r => chip(r, t.hourRate === r, `data-i="${i}" data-rate="${r}"`, 'y')).join('')}</div></div>`
+         <div class="dj-f"><label for="dj-hr${i}">฿ ต่อชั่วโมง</label><input id="dj-hr${i}" type="number" inputmode="numeric" pattern="[0-9]*" data-i="${i}" data-k="hourRate" value="${t.hourRate}" placeholder="200–300"></div>
+         <div class="dj-f"><label>ค่าชั่วโมงรวม</label><input disabled value="${baht((+t.hours || 0) * (+t.hourRate || 0))} ฿"></div>`
       : `<div class="dj-f"><label for="dj-g${i}">ราคา Grab ฿</label><input id="dj-g${i}" type="number" inputmode="numeric" data-i="${i}" data-k="grab" value="${esc(t.grab)}" placeholder="เปิดแอปดู"></div>
          <div class="dj-f" style="grid-column:span 2"><span class="dj-lbl">บวกเพิ่ม</span><div class="dj-chips">${[0, 100, 200].map(r => chip('+' + r, +t.grabAdd === r, `data-i="${i}" data-gadd="${r}"`, 'y')).join('')}</div></div>`;
     const edited = t.final !== null && +t.final !== b.suggest;
@@ -296,7 +297,6 @@
     if (d.driver) t.driver = d.driver;
     else if (d.car) t.car = d.car;
     else if (d.mode) { t.mode = d.mode; t.final = null; }
-    else if (d.rate) t.hourRate = +d.rate;
     else if (d.gadd) t.grabAdd = +d.gadd;
     else if (d.reset) job.trips[d.reset].final = null;
     else if (d.addstop) { const x = job.trips[d.addstop]; x.stops.splice(x.stops.length - 1, 0, ''); }
