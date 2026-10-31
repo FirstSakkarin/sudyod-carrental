@@ -1,4 +1,4 @@
-// "งานคนขับ" — car + driver jobs for close customers, priced per trip.
+// "งานพิเศษ" — car + driver jobs for close customers, priced per trip.
 // One job = one customer with several trips. Each trip is saved as an ordinary
 // booking row (so it holds its car in the queue only for that trip's time, and
 // each trip can use a different free car), plus a driverJob JSON column that
@@ -261,8 +261,8 @@
       ov.addEventListener('pointerdown', () => { pressing = true; }, true); }
     document.body.style.overflow = 'hidden';
     const editing = job.trips.some(t => t.id);
-    ov.innerHTML = `<div class="dj" role="dialog" aria-modal="true" aria-label="งานคนขับ">
-      <div class="dj-top"><h2>🧑‍✈️ ${editing ? 'แก้งานคนขับ' : 'งานคนขับ'}</h2><button type="button" class="dj-x" data-close="1" aria-label="ปิด">×</button></div>
+    ov.innerHTML = `<div class="dj" role="dialog" aria-modal="true" aria-label="งานพิเศษ">
+      <div class="dj-top"><h2>🧑‍✈️ ${editing ? 'แก้งานพิเศษ' : 'งานพิเศษ'}</h2><button type="button" class="dj-x" data-close="1" aria-label="ปิด">×</button></div>
       <div class="dj-card">
         <div class="dj-2">
           <div class="dj-f"><label for="dj-cust">ลูกค้า</label><input id="dj-cust" data-j="customer" value="${esc(job.customer)}" placeholder="ชื่อลูกค้า"></div>
@@ -355,7 +355,7 @@
       const data = {
         carId: t.car, customer: job.customer.trim(), phone: job.phone.trim(), start: t.date, startTime: t.start, end: tripEnd(t), endTime: t.end,
         pickupLocation: stops[0] || '', returnLocation: stops[stops.length - 1] || '', rate: price, total: price, otFee: 0, lateFee: 0, discount: 0,
-        note: `🧑‍✈️ งานคนขับ${via.length ? ' · แวะ ' + via.join(' → ') : ''}${t.note ? ' · ' + t.note : ''}`,
+        note: `🧑‍✈️ งานพิเศษ${via.length ? ' · แวะ ' + via.join(' → ') : ''}${t.note ? ' · ' + t.note : ''}`,
         staffOut: t.driver, staffIn: t.driver,
         driverJob: JSON.stringify({ v: 1, g: job.g, n, driver: t.driver, stops, note: t.note, mode: t.mode, km: +t.km || 0, kmOut: +t.kmOut || 0, kmBack: +t.kmBack || 0,
           hours: +t.hours || 0, hourRate: t.hourRate, dayRate: +t.dayRate || 0, grab: t.grab, grabAdd: +t.grabAdd || 0, fuel: job.fuel, kml: job.kml,
@@ -380,7 +380,7 @@
     saveToStorage();
     pushToSheets(carsChanged ? ['bookings', 'cars'] : ['bookings']);
     if (typeof renderCurrentPage === 'function') renderCurrentPage(); else { renderBookingsPage(); renderDashboard(); }
-    showToast(`บันทึกงานคนขับ ${n} ทริป รวม ${baht(sum)} ฿ แล้ว`, 'success');
+    showToast(`บันทึกงานพิเศษ ${n} ทริป รวม ${baht(sum)} ฿ แล้ว`, 'success');
   }
 
   // ---------- hook into the app ----------
@@ -410,7 +410,7 @@
       const j = parseJob((state.bookings || []).find(x => x.id === m[1]));
       if (!j || el.querySelector('.dj-tag')) return;
       const spot = el.querySelector('.bk-who') || el.children[1];
-      if (spot) spot.insertAdjacentHTML('afterbegin', `<span class="dj-tag">🧑‍✈️ คนขับ ${esc((DRIVERS.find(x => x[0] === j.driver) || [, j.driver])[1])}</span>`);
+      if (spot) spot.insertAdjacentHTML('afterbegin', `<span class="dj-tag">🧑‍✈️ งานพิเศษ · ${esc((DRIVERS.find(x => x[0] === j.driver) || [, j.driver])[1])}</span>`);
     });
     return r;
   };
@@ -419,7 +419,7 @@
     const hd = document.querySelector('#page-bookings .page-header'); if (!hd || document.getElementById('djBtn')) return;
     const btn = document.createElement('button');
     btn.id = 'djBtn'; btn.className = 'btn btn-secondary'; btn.type = 'button';
-    btn.innerHTML = '🧑‍✈️ งานคนขับ'; btn.style.cssText = 'background:#c084fc;color:#1e0b33;border-color:#c084fc;font-weight:700';
+    btn.innerHTML = '🧑‍✈️ งานพิเศษ'; btn.style.cssText = 'background:#c084fc;color:#1e0b33;border-color:#c084fc;font-weight:700';
     btn.onclick = openNew;
     const add = hd.querySelector('.btn-primary');
     let box = hd.querySelector('.dj-btns');
