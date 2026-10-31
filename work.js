@@ -210,6 +210,10 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--brand); outline
 .fopts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .fopts button { min-height: 42px; border-radius: 12px; border: 1px solid var(--edge-2); background: var(--glass-2); color: var(--text); font-weight: 700; font-size: .92rem; }
 .fopts button[aria-pressed="true"] { background: linear-gradient(180deg, var(--brand), var(--brand-2)); color: var(--brand-ink); border-color: transparent; }
+.mini.tr { color: #93c5fd; }
+.trip { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 0; padding: 8px 10px; border-radius: 14px; background: rgba(59,130,246,.12); border: 1px solid rgba(147,197,253,.35); }
+.trip .tt { flex: 1 1 auto; min-width: 0; font-size: .95rem; } .trip .tt b { color: #bfdbfe; }
+.trip a { flex-shrink: 0; min-height: 44px; display: inline-flex; align-items: center; padding: 0 14px; border-radius: 12px; font-weight: 700; text-decoration: none; color: #0b1220; background: #93c5fd; }
 .mini.cs { color: #f9a8d4; } .mini.fu { color: var(--brand); }
 .fuel2 input { width: 110px; min-height: 44px; border-radius: 12px; padding: 0 12px; text-align: right; font: 700 1.2rem var(--mono); color: var(--text); background: rgba(0,0,0,.3); border: 1px solid var(--edge-2); }
 .fuel2 input:focus { outline: 2px solid var(--brand); }
@@ -272,6 +276,10 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--brand); outline
     return m ? `${m[1]}${m[2] ? `<em>${m[2]}</em>` : ''} ${m[2] && t.replace(/\s/g, '') === m[2] ? '' : esc(t)}` : `📍 ${esc(t)}`; };
   const navText = p => { const t = window.placeLabel ? placeLabel(p) : ''; return t ? `🧭 <span class="navto">นำทางไป ${esc(t)}</span>` : '🧭 นำทาง'; };
   const mapUrl = p => { const u = String(p || '').match(/https?:\/\/\S+/); return u ? u[0] : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p)}`; };
+  // Flight / train / bus trip typed in the booking form for this leg.
+  const tripOf = j => { const t = String((j.k === 'go' ? j.b.pickupTrip : j.b.returnTrip) || '').trim(); if (!t) return null;
+    const k = (window.tripKind && tripKind(j.place)) || 'flight', T = (window.TRIP_KINDS || {})[k] || { icon: '✈️' };
+    return { k, t, icon: T.icon, code: k === 'flight' && window.flightCode ? flightCode(t) : '' }; };
   const opened = {};
   const name = b => String(b.customer || '-');
   const baht = n => Math.round(+n || 0).toLocaleString('en-US');
@@ -460,14 +468,16 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--brand); outline
     const pr = (j.k === 'go' && prep[j.id]) || {}, st = staffOf(j.id);
     const isOpen = !!opened[j.id], b2 = j.k === 'go' ? prevOf(b) : nextOf(b);
     const gap = b2 && (j.k === 'go' ? b2.end === b.start : b2.start === b.end) ? (j.k === 'go' ? j.at - mins(b2.end, b2.endTime) : mins(b2.start, b2.startTime) - j.at) : null;
+    const trip = tripOf(j);
     const flag = gap !== null && level(gap) !== 'ok' ? `<span class="mini ${level(gap)}">⏱ ${gap <= 0 ? 'ต่อทันที' : gapText(gap)}</span>` : '';
     return `<article class="job ${j.k}${isDone ? ' done' : ''}${isLate ? ' isLate' : ''}${isOpen ? ' open' : ''}">
       <button class="sum" data-open="${j.id}" aria-expanded="${isOpen}">
         <span class="r1"><span class="t">${j.time.replace(':', '.')}</span><span class="plate">${plate}</span><span class="model">${model}</span><span class="kind">${isDone ? '✓ ' : ''}${j.k === 'go' ? 'ส่ง' : 'รับคืน'}</span><span class="chev">${isOpen ? '▴' : '▾'}</span></span>
-        <span class="r2">${st.length ? `<span class="who3">${st.map(n => `<span class="pb p-${n}">${n}</span>`).join('')}</span>` : '<span class="mini nost">👤 ?</span>'}<span class="who">${esc(name(b))}</span><span class="where">${placeHtml(j.place)}</span>${isLate ? `<span class="mini bad">เลย ${gapText(lateMin)}</span>` : ''}${flag}${pr.water ? `<span class="mini w">💧${pr.water}</span>` : ''}${pr.cs ? `<span class="mini cs">👶${pr.cs}</span>` : ''}${+pr.fuelAmt ? `<span class="mini fu">⛽${baht(pr.fuelAmt)}</span>` : ''}${pr.note ? '<span class="mini n">🗒</span>' : ''}</span>
+        <span class="r2">${st.length ? `<span class="who3">${st.map(n => `<span class="pb p-${n}">${n}</span>`).join('')}</span>` : '<span class="mini nost">👤 ?</span>'}<span class="who">${esc(name(b))}</span><span class="where">${placeHtml(j.place)}</span>${trip ? `<span class="mini tr">${trip.icon} ${esc(trip.code || trip.t)}</span>` : ''}${isLate ? `<span class="mini bad">เลย ${gapText(lateMin)}</span>` : ''}${flag}${pr.water ? `<span class="mini w">💧${pr.water}</span>` : ''}${pr.cs ? `<span class="mini cs">👶${pr.cs}</span>` : ''}${+pr.fuelAmt ? `<span class="mini fu">⛽${baht(pr.fuelAmt)}</span>` : ''}${pr.note ? '<span class="mini n">🗒</span>' : ''}</span>
       </button>
       ${isOpen ? `<div class="more">
       ${phone}
+      ${trip ? `<div class="trip"><span class="tt">${trip.icon} ${j.k === 'go' ? 'มาถึงด้วย' : 'กลับด้วย'} <b>${esc(trip.t)}</b></span>${trip.k === 'flight' ? `<a href="${flightStatusUrl(trip.t)}" target="_blank" rel="noopener">✈️ เช็กไฟลท์${trip.code ? ' ' + esc(trip.code) : ''}</a>` : ''}</div>` : ''}
       ${staffHtml(j)}
       ${j.k === 'go' ? prepHtml(j) : ''}
       <div class="chips">${chipsFor(j)}</div>
@@ -552,6 +562,8 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--brand); outline
       L.push(`   👷 ${st.length ? st.map(n => HEART[n] + n).join(' ') : 'ยังไม่มีคน'}`);
       L.push(`   ${name(b)}${b.phone ? ' ' + formatPhone(b.phone) : ''}`);
       if (j.place) L.push(`   📍 ${j.place}`);
+      const tr = tripOf(j);
+      if (tr) L.push(`   ${tr.icon} ${tr.t}`);
       const D = [];
       if (j.k === 'go') {
         const due = (+b.total || 0) - (+b.bookingDeposit || 0) + (+b.deposit || 0);

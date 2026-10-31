@@ -1972,6 +1972,9 @@ function openAddBookingModal() {
   document.getElementById('bookingEndTime').value    = '';
   document.getElementById('bookingPickupLocation').value = '';
   document.getElementById('bookingReturnLocation').value  = '';
+  document.getElementById('bookingPickupTrip').value = '';
+  document.getElementById('bookingReturnTrip').value = '';
+  updateTripFields();
   document.getElementById('bookingMileageOut').value = '';
   document.getElementById('bookingRate').value       = '';
   document.getElementById('bookingOtFee').value      = '';
@@ -2004,6 +2007,9 @@ function openEditBookingModal(id) {
   document.getElementById('bookingEndTime').value    = b.endTime || '';
   document.getElementById('bookingPickupLocation').value = b.pickupLocation || '';
   document.getElementById('bookingReturnLocation').value  = b.returnLocation || '';
+  document.getElementById('bookingPickupTrip').value = b.pickupTrip || '';
+  document.getElementById('bookingReturnTrip').value = b.returnTrip || '';
+  updateTripFields();
   document.getElementById('bookingMileageOut').value = b.mileageOut || '';
   document.getElementById('bookingRate').value       = b.rate || '';
   document.getElementById('bookingOtFee').value      = b.otFee || '';
@@ -2131,6 +2137,8 @@ function saveBooking() {
     endTime:         document.getElementById('bookingEndTime').value || '',
     pickupLocation:  document.getElementById('bookingPickupLocation').value.trim(),
     returnLocation:  document.getElementById('bookingReturnLocation').value.trim(),
+    pickupTrip:      tripValue('Pickup'),
+    returnTrip:      tripValue('Return'),
     phone:            formatPhone(document.getElementById('bookingPhone').value.trim()),
     customerAddress:  document.getElementById('bookingCustomerAddress').value.trim(),
     deposit:          +document.getElementById('bookingDeposit').value || 0,
@@ -2540,7 +2548,51 @@ function prefillBooking(carId, prefix = 'suggest') {
   const returnLoc = document.getElementById(`${prefix}EndLocation`);
   if (pickupLoc) document.getElementById('bookingPickupLocation').value = pickupLoc.value.trim();
   if (returnLoc) document.getElementById('bookingReturnLocation').value = returnLoc.value.trim();
+  updateTripFields();
   calcBookingTotal();
+}
+
+// ── Flight / train / bus trip for airport & station pickups ──────────
+// Picking up or returning at the airport, train station or bus terminal
+// shows an extra box for the flight no. / train / bus trip, so the
+// งานส่ง-รับรถ page can show it and open the flight status.
+const TRIP_KINDS = {
+  flight: { re: /สนามบิน|ท่าอากาศยาน|airport|\bcnx\b/i, icon: '✈️', go: 'ไฟลท์ที่ลูกค้ามาถึง', back: 'ไฟลท์ขากลับ', ph: 'เช่น FD3438 · 10.30' },
+  train:  { re: /รถไฟ|railway|train/i, icon: '🚆', go: 'รถไฟขบวนที่ลูกค้ามาถึง', back: 'รถไฟขบวนขากลับ', ph: 'เช่น ขบวน 9 · 07.15' },
+  bus:    { re: /อาเขต|ขนส่ง|บขส|สมบัติ|นครชัย|รถทัวร์|terminal|\bbus\b/i, icon: '🚌', go: 'รถทัวร์เที่ยวที่ลูกค้ามาถึง', back: 'รถทัวร์เที่ยวขากลับ', ph: 'เช่น นครชัย 06.30' },
+};
+function tripKind(loc) {
+  const s = String(loc || '');
+  if (!s) return null;
+  return ['flight', 'train', 'bus'].find(k => TRIP_KINDS[k].re.test(s)) || null;
+}
+// Airline code + number inside free text ("FD 3438 ถึง 10.30" → "FD3438").
+function flightCode(t) {
+  const m = String(t || '').toUpperCase().match(/\b([A-Z]{2}|[A-Z]\d|\d[A-Z])\s*-?\s*(\d{1,4})\b/);
+  return m ? m[1] + m[2] : '';
+}
+function flightStatusUrl(t) {
+  const code = flightCode(t) || String(t || '').trim();
+  return `https://www.google.com/search?q=${encodeURIComponent(code + ' flight status')}`;
+}
+window.tripKind = tripKind; window.TRIP_KINDS = TRIP_KINDS; window.flightCode = flightCode; window.flightStatusUrl = flightStatusUrl;
+function updateTripFields() {
+  [['Pickup', 'go'], ['Return', 'back']].forEach(([side, leg]) => {
+    const loc = document.getElementById(`booking${side}Location`);
+    const box = document.getElementById(`booking${side}TripBox`);
+    if (!loc || !box) return;
+    const k = tripKind(loc.value);
+    box.style.display = k ? '' : 'none';
+    if (!k) return;
+    const T = TRIP_KINDS[k];
+    document.getElementById(`booking${side}TripLabel`).textContent = `${T.icon} ${T[leg]}`;
+    document.getElementById(`booking${side}Trip`).placeholder = T.ph;
+  });
+}
+// Only keep the trip when the place still needs one.
+function tripValue(side) {
+  const loc = document.getElementById(`booking${side}Location`).value;
+  return tripKind(loc) ? document.getElementById(`booking${side}Trip`).value.trim() : '';
 }
 
 // ── Finance Page ───────────────────────────────────────────────────────
