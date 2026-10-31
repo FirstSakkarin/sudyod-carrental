@@ -174,6 +174,38 @@ function catalogForType_(vehicleCatalog, type) {
   return type === 'motorcycle' ? vehicleCatalog.motorcycle : vehicleCatalog.car;
 }
 
+// Hybrid versions the app offers next to their base model (same list as
+// HYBRID_MODELS in app.js), so the Sheet never flags them as invalid.
+var HYBRID_MODELS_ = {
+  'Toyota':     ['Yaris Cross HEV', 'Corolla Altis Hybrid', 'Corolla Cross Hybrid', 'Camry Hybrid'],
+  'Honda':      ['City e:HEV', 'City Hatchback e:HEV', 'Civic e:HEV', 'Accord e:HEV', 'HR-V e:HEV', 'CR-V e:HEV'],
+  'MG':         ['VS HEV', 'ZS HEV', 'HS PHEV'],
+  'Nissan':     ['Note e-POWER', 'Kicks e-POWER'],
+  'Mitsubishi': ['Xpander HEV']
+};
+
+// Brand → model list for dropdowns: the VehicleCatalog sheet + hybrids +
+// every brand/model the cars already use. A model typed in the app (or one
+// missing from the catalog) is therefore always "on the list" and never shows
+// the red "Invalid" mark. Validation only warns anyway — values are never removed.
+function modelListsFor_(vehicleCatalog, type, carsRows) {
+  var base = catalogForType_(vehicleCatalog, type), out = {};
+  Object.keys(base).forEach(function (b) { out[b] = base[b].slice(); });
+  if (type !== 'motorcycle') {
+    Object.keys(HYBRID_MODELS_).forEach(function (b) {
+      if (!out[b]) out[b] = [];
+      HYBRID_MODELS_[b].forEach(function (m) { if (out[b].indexOf(m) === -1) out[b].push(m); });
+    });
+  }
+  (carsRows || []).forEach(function (c) {
+    var b = String(c.brand || '').trim(), m = String(c.model || '').trim();
+    if (!b || (c.type === 'motorcycle') !== (type === 'motorcycle')) return;
+    if (!out[b]) out[b] = [];
+    if (m && out[b].indexOf(m) === -1) out[b].push(m);
+  });
+  return out;
+}
+
 function setListValidation_(range, values) {
   if (values && values.length) {
     range.setDataValidation(
@@ -187,7 +219,7 @@ function setListValidation_(range, values) {
 // type/year/color options — must match app.js's TYPE_LABEL keys and
 // CAR_COLORS list so the Sheet's dropdowns never flag values the app itself
 // writes as "invalid".
-var CAR_TYPE_KEYS = ['sedan', 'hatchback', 'suv', 'mpv', 'ppv', 'van', 'pickup', 'ev', 'motorcycle'];
+var CAR_TYPE_KEYS = ['sedan', 'hatchback', 'suv', 'mpv', 'ppv', 'van', 'pickup', 'ev', 'ehev', 'motorcycle'];
 var CAR_COLOR_BASE = ['ขาว', 'ดำ', 'เงิน', 'เทา', 'แดง', 'น้ำเงิน', 'ฟ้า', 'เขียว', 'เหลือง', 'ส้ม', 'น้ำตาล', 'ทอง', 'บรอนซ์', 'ม่วง', 'ชมพู'];
 
 // Reapplies dropdown validation for type/brand/model/year/color on the Cars
@@ -216,9 +248,10 @@ function applyCarsDropdowns_(sheet, data, headers) {
   setListValidation_(sheet.getRange(2, col.color, data.length, 1), colors);
 
   var vehicleCatalog = getVehicleCatalog_(sheet.getParent());
+  var lists = { car: modelListsFor_(vehicleCatalog, 'car', data), motorcycle: modelListsFor_(vehicleCatalog, 'motorcycle', data) };
   data.forEach(function(c, i) {
     var row = i + 2;
-    var catalog = catalogForType_(vehicleCatalog, c.type);
+    var catalog = c.type === 'motorcycle' ? lists.motorcycle : lists.car;
     setListValidation_(sheet.getRange(row, col.brand, 1, 1), Object.keys(catalog));
     setListValidation_(sheet.getRange(row, col.model, 1, 1), catalog[c.brand] || []);
   });
@@ -249,7 +282,7 @@ function onEdit(e) {
         var vehicleCatalog = getVehicleCatalog_(sheet.getParent());
         var type    = sheet.getRange(row, 5).getValue();
         var brand   = sheet.getRange(row, 3).getValue();
-        var catalog = catalogForType_(vehicleCatalog, type);
+        var catalog = modelListsFor_(vehicleCatalog, type, sheetToArray(sheet.getParent(), SHEET_NAMES.cars, HEADERS.cars));
         if (col === 5) setListValidation_(sheet.getRange(row, 3), Object.keys(catalog));
         setListValidation_(sheet.getRange(row, 4), catalog[brand] || []);
       }
