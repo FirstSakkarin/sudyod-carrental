@@ -170,6 +170,8 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
 .bar .pl .spot em { font-size: .7em; padding: 1px 5px; }
 .when small { color: var(--text); opacity: .85; font-size: .85rem; line-height: 1.25; margin-top: 2px; }
 .bar small { font: 500 .68rem var(--mono); opacity: .9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* driver jobs (งานคนขับ) are purple, whatever the car colour */
+.bar.drv { --h: 275 !important; }
 .bar.done {
   background: rgba(148, 156, 176, .16); border: 1px dashed rgba(200, 206, 222, .4); color: rgba(235, 238, 245, .62);
   box-shadow: none; text-shadow: none;
@@ -565,10 +567,10 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
         const s = Math.max(0, rs), e = Math.min(slots, Math.max(re, rs + 0.3));
         if (e <= s) return '';
         const clash = !!clashFor(b, c.id);
-        return `<button class="bar${clash ? ' clash' : ''}${isDone(b) ? ' done' : ''}${b.id === flashId ? ' flash' : ''}" data-id="${b.id}"
+        return `<button class="bar${clash ? ' clash' : ''}${isDone(b) ? ' done' : ''}${b.driverJob ? ' drv' : ''}${b.id === flashId ? ' flash' : ''}" data-id="${b.id}"
           style="left:${s / slots * 100}%;width:${(e - s) / slots * 100}%;top:${5 + laneOf[b.id] * LANE}px;${hueVar(c)}"
           aria-label="${who(b)} ${dayText(b.start, b.startTime)} ถึง ${dayText(b.end, b.endTime)}">
-          <span class="in"><span class="ln1"><b>${clash ? '⚠ ' : ''}${rs < 0 ? '‹ ' : ''}${who(b)}</b><span class="pl">${placeLine(b)}</span></span>
+          <span class="in"><span class="ln1"><b>${clash ? '⚠ ' : ''}${rs < 0 ? '‹ ' : ''}${b.driverJob ? '🧑‍✈️ ' : ''}${who(b)}</b><span class="pl">${placeLine(b)}</span></span>
           <small>${isDone(b) ? '<span class="ok">✓ คืนแล้ว</span> · ' : delivered(b) ? '<span class="ok">✓ ส่งแล้ว</span> · ' : ''}${stamp(b.start, b.startTime)}-${stamp(b.end, b.endTime)}</small></span></button>`;
       }).join('');
       // Turnaround chips: where one queue ends and the next one on this car starts soon after.
