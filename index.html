@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black" />
   <meta name="apple-mobile-web-app-title" content="สุดยอดรถเช่า" />
-  <link rel="stylesheet" href="styles.css?v=20261031e" />
+  <link rel="stylesheet" href="styles.css?v=20261031f" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 </head>
 <body>
@@ -611,11 +611,19 @@
         <div class="form-row-2col">
           <div class="form-group">
             <label>สถานที่รับรถ</label>
-            <input type="text" id="bookingPickupLocation" placeholder="ชื่อสถานที่ หรือวางลิงก์ Google Maps" />
+            <input type="text" id="bookingPickupLocation" placeholder="ชื่อสถานที่ หรือวางลิงก์ Google Maps" oninput="updateTripFields()" />
+            <div class="trip-field" id="bookingPickupTripBox" style="display:none;margin-top:.5rem;">
+              <label for="bookingPickupTrip" id="bookingPickupTripLabel">✈️ ไฟลท์ที่ลูกค้ามาถึง</label>
+              <input type="text" id="bookingPickupTrip" autocapitalize="characters" />
+            </div>
           </div>
           <div class="form-group">
             <label>สถานที่คืนรถ</label>
-            <input type="text" id="bookingReturnLocation" placeholder="ชื่อสถานที่ หรือวางลิงก์ Google Maps" />
+            <input type="text" id="bookingReturnLocation" placeholder="ชื่อสถานที่ หรือวางลิงก์ Google Maps" oninput="updateTripFields()" />
+            <div class="trip-field" id="bookingReturnTripBox" style="display:none;margin-top:.5rem;">
+              <label for="bookingReturnTrip" id="bookingReturnTripLabel">✈️ ไฟลท์ขากลับ</label>
+              <input type="text" id="bookingReturnTrip" autocapitalize="characters" />
+            </div>
           </div>
         </div>
         <div class="form-group">
@@ -1005,13 +1013,13 @@
   <!-- Custom select dropdown panel (native <select> popups can't be restyled) -->
   <div id="customSelectPanel" class="custom-select-panel"></div>
 
-  <script src="app.js?v=20261031e"></script>
-  <script src="queue.js?v=20261031e"></script>
-  <script src="work.js?v=20261031e"></script>
-  <script src="cars.js?v=20261031e"></script>
-  <script src="bookings.js?v=20261031e"></script>
-  <script src="booking-picker.js?v=20261031e"></script>
-  <script src="driver-job.js?v=20261031e"></script>
-  <script src="pwa.js?v=20261031e"></script>
+  <script src="app.js?v=20261031f"></script>
+  <script src="queue.js?v=20261031f"></script>
+  <script src="work.js?v=20261031f"></script>
+  <script src="cars.js?v=20261031f"></script>
+  <script src="bookings.js?v=20261031f"></script>
+  <script src="booking-picker.js?v=20261031f"></script>
+  <script src="driver-job.js?v=20261031f"></script>
+  <script src="pwa.js?v=20261031f"></script>
 </body>
 </html>
