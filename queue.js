@@ -624,7 +624,7 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
     const total = +b.total || p.total;
     const days = rate && total - ot - late - seat + disc > 0 ? Math.round((total - ot - late - seat + disc) / rate) : p.days;
     const name = String(who(b)).trim();
-    return { name: /^คุณ/.test(name) ? name : 'คุณ' + name, phone: b.phone || '', carTxt: `${c.name} ${c.plate}`.trim(),
+    return { name: /^คุณ/.test(name) ? name : 'คุณ' + name, phone: formatPhone(b.phone || ''), carTxt: `${c.name} ${c.plate}`.trim(),
       range: `${thDate(b.start)}-${thDate(b.end)}`, pick: b.pickupLocation || '', ret: b.returnLocation || '',
       st: thTime(b.startTime), et: thTime(b.endTime), rate, ot, dep, paid, total, days, late, lateH: late && p.lateRate ? Math.round(late / p.lateRate) : 0, disc, seat, rent: total - ot - late - seat + disc, due: total - paid + dep };
   }
