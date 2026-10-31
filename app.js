@@ -1979,7 +1979,6 @@ function openAddBookingModal() {
   document.getElementById('bookingRate').value       = '';
   document.getElementById('bookingOtFee').value      = '';
   document.getElementById('bookingDeliveryFee').value = '';
-  document.getElementById('bookingCollectFee').value  = '';
   document.getElementById('bookingDeposit').value    = '';
   document.getElementById('bookingAdvance').value    = '';
   document.getElementById('bookingDiscount').value   = '';
@@ -2015,8 +2014,7 @@ function openEditBookingModal(id) {
   document.getElementById('bookingMileageOut').value = b.mileageOut || '';
   document.getElementById('bookingRate').value       = b.rate || '';
   document.getElementById('bookingOtFee').value      = b.otFee || '';
-  document.getElementById('bookingDeliveryFee').value = b.deliveryFee || '';
-  document.getElementById('bookingCollectFee').value  = b.collectFee || '';
+  document.getElementById('bookingDeliveryFee').value = (+b.deliveryFee || 0) + (+b.collectFee || 0) || '';
   document.getElementById('bookingDeposit').value    = b.deposit || '';
   document.getElementById('bookingAdvance').value    = b.bookingDeposit || '';
   document.getElementById('bookingDiscount').value   = b.discount || '';
@@ -2072,13 +2070,12 @@ function calcBookingTotal() {
 
   const p = priceBooking({ carId, start, end, startTime: document.getElementById('bookingStartTime').value, endTime: document.getElementById('bookingEndTime').value,
     rate: rateOverride, otFee, discount: +document.getElementById('bookingDiscount').value || 0, carseat: +document.getElementById('bookingCarseat').value || 0,
-    deliveryFee: +document.getElementById('bookingDeliveryFee').value || 0, collectFee: +document.getElementById('bookingCollectFee').value || 0 });
+    deliveryFee: +document.getElementById('bookingDeliveryFee').value || 0 });
   const total = p.total, parts = [];
   if (p.lateFee) parts.push(`เลท ${p.lateH} ชม. × ${p.lateRate.toLocaleString()} = ${p.lateFee.toLocaleString()} ฿`);
   if (p.seatFee) parts.push(`Carseat เพิ่ม ${extraSeats(document.getElementById('bookingCarseat').value)} ตัว × ${CARSEAT_FEE} × ${p.days} วัน = ${p.seatFee.toLocaleString()} ฿ (ตัวแรกฟรี)`);
   if (otFee) parts.push(`OT ${otFee.toLocaleString()} ฿`);
-  if (p.deliveryFee) parts.push(`ค่าส่งรถ ${p.deliveryFee.toLocaleString()} ฿`);
-  if (p.collectFee) parts.push(`ค่าคืนรถ ${p.collectFee.toLocaleString()} ฿`);
+  if (p.deliveryFee) parts.push(`ค่าส่ง-คืนรถ ${p.deliveryFee.toLocaleString()} ฿`);
   if (p.discount) parts.push(`ส่วนลด −${p.discount.toLocaleString()} ฿`);
 
   document.getElementById('bookingDays').textContent  = p.days;
@@ -2134,7 +2131,7 @@ function saveBooking() {
   const otFee = +document.getElementById('bookingOtFee').value || 0;
   const discount = +document.getElementById('bookingDiscount').value || 0;
   const deliveryFee = +document.getElementById('bookingDeliveryFee').value || 0;
-  const collectFee  = +document.getElementById('bookingCollectFee').value || 0;
+  const collectFee  = 0; // ค่าส่ง-คืนรถ is one amount in deliveryFee; old split bookings fold into it on edit
   const p = priceBooking({ carId, start, end, startTime: document.getElementById('bookingStartTime').value || '', endTime: document.getElementById('bookingEndTime').value || '', rate: rateOverride, otFee, discount, deliveryFee, collectFee, carseat: +document.getElementById('bookingCarseat').value || 0 });
   const rate = p.rate, total = p.total, lateFee = p.lateFee;
 
@@ -2220,7 +2217,7 @@ function openReturnModal(bookingId) {
     วันรับรถ: ${b.start}${b.startTime ? ' ' + b.startTime : ''} · กำหนดคืน: ${b.end}${b.endTime ? ' ' + b.endTime : ''} (${days} วัน)<br>
     ${b.returnLocation ? `สถานที่คืนรถ: ${mapLink(b.returnLocation)}<br>` : ''}
     เลขไมล์ตอนรับรถ: <strong>${((b.mileageOut ?? car.mileage) || 0).toLocaleString()} กม.</strong><br>
-    ยอดเช่า: <strong>${(b.total||0).toLocaleString()} ฿</strong>${b.otFee || +b.deliveryFee || +b.collectFee ? ` (รวม ${[b.otFee ? `OT ${(+b.otFee).toLocaleString()}` : '', +b.deliveryFee ? `ค่าส่งรถ ${(+b.deliveryFee).toLocaleString()}` : '', +b.collectFee ? `ค่าคืนรถ ${(+b.collectFee).toLocaleString()}` : ''].filter(Boolean).join(' + ')} ฿)` : ''}
+    ยอดเช่า: <strong>${(b.total||0).toLocaleString()} ฿</strong>${b.otFee || +b.deliveryFee || +b.collectFee ? ` (รวม ${[b.otFee ? `OT ${(+b.otFee).toLocaleString()}` : '', +b.deliveryFee || +b.collectFee ? `ค่าส่ง-คืนรถ ${((+b.deliveryFee || 0) + (+b.collectFee || 0)).toLocaleString()}` : ''].filter(Boolean).join(' + ')} ฿)` : ''}
     ${b.deposit ? `<br>เงินประกัน: <strong>${b.deposit.toLocaleString()} ฿</strong>` : ''}
   `;
   showModal('returnModal');
