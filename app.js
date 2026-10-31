@@ -121,16 +121,22 @@ function buildVehicleCatalog(rows) {
 // Hybrid (eHEV) versions, always offered next to their base model even when
 // the Sheet's VehicleCatalog doesn't list them.
 const HYBRID_MODELS = {
-  'Toyota':     { 'Yaris Ativ': ['Yaris Cross HEV'], 'Corolla Altis': ['Corolla Altis Hybrid'], 'Corolla Cross': ['Corolla Cross Hybrid'], 'Camry': ['Camry Hybrid'] },
+  'Toyota':     { 'Yaris Ativ': ['Yaris Ativ HEV', 'Yaris Cross HEV'], 'Corolla Altis': ['Corolla Altis HEV'], 'Corolla Cross': ['Corolla Cross HEV'],
+                  'Camry': ['Camry HEV'], 'C-HR': ['C-HR HEV'], 'Innova': ['Innova Zenix HEV'], 'Alphard': ['Alphard HEV'] },
   'Honda':      { 'City': ['City e:HEV', 'City Hatchback e:HEV'], 'Civic': ['Civic e:HEV'], 'Accord': ['Accord e:HEV'], 'HR-V': ['HR-V e:HEV'], 'CR-V': ['CR-V e:HEV'] },
-  'MG':         { 'ZS': ['VS HEV', 'ZS HEV'], 'HS': ['HS PHEV'] },
-  'Nissan':     { 'Note': ['Note e-POWER'], 'Kicks': ['Kicks e-POWER'] },
-  'Mitsubishi': { 'Xpander': ['Xpander HEV'] },
+  'MG':         { 'MG3': ['MG3 Hybrid+'], 'ZS': ['VS HEV', 'ZS HEV'], 'HS': ['HS PHEV'] },
+  'Nissan':     { 'Note': ['Note e-POWER'], 'Kicks': ['Kicks e-POWER'], 'Serena': ['Serena e-POWER'] },
+  'Mitsubishi': { 'Xpander': ['Xpander HEV', 'Xpander Cross HEV'], 'Xforce': ['Xforce HEV'] },
+  'Suzuki':     { 'Swift': ['Swift Hybrid'] },
+  'Haval':      { 'H6': ['H6 HEV'], 'Jolion': ['Jolion HEV'] },
+  'BYD':        { 'Sealion 6': ['Sealion 6 DM-i'] },
 };
+// Adds the hybrid versions next to their base model; brands only known for
+// hybrids (Haval, BYD…) are added too.
 function withHybrids(cat) {
   const out = {};
-  Object.keys(cat).forEach(brand => {
-    const list = [...cat[brand]], add = HYBRID_MODELS[brand] || {};
+  [...new Set([...Object.keys(cat), ...Object.keys(HYBRID_MODELS)])].forEach(brand => {
+    const list = [...(cat[brand] || [])], add = HYBRID_MODELS[brand] || {};
     Object.keys(add).forEach(base => {
       const fresh = add[base].filter(m => !list.includes(m));
       if (!fresh.length) return;

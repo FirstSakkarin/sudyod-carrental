@@ -177,12 +177,37 @@ function catalogForType_(vehicleCatalog, type) {
 // Hybrid versions the app offers next to their base model (same list as
 // HYBRID_MODELS in app.js), so the Sheet never flags them as invalid.
 var HYBRID_MODELS_ = {
-  'Toyota':     ['Yaris Cross HEV', 'Corolla Altis Hybrid', 'Corolla Cross Hybrid', 'Camry Hybrid'],
+  'Toyota':     ['Yaris Ativ HEV', 'Yaris Cross HEV', 'Corolla Altis HEV', 'Corolla Cross HEV', 'Camry HEV', 'C-HR HEV', 'Innova Zenix HEV', 'Alphard HEV'],
   'Honda':      ['City e:HEV', 'City Hatchback e:HEV', 'Civic e:HEV', 'Accord e:HEV', 'HR-V e:HEV', 'CR-V e:HEV'],
-  'MG':         ['VS HEV', 'ZS HEV', 'HS PHEV'],
-  'Nissan':     ['Note e-POWER', 'Kicks e-POWER'],
-  'Mitsubishi': ['Xpander HEV']
+  'MG':         ['MG3 Hybrid+', 'VS HEV', 'ZS HEV', 'HS PHEV'],
+  'Nissan':     ['Note e-POWER', 'Kicks e-POWER', 'Serena e-POWER'],
+  'Mitsubishi': ['Xpander HEV', 'Xpander Cross HEV', 'Xforce HEV'],
+  'Suzuki':     ['Swift Hybrid'],
+  'Haval':      ['H6 HEV', 'Jolion HEV'],
+  'BYD':        ['Sealion 6 DM-i']
 };
+
+// Writes any hybrid model or any brand/model a car already uses that is
+// missing from the VehicleCatalog sheet, so the catalog the app and the Sheet
+// read always lists them. Only appends; never removes or reorders rows.
+function fillVehicleCatalog_(ss, carsRows) {
+  var sheet = ss.getSheetByName(SHEET_NAMES.catalog);
+  if (!sheet) return;
+  var have = {};
+  sheetToArray(ss, SHEET_NAMES.catalog, HEADERS.catalog).forEach(function (r) {
+    have[(r.type === 'motorcycle' ? 'motorcycle' : 'car') + '|' + r.brand + '|' + r.model] = true;
+  });
+  var add = [];
+  function want(type, brand, model) {
+    brand = String(brand || '').trim(); model = String(model || '').trim();
+    if (!brand || !model) return;
+    var k = type + '|' + brand + '|' + model;
+    if (!have[k]) { have[k] = true; add.push([type, brand, model]); }
+  }
+  Object.keys(HYBRID_MODELS_).forEach(function (b) { HYBRID_MODELS_[b].forEach(function (m) { want('car', b, m); }); });
+  (carsRows || []).forEach(function (c) { want(c.type === 'motorcycle' ? 'motorcycle' : 'car', c.brand, c.model); });
+  if (add.length) sheet.getRange(sheet.getLastRow() + 1, 1, add.length, 3).setValues(add);
+}
 
 // Brand → model list for dropdowns: the VehicleCatalog sheet + hybrids +
 // every brand/model the cars already use. A model typed in the app (or one
@@ -247,6 +272,7 @@ function applyCarsDropdowns_(sheet, data, headers) {
   setListValidation_(sheet.getRange(2, col.year, data.length, 1), years);
   setListValidation_(sheet.getRange(2, col.color, data.length, 1), colors);
 
+  fillVehicleCatalog_(sheet.getParent(), data);
   var vehicleCatalog = getVehicleCatalog_(sheet.getParent());
   var lists = { car: modelListsFor_(vehicleCatalog, 'car', data), motorcycle: modelListsFor_(vehicleCatalog, 'motorcycle', data) };
   data.forEach(function(c, i) {
