@@ -184,6 +184,7 @@ function initApp() {
   renderDashboard();
   navigate('dashboard');
   initCustomPickers();
+  document.getElementById('bookingPhone')?.addEventListener('input', phoneTyping);
   enhanceAllSelects();
   if (state.sheetsUrl) {
     // If the last session left unsynced local changes (e.g. entered while
@@ -212,6 +213,10 @@ function loadFromStorage() {
   state.expenses      = JSON.parse(localStorage.getItem('expenses')      || '[]');
   state.extraIncome   = JSON.parse(localStorage.getItem('extraIncome')   || '[]');
   state.customerTags  = JSON.parse(localStorage.getItem('customerTags')  || '{}');
+  Object.keys(state.customerTags).forEach(k => {
+    const [n, ph = ''] = k.split('||'), nk = n + '||' + formatPhone(ph);
+    if (nk !== k && !(nk in state.customerTags)) state.customerTags[nk] = state.customerTags[k];
+  });
   state.catalog       = JSON.parse(localStorage.getItem('vehicleCatalog') || 'null');
   const savedTombstones = JSON.parse(localStorage.getItem('tombstones') || 'null');
   if (savedTombstones) state.tombstones = savedTombstones;
@@ -1369,7 +1374,7 @@ function renderGanttBookingSheet() {
       <div class="gsheet-actions">
         <button class="gsheet-btn gsheet-btn-main" onclick="ganttSheetView('car')"><i class="fa-solid fa-right-left"></i> ย้ายไปรถคันอื่น</button>
         <button class="gsheet-btn gsheet-btn-main" onclick="ganttSheetView('time')"><i class="fa-regular fa-clock"></i> เลื่อนวัน / เวลา</button>
-        ${digits ? `<a class="gsheet-btn" href="tel:${digits}"><i class="fa-solid fa-phone"></i> โทร ${b.phone}</a>` : ''}
+        ${digits ? `<a class="gsheet-btn" href="tel:${digits}"><i class="fa-solid fa-phone"></i> โทร ${formatPhone(b.phone)}</a>` : ''}
         <button class="gsheet-btn" onclick="closeGanttBookingSheet(); openEditBookingModal('${b.id}')"><i class="fa-solid fa-pen"></i> แก้ไขทั้งหมด</button>
       </div>`;
   } else if (ganttSheet.view === 'car') {
@@ -1991,7 +1996,7 @@ function openEditBookingModal(id) {
   document.getElementById('bookingModalId').value    = b.id;
   document.getElementById('bookingCar').value        = b.carId;
   document.getElementById('bookingCustomer').value   = b.customer;
-  document.getElementById('bookingPhone').value      = b.phone || '';
+  document.getElementById('bookingPhone').value      = formatPhone(b.phone || '');
   document.getElementById('bookingCustomerAddress').value = b.customerAddress || '';
   document.getElementById('bookingStart').value      = b.start;
   document.getElementById('bookingStartTime').value  = b.startTime || '';
@@ -2126,7 +2131,7 @@ function saveBooking() {
     endTime:         document.getElementById('bookingEndTime').value || '',
     pickupLocation:  document.getElementById('bookingPickupLocation').value.trim(),
     returnLocation:  document.getElementById('bookingReturnLocation').value.trim(),
-    phone:            document.getElementById('bookingPhone').value.trim(),
+    phone:            formatPhone(document.getElementById('bookingPhone').value.trim()),
     customerAddress:  document.getElementById('bookingCustomerAddress').value.trim(),
     deposit:          +document.getElementById('bookingDeposit').value || 0,
     bookingDeposit:   +document.getElementById('bookingAdvance').value || 0,
@@ -2851,12 +2856,12 @@ const TAG_COLOR = {
 function buildCustomerList() {
   const map = {};
   state.bookings.forEach(b => {
-    const key = (b.customer || '').trim() + '||' + (b.phone || '').trim();
+    const key = (b.customer || '').trim() + '||' + formatPhone((b.phone || '').trim());
     if (!map[key]) {
       map[key] = {
         key,
         name:     (b.customer || '').trim(),
-        phone:    (b.phone || '').trim() || '-',
+        phone:    formatPhone((b.phone || '').trim()) || '-',
         bookings: [],
         totalSpent: 0,
         lastDate: '',
@@ -2875,9 +2880,10 @@ function buildCustomerList() {
 function renderCustomersPage() {
   const q       = (document.getElementById('customerSearch')?.value || '').toLowerCase();
   const tagFilter = document.getElementById('customerTagFilter')?.value || '';
+  const qDigits = q.replace(/\D/g, '');
 
   let customers = buildCustomerList().filter(c => {
-    const matchQ   = !q || c.name.toLowerCase().includes(q) || c.phone.includes(q);
+    const matchQ   = !q || c.name.toLowerCase().includes(q) || c.phone.includes(q) || (qDigits.length >= 3 && c.phone.replace(/\D/g, '').includes(qDigits));
     const tag      = state.customerTags[c.key] || '';
     const matchTag = !tagFilter || tag === tagFilter;
     return matchQ && matchTag;
@@ -3066,7 +3072,7 @@ function prefillBookingForCustomer(encodedKey) {
   const [name, phone] = key.split('||');
   openAddBookingModal();
   document.getElementById('bookingCustomer').value = name || '';
-  document.getElementById('bookingPhone').value    = phone || '';
+  document.getElementById('bookingPhone').value    = formatPhone(phone || '');
 }
 
 // ── Google Sheets Sync ─────────────────────────────────────────────────
@@ -3302,7 +3308,32 @@ function telLink(phone) {
   if (!phone) return '-';
   const digits = String(phone).replace(/[^\d+]/g, '');
   if (!digits) return phone;
-  return `<a href="tel:${digits}" class="tel-link" onclick="event.stopPropagation()"><i class="fa-solid fa-phone"></i> ${phone}</a>`;
+  return `<a href="tel:${digits}" class="tel-link" onclick="event.stopPropagation()"><i class="fa-solid fa-phone"></i> ${formatPhone(phone)}</a>`;
+}
+
+// Thai phone numbers with dashes: "0812345678" → "081-234-5678",
+// landline "053123456" → "053-123-456". Works on half-typed numbers too, so it
+// can run on every keystroke. Anything with a +, letters or a note, or more
+// than 10 digits is left exactly as typed.
+function formatPhone(s) {
+  s = s == null ? '' : String(s);
+  const d = s.replace(/\D/g, '');
+  if (!d || d.length > 10 || /[^\d\s\-.()]/.test(s)) return s;
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return d.slice(0, 3) + '-' + d.slice(3);
+  return d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6);
+}
+
+// Phone field typing: re-adds the dashes after each key and keeps the
+// cursor next to the same digit. Call from an 'input' event.
+function phoneTyping(e) {
+  const el = e.target, v = el.value, out = formatPhone(v);
+  if (out === v) return;
+  const before = v.slice(0, el.selectionStart ?? v.length).replace(/\D/g, '').length;
+  let i = 0;
+  for (let n = 0; i < out.length && n < before; i++) if (/\d/.test(out[i])) n++;
+  el.value = out;
+  try { el.setSelectionRange(i, i); } catch (_) {}
 }
 
 // Renders a pickup/return location as a Google-Maps navigation link.

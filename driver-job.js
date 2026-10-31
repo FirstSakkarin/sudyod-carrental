@@ -267,7 +267,7 @@
       <div class="dj-card">
         <div class="dj-2">
           <div class="dj-f"><label for="dj-cust">ลูกค้า</label><input id="dj-cust" data-j="customer" value="${esc(job.customer)}" placeholder="ชื่อลูกค้า"></div>
-          <div class="dj-f"><label for="dj-phone">เบอร์</label><input id="dj-phone" class="dj-mono" type="tel" data-j="phone" value="${esc(job.phone)}"></div>
+          <div class="dj-f"><label for="dj-phone">เบอร์</label><input id="dj-phone" class="dj-mono" type="tel" inputmode="tel" autocomplete="tel" placeholder="08X-XXX-XXXX" data-j="phone" value="${esc(formatPhone(job.phone))}"></div>
         </div>
         ${saveTry && !job.customer.trim() ? '<div class="dj-err">⚠ ใส่ชื่อลูกค้าก่อน</div>' : ''}
         <div class="dj-2">
@@ -310,6 +310,7 @@
   }
   function onInput(e) {
     const el = e.target, d = el.dataset, t = job.trips[d.i];
+    if (d.j === 'phone') phoneTyping(e);
     if (d.j) { job[d.j] = (d.j === 'fuel' || d.j === 'kml') ? (+el.value || 0) : el.value;
       if (d.j === 'fuel') store.set('djFuel', el.value); if (d.j === 'kml') store.set('djKml', el.value); if (d.j === 'home') store.set('djHome', el.value);
       if (d.j === 'fuel' || d.j === 'kml') return draw(el.id);
@@ -353,7 +354,7 @@
       const stops = t.stops.map(s => String(s).trim()).filter(Boolean), price = priceOf(t), b0 = breakdown(t);
       const via = stops.slice(1, -1);
       const data = {
-        carId: t.car, customer: job.customer.trim(), phone: job.phone.trim(), start: t.date, startTime: t.start, end: tripEnd(t), endTime: t.end,
+        carId: t.car, customer: job.customer.trim(), phone: formatPhone(job.phone.trim()), start: t.date, startTime: t.start, end: tripEnd(t), endTime: t.end,
         pickupLocation: stops[0] || '', returnLocation: stops[stops.length - 1] || '', rate: price, total: price, otFee: 0, lateFee: 0, discount: 0,
         note: `🧑‍✈️ งานพิเศษ${via.length ? ' · แวะ ' + via.join(' → ') : ''}${t.note ? ' · ' + t.note : ''}`,
         staffOut: t.driver, staffIn: t.driver,

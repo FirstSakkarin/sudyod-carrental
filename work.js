@@ -455,7 +455,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--brand); outline
     const b = j.b, [plate, model] = CARS[b.carId], isDone = !!done[j.id], digits = String(b.phone || '').replace(/[^\d+]/g, '');
     const lateMin = nowMin() - j.at, x = extras[j.id];
     const phone = b.phone
-      ? `<div class="phone"><span class="num">${esc(b.phone)}</span><a href="tel:${digits}" target="_blank" rel="noopener">📞 โทร</a></div>`
+      ? `<div class="phone"><span class="num">${esc(formatPhone(b.phone))}</span><a href="tel:${digits}" target="_blank" rel="noopener">📞 โทร</a></div>`
       : `<div class="phone"><span class="num none">ไม่มีเบอร์ลูกค้า</span></div>`;
     const pr = (j.k === 'go' && prep[j.id]) || {}, st = staffOf(j.id);
     const isOpen = !!opened[j.id], b2 = j.k === 'go' ? prevOf(b) : nextOf(b);
@@ -550,7 +550,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--brand); outline
       }
       L.push('', `${done[j.id] ? '✅' : j.k === 'go' ? '🟢' : '🟠'} ${j.time.replace(':', '.')} ${j.k === 'go' ? 'ส่งรถ' : 'รับรถคืน'} ${mdl} ${p4}`);
       L.push(`   👷 ${st.length ? st.map(n => HEART[n] + n).join(' ') : 'ยังไม่มีคน'}`);
-      L.push(`   ${name(b)}${b.phone ? ' ' + b.phone : ''}`);
+      L.push(`   ${name(b)}${b.phone ? ' ' + formatPhone(b.phone) : ''}`);
       if (j.place) L.push(`   📍 ${j.place}`);
       const D = [];
       if (j.k === 'go') {
