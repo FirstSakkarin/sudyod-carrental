@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black" />
   <meta name="apple-mobile-web-app-title" content="สุดยอดรถเช่า" />
-  <link rel="stylesheet" href="styles.css?v=20261031g" />
+  <link rel="stylesheet" href="styles.css?v=20261031h" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 </head>
 <body>
@@ -642,12 +642,12 @@
         </div>
         <div class="form-row-2col">
           <div class="form-group">
-            <label>🚗 ค่าส่งรถ (บาท)</label>
+            <label>🚗 ค่าส่ง-คืนรถ (บาท)</label>
             <input type="number" inputmode="numeric" id="bookingDeliveryFee" placeholder="0" oninput="calcBookingTotal()" />
           </div>
           <div class="form-group">
-            <label>🏁 ค่าคืนรถ (บาท)</label>
-            <input type="number" inputmode="numeric" id="bookingCollectFee" placeholder="0" oninput="calcBookingTotal()" />
+            <label>ส่วนลด (บาท)</label>
+            <input type="number" inputmode="numeric" id="bookingDiscount" placeholder="0" oninput="calcBookingTotal()" />
           </div>
         </div>
         <div class="form-row-2col">
@@ -662,20 +662,13 @@
         </div>
         <div class="form-row-2col">
           <div class="form-group">
-            <label>ส่วนลด (บาท)</label>
-            <input type="number" inputmode="numeric" id="bookingDiscount" placeholder="0" oninput="calcBookingTotal()" />
-          </div>
-          <div class="form-group">
             <label>💧 น้ำ (ชุด)</label>
             <input type="number" inputmode="numeric" id="bookingWater" placeholder="0" min="0" />
           </div>
-        </div>
-        <div class="form-row-2col">
           <div class="form-group">
             <label>👶 Carseat (ตัว)</label>
             <input type="number" inputmode="numeric" id="bookingCarseat" placeholder="ตัวแรกฟรี · ต่อไปวันละ 100" min="0" oninput="calcBookingTotal()" />
           </div>
-          <div class="form-group"></div>
         </div>
         <p class="hint-note" style="margin:-.2rem 0 .6rem;font-size:.8rem;">คิดเงิน: ครบ 24 ชม. = 1 วัน · เลทไม่เกิน 4 ชม. คิดรายชั่วโมงตามค่าเลทของรถ · เกิน 4 ชม. คิดเพิ่ม 1 วัน</p>
         <div class="booking-total-box" id="bookingTotalBox" style="display:none;">
@@ -1023,13 +1016,13 @@
   <!-- Custom select dropdown panel (native <select> popups can't be restyled) -->
   <div id="customSelectPanel" class="custom-select-panel"></div>
 
-  <script src="app.js?v=20261031g"></script>
-  <script src="queue.js?v=20261031g"></script>
-  <script src="work.js?v=20261031g"></script>
-  <script src="cars.js?v=20261031g"></script>
-  <script src="bookings.js?v=20261031g"></script>
-  <script src="booking-picker.js?v=20261031g"></script>
-  <script src="driver-job.js?v=20261031g"></script>
-  <script src="pwa.js?v=20261031g"></script>
+  <script src="app.js?v=20261031h"></script>
+  <script src="queue.js?v=20261031h"></script>
+  <script src="work.js?v=20261031h"></script>
+  <script src="cars.js?v=20261031h"></script>
+  <script src="bookings.js?v=20261031h"></script>
+  <script src="booking-picker.js?v=20261031h"></script>
+  <script src="driver-job.js?v=20261031h"></script>
+  <script src="pwa.js?v=20261031h"></script>
 </body>
 </html>
