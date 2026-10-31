@@ -164,9 +164,9 @@
 
   // Cars: motorbikes only when มอไซค์ is picked. Order = queue order (ลำดับ).
   const ord = c => (c.orderNo === '' || c.orderNo == null || isNaN(+c.orderNo)) ? 1e9 : +c.orderNo;
-  const visible = () => (state.cars || []).filter(c => Q.type ? c.type === Q.type : c.type !== 'motorcycle')
+  const visible = () => (state.cars || []).filter(c => Q.type ? (c.type === Q.type || (Q.type === 'ehev' && c.type !== 'motorcycle' && isHybridName(c))) : c.type !== 'motorcycle')
     .sort((a, b) => ord(a) - ord(b) || String(a.plate).localeCompare(String(b.plate), 'th'));
-  const isHybridName = c => /hev|hybrid|ไฮบริด/i.test(`${c.model}`);
+  const isHybridName = c => /hev|hybrid|e-power|dm-i|ไฮบริด/i.test(`${c.model}`);
   const groupLabel = c => `${c.brand || ''} ${c.model || ''}`.trim() + (c.type === 'ehev' && !isHybridName(c) ? ' Hybrid' : c.type === 'ev' ? ' EV' : '');
   function byModel(rows) {
     const m = new Map();
