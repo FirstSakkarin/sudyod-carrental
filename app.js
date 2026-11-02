@@ -1959,6 +1959,9 @@ function renderBookingsPage() {
   runBookingsSearch();
 }
 
+// เงินประกันเริ่มต้นสำหรับการจองใหม่ (แก้ได้ในฟอร์ม)
+const DEFAULT_BOOKING_DEPOSIT = 3000;
+
 function openAddBookingModal() {
   populateCarSelect('bookingCar', true);
   document.getElementById('bookingModalTitle').textContent = 'เพิ่มการจอง';
@@ -1979,7 +1982,7 @@ function openAddBookingModal() {
   document.getElementById('bookingRate').value       = '';
   document.getElementById('bookingOtFee').value      = '';
   document.getElementById('bookingDeliveryFee').value = '';
-  document.getElementById('bookingDeposit').value    = '';
+  document.getElementById('bookingDeposit').value    = DEFAULT_BOOKING_DEPOSIT;
   document.getElementById('bookingAdvance').value    = '';
   document.getElementById('bookingDiscount').value   = '';
   document.getElementById('bookingWater').value      = '';
