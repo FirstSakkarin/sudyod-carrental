@@ -52,6 +52,12 @@ const HEADERS = {
 function doGet(e) {
   var action = e && e.parameter && e.parameter.action;
   if (action === 'ping') return respond({ status: 'ok' });
+  // Pull bookings from the queue Sheet right now / show the last sync report.
+  if (action === 'syncQueue') return respond(syncQueueFromSheet_(30000));
+  if (action === 'queueSyncStatus') {
+    var last = PropertiesService.getScriptProperties().getProperty('QUEUE_SYNC_LAST');
+    return respond(last ? JSON.parse(last) : { status: 'never' });
+  }
   return respond(handleGet());
 }
 
@@ -72,6 +78,8 @@ function handleGet() {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     ensureSheets(ss);
+    // New bookings from the queue Sheet (at most every few minutes).
+    maybeSyncQueue_();
     // Catch rows deleted by hand in the Sheet (onEdit can't see row deletions)
     // and turn them into tombstones before we hand data back to the app.
     reconcileDeletions_(ss);
@@ -97,6 +105,11 @@ function handleGet() {
    POST — Save all data (full sync)
 ───────────────────────────────────────── */
 function handlePost(e) {
+  // Wait for a queue-Sheet sync that is writing Bookings, so neither write
+  // overwrites the other halfway through.
+  var lock = LockService.getScriptLock();
+  var locked = false;
+  try { locked = lock.tryLock(25000); } catch (err) {}
   try {
     var body = JSON.parse(e.postData.contents);
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -117,6 +130,8 @@ function handlePost(e) {
     return { status: 'ok', timestamp: new Date().toISOString() };
   } catch(err) {
     return { status: 'error', error: err.message };
+  } finally {
+    if (locked) lock.releaseLock();
   }
 }
 
@@ -494,6 +509,360 @@ function reconcileDeletions_(ss) {
   // Only rewrite the snapshot when it actually changed, so steady-state reads
   // (nothing added/removed) stay read-only and cheap.
   if (snapshotDiffers_(snap, current)) writeIdSnapshot_(ss, current);
+}
+
+/* ─────────────────────────────────────────
+   Auto-import from the shop's queue Sheet ("ตารางคิวรถ2569")
+
+   Top & Mink keep the real queue in a paper-style Google Sheet: one tab per
+   month, one row per car, two columns per day (เช้า/บ่าย), and each booking is
+   a merged cell like "13/11:8.30-16/11:16.40 น. 4Line Pailin". Nobody types
+   those bookings into the web app, so this section reads that Sheet and adds
+   the bookings to the Bookings tab by itself:
+   - runs at most every QUEUE_SYNC_EVERY_MIN minutes when the app loads data
+     (or right away with ?action=syncQueue)
+   - only bookings that end today or later, only cars that exist in Cars
+   - a booking already typed into the app (same car, start within 1 day)
+     is never added twice
+   - rows it added are kept in step with the queue Sheet (moved times,
+     deleted cells) until someone edits that row in the app; after that the
+     app's copy wins and the sync leaves it alone
+   - a booking deleted in the app stays deleted (tombstone)
+───────────────────────────────────────── */
+var QUEUE_SHEET_ID_DEFAULT = '1fWxpWzoWOJcfFNvdX5uJY13Dxo5-aY3PdxuJAa-j3Pw';
+var QUEUE_BASE_YEAR = 2026;   // tabs without a year suffix ('พย') are 2569 = 2026; 'มค70' = 2570 = 2027
+var QUEUE_MONTHS_AHEAD = 3;   // read this month + 3 more tabs
+var QUEUE_SYNC_EVERY_MIN = 5;
+var QUEUE_SYNC_SHEET = '_QueueSync'; // hidden: id + updatedAt of rows this sync wrote
+var QUEUE_TAB_NAMES = ['มค','กพ','มีค','เมย','พค','มิย','กค','สค','กย','ตค','พย','ธค'];
+var QUEUE_NOTE_TAG = '(นำเข้าจากตารางคิว)';
+
+var QUEUE_RANGE_RE = /(\d{1,2})\s*\/\s*(\d{1,2})\s*:\s*([0-9.:]*)[^0-9\/\-–]*?[-–\/]\s*(\d{1,2})\s*\/\s*(\d{1,2})\s*:\s*([0-9.:]*)/;
+var QUEUE_SAMEDAY_RE = /(\d{1,2})\s*\/\s*(\d{1,2})\s*:\s*(\d{1,2}[.:]\d{2})\s*-\s*(\d{1,2}[.:]\d{2})(?![\d\/])/; // 6/2:8.00-20.00
+var QUEUE_SINGLE_RE = /(\d{1,2})\s*\/\s*(\d{1,2})\s*:\s*\d{1,2}[.:]\d{2}/;
+var QUEUE_NOT_RENTAL_RE = /ซ่อม|ปรับตั้ง|เช็คระยะ|เช็กระยะ|ล้างรถ|ตรวจสอบ|ถ่ายน้ำมัน|นำรถกลับ/;
+var QUEUE_CHANNELS = [
+  [/^(FB|facebook)(?![a-z])/i, 'Facebook'],
+  [/^OA(?![a-z])/i,            'LINE OA'],
+  [/^line(?![a-z])/i,          'Line'],
+  [/^WA(?![a-z])/i,            'WhatsApp'],
+  [/^easy\s*rent(?![a-z])/i,   'Easyrent'],
+  [/^(DH|drivehub)(?![a-z])/i, 'DriveHub'],
+  [/^fastwork(?![a-z])/i,      'Fastwork'],
+  [/^haup\w*/i,                'HaupCar']
+];
+
+// "City ขาว-จง4064ชม" -> "จง4064", "จง4064 เชียงใหม่" -> "จง4064", "ฉค 1721" -> "ฉค1721"
+function queuePlateKey_(s) {
+  var m = String(s || '').match(/(?<![ก-๙])(\d?[ก-ฮ]{1,3})[\s-]?(\d{1,4})(?!\d)/);
+  return m ? m[1] + m[2] : '';
+}
+
+function queueCarsByPlate_(cars) {
+  var out = {};
+  (cars || []).slice().sort(function (a, b) {
+    return (Number(a.orderNo) || 999) - (Number(b.orderNo) || 999);
+  }).forEach(function (c) {
+    var k = queuePlateKey_(c.plate);
+    if (k && !out[k]) out[k] = c; // duplicate plates: lowest ลำดับ wins
+  });
+  return out;
+}
+
+function queueYmd_(t) { // UTC ms -> 'yyyy-MM-dd'
+  var d = new Date(t);
+  return d.getUTCFullYear() + '-' + ('0' + (d.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + d.getUTCDate()).slice(-2);
+}
+function queueDayMs_(ymd) { var p = String(ymd).split('-'); return Date.UTC(+p[0], +p[1] - 1, +p[2]); }
+var QUEUE_DAY = 86400000;
+
+// "8.00" -> "08:00"; "" or "…" -> null
+function queueTime_(s) {
+  var m = String(s || '').match(/^(\d{1,2})[.:](\d{2})/);
+  if (!m || +m[1] > 23 || +m[2] > 59) return null;
+  return ('0' + m[1]).slice(-2) + ':' + m[2];
+}
+
+// d/m nearest to the reference day (handles bookings that cross a new year)
+function queueNearestDay_(d, m, refMs) {
+  var y = new Date(refMs).getUTCFullYear(), best = null;
+  [y - 1, y, y + 1].forEach(function (yy) {
+    var t = Date.UTC(yy, m - 1, d);
+    if (best === null || Math.abs(t - refMs) < Math.abs(best - refMs)) best = t;
+  });
+  return best;
+}
+
+// Row 3 holds the day numbers: one number per day, the next column (empty) is
+// the afternoon half. Days roll into the next month when the number drops.
+function queueColumnDates_(values, year, month) {
+  var row = values[2] || [], out = [], y = year, m = month, prev = 0, last = null;
+  for (var c = 2; c < row.length; c++) {
+    var v = String(row[c] === null || row[c] === undefined ? '' : row[c]).trim();
+    if (/^\d{1,2}$/.test(v)) {
+      var d = +v;
+      if (d < prev) { m++; if (m > 12) { m = 1; y++; } }
+      prev = d;
+      last = { ms: Date.UTC(y, m - 1, d), half: 'am' };
+      out[c] = last;
+    } else if (last && last.half === 'am') {
+      last = { ms: last.ms, half: 'pm' };
+      out[c] = last;
+    } else {
+      last = null;
+    }
+  }
+  return out;
+}
+
+// One month tab -> { bookings: [...], skipped: [...] }
+// values: 2D display values; merges: [[row1,col1,row2,col2], ...] 1-based.
+function parseQueueGrid_(tab, values, merges, year, month, carsByPlate, todayYmd) {
+  var cols = queueColumnDates_(values, year, month);
+  var lastCol = 0, firstCol = -1;
+  cols.forEach(function (v, c) { if (v) { lastCol = c; if (firstCol < 0) firstCol = c; } });
+  var spanEnd = {};
+  (merges || []).forEach(function (mg) { spanEnd[(mg[0] - 1) + ',' + (mg[1] - 1)] = mg[3] - 1; });
+  var todayMs = queueDayMs_(todayYmd);
+  var res = { bookings: [], skipped: [] };
+
+  for (var r = 3; r < values.length; r++) {
+    var row = values[r];
+    var label = String(row[1] || '').trim();
+    if (!/^\d+$/.test(String(row[0] || '').trim()) || !label) continue; // only numbered car rows
+    var car = carsByPlate[queuePlateKey_(label)];
+    for (var c = 2; c < row.length; c++) {
+      var text = String(row[c] === null || row[c] === undefined ? '' : row[c]).replace(/\s+/g, ' ').trim();
+      if (!text || !cols[c]) continue;
+      var c2 = spanEnd[r + ',' + c] !== undefined ? spanEnd[r + ',' + c] : c;
+      while (c2 > c && !cols[c2]) c2--;
+      var where = tab + ' แถว ' + (r + 1) + ' ' + label;
+      var skip = function (why) { res.skipped.push({ where: where, text: text, why: why }); };
+
+      var m = text.match(QUEUE_RANGE_RE);
+      if (!m) { // same-day rental "6/2:8.00-20.00" -> same shape as a range
+        var sd = text.match(QUEUE_SAMEDAY_RE);
+        if (sd) { m = [sd[0], sd[1], sd[2], sd[3], sd[1], sd[2], sd[4]]; m.index = sd.index; }
+      }
+      if (QUEUE_NOT_RENTAL_RE.test(text)) { if (m) skip('งานรถ ไม่ใช่การเช่า'); continue; }
+      if (!m) { if (QUEUE_SINGLE_RE.test(text)) skip('มีเวลาเดียว (งานรับ-ส่ง/คนขับ)'); continue; }
+
+      var S0 = cols[c].ms, E0 = cols[c2].ms, fixes = [];
+      var s = queueNearestDay_(+m[1], +m[2], S0);
+      var e = queueNearestDay_(+m[4], +m[5], E0);
+      var startsAtEdge = c === firstCol, endsAtEdge = c2 === lastCol;
+      if (startsAtEdge ? s > S0 + 2 * QUEUE_DAY : Math.abs(s - S0) > 2 * QUEUE_DAY) { s = S0; fixes.push('วันรับรถ'); }
+      if (endsAtEdge ? e < E0 - 2 * QUEUE_DAY : Math.abs(e - E0) > 2 * QUEUE_DAY) { e = E0; fixes.push('วันคืนรถ'); }
+      if (e < s) { skip('วันคืนก่อนวันรับ'); continue; }
+      if (e < todayMs) continue; // finished already
+
+      var st = queueTime_(m[3]), et = queueTime_(m[6]);
+      if (!st) { st = cols[c].half === 'am' ? '09:00' : '13:00'; fixes.push('เวลารับรถ'); }
+      if (!et) { et = cols[c2].half === 'am' ? '09:00' : '17:00'; fixes.push('เวลาคืนรถ'); }
+
+      if (!car) { skip('ไม่มีรถคันนี้ในระบบ'); continue; }
+
+      var rest = text.slice(m.index + m[0].length).replace(/^[\s.…]*(น\.)?[\s.…]*/, '').replace(/^\d+\s*/, '');
+      var channel = '';
+      for (var i = 0; i < QUEUE_CHANNELS.length; i++) {
+        if (QUEUE_CHANNELS[i][0].test(rest)) { channel = QUEUE_CHANNELS[i][1]; rest = rest.replace(QUEUE_CHANNELS[i][0], ''); break; }
+      }
+      if (!channel && /^(รับ)?คิวจาก/.test(rest)) channel = 'ฝากคิว';
+      var customer = rest.replace(/^[\s.·,:-]+/, '').trim().slice(0, 60) || 'ไม่ระบุชื่อ';
+
+      res.bookings.push({
+        carId: car.id,
+        customer: customer,
+        start: queueYmd_(s), startTime: st,
+        end: queueYmd_(e), endTime: et,
+        channel: channel,
+        text: text,
+        fixes: fixes,
+        where: where
+      });
+    }
+  }
+  return res;
+}
+
+function queueStatus_(b, nowYmdHm) {
+  var s = b.start + ' ' + b.startTime, e = b.end + ' ' + b.endTime;
+  if (nowYmdHm < s) return 'upcoming';
+  if (nowYmdHm < e) return 'active';
+  return 'completed';
+}
+
+function queueSameBooking_(a, b) {
+  if (String(a.carId) !== String(b.carId)) return false;
+  var as = queueDayMs_(a.start), bs = queueDayMs_(b.start);
+  var ae = queueDayMs_(a.end || a.start), be = queueDayMs_(b.end || b.start);
+  return Math.abs(as - bs) <= QUEUE_DAY && as <= be && bs <= ae;
+}
+
+// Pure merge step (no Sheet access) so it can be tested on its own.
+// parsed: from parseQueueGrid_ (all tabs). owned: {id: updatedAt this sync wrote}.
+// Returns the new bookings array + what changed.
+function planQueueSync_(parsed, bookings, owned, tombIds, todayYmd, coveredUntilYmd, nowIso, nowYmdHm, idFn) {
+  var out = bookings.slice(), byId = {}, seen = {}, kept = [], added = [], updated = [], removed = [];
+  out.forEach(function (b) { byId[String(b.id)] = b; });
+  var isOwnedUntouched = function (b) { return owned[b.id] && String(owned[b.id]) === String(b.updatedAt); };
+  var manual = out.filter(function (b) { return !owned[b.id]; });
+
+  parsed.forEach(function (p) {
+    var id = 'bq' + idFn(p.carId + '|' + p.start + '|' + p.startTime);
+    if (seen[id]) return; // same booking seen in two month tabs
+    // ...or written slightly differently in the two tabs: keep the first one
+    if (kept.some(function (k) { return queueSameBooking_(k, p); })) return;
+    seen[id] = true; kept.push(p);
+    if (tombIds[id]) return; // deleted in the app: stays deleted
+    var note = (p.channel ? p.channel + ' · ' : '') + p.text + ' ' + QUEUE_NOTE_TAG;
+    var existing = byId[id];
+    if (existing) {
+      if (isOwnedUntouched(existing) &&
+          (existing.customer !== p.customer || existing.end !== p.end || existing.endTime !== p.endTime || existing.note !== note)) {
+        existing.customer = p.customer; existing.end = p.end; existing.endTime = p.endTime; existing.note = note;
+        existing.updatedAt = nowIso; owned[id] = nowIso;
+        updated.push(p);
+      }
+      return;
+    }
+    if (manual.some(function (b) { return queueSameBooking_(b, p); })) return; // already typed into the app
+    var row = {
+      id: id, carId: p.carId, customer: p.customer, phone: '', customerAddress: '',
+      start: p.start, startTime: p.startTime, pickupLocation: '',
+      end: p.end, endTime: p.endTime, returnLocation: '',
+      mileageOut: 0, rate: 0, otFee: 0, total: 0, deposit: 0, bookingDeposit: 0,
+      status: queueStatus_(p, nowYmdHm), note: note, updatedAt: nowIso
+    };
+    out.push(row); byId[id] = row; owned[id] = nowIso;
+    added.push(p);
+  });
+
+  // Rows this sync made that are gone from the queue Sheet (moved or deleted
+  // there), or that someone has since typed into the app by hand.
+  out = out.filter(function (b) {
+    if (!isOwnedUntouched(b) || b.status !== 'upcoming') return true;
+    var gone = !seen[b.id] && b.start >= todayYmd && b.start <= coveredUntilYmd;
+    var dupe = manual.some(function (mb) { return mb.id !== b.id && queueSameBooking_(mb, b); });
+    if (gone || dupe) { removed.push(b); delete owned[b.id]; return false; }
+    return true;
+  });
+  return { bookings: out, added: added, updated: updated, removed: removed, owned: owned };
+}
+
+function queueTabName_(year, month) {
+  return QUEUE_TAB_NAMES[month - 1] + (year === QUEUE_BASE_YEAR ? '' : String((year + 543) % 100));
+}
+
+function readQueueSyncOwned_(ss) {
+  var sh = ss.getSheetByName(QUEUE_SYNC_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(QUEUE_SYNC_SHEET);
+    sh.getRange(1, 1, 1, 2).setValues([['id', 'updatedAt']]);
+    sh.hideSheet();
+  }
+  var out = {}, last = sh.getLastRow();
+  if (last >= 2) sh.getRange(2, 1, last - 1, 2).getDisplayValues().forEach(function (r) { if (r[0]) out[r[0]] = r[1]; });
+  return { sheet: sh, owned: out };
+}
+
+function writeQueueSyncOwned_(sh, owned, liveIds) {
+  var rows = [['id', 'updatedAt']];
+  Object.keys(owned).forEach(function (id) { if (liveIds[id]) rows.push([id, owned[id]]); });
+  sh.clearContents();
+  sh.getRange(1, 1, rows.length, 2).setNumberFormat('@').setValues(rows);
+}
+
+// Main entry. Returns a small report (also saved for ?action=queueSyncStatus).
+function syncQueueFromSheet_(waitMs) {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(waitMs || 0)) return { status: 'busy' };
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    ensureSheets(ss);
+    var props = PropertiesService.getScriptProperties();
+    var queueId = props.getProperty('QUEUE_SHEET_ID') || QUEUE_SHEET_ID_DEFAULT;
+    var q = SpreadsheetApp.openById(queueId);
+    var tz = 'Asia/Bangkok', now = new Date();
+    var todayYmd = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
+    var nowYmdHm = Utilities.formatDate(now, tz, 'yyyy-MM-dd HH:mm');
+    var cars = sheetToArray(ss, SHEET_NAMES.cars, HEADERS.cars);
+    var carsByPlate = queueCarsByPlate_(cars);
+
+    var y = +todayYmd.slice(0, 4), mo = +todayYmd.slice(5, 7);
+    var parsed = [], skipped = [], tabsRead = [], coveredUntil = '0000-00-00';
+    for (var i = 0; i <= QUEUE_MONTHS_AHEAD; i++) {
+      var name = queueTabName_(y, mo), sh = q.getSheetByName(name);
+      if (!sh) break; // stop at the first missing month so removals stay safe
+      var values = sh.getDataRange().getDisplayValues();
+      var merges = sh.getRange(1, 1, sh.getMaxRows(), sh.getMaxColumns()).getMergedRanges().map(function (r) {
+        return [r.getRow(), r.getColumn(), r.getLastRow(), r.getLastColumn()];
+      });
+      var res = parseQueueGrid_(name, values, merges, y, mo, carsByPlate, todayYmd);
+      parsed = parsed.concat(res.bookings); skipped = skipped.concat(res.skipped);
+      tabsRead.push(name);
+      coveredUntil = queueYmd_(Date.UTC(y, mo, 0)); // last day of this month
+      mo++; if (mo > 12) { mo = 1; y++; }
+    }
+    if (!tabsRead.length) return { status: 'error', error: 'ไม่พบแท็บเดือนนี้ในตารางคิว' };
+
+    var bookings = sheetToArray(ss, SHEET_NAMES.bookings, HEADERS.bookings);
+    var tomb = currentTombstoneIds_(ss).bookings || {};
+    var ownedInfo = readQueueSyncOwned_(ss);
+    var nowIso = now.toISOString();
+    var md5 = function (s) {
+      return Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, s, Utilities.Charset.UTF_8)
+        .map(function (b) { return ('0' + (b & 0xff).toString(16)).slice(-2); }).join('').slice(0, 10);
+    };
+    var plan = planQueueSync_(parsed, bookings, ownedInfo.owned, tomb, todayYmd, coveredUntil, nowIso, nowYmdHm, md5);
+
+    if (plan.added.length || plan.updated.length || plan.removed.length) {
+      arrayToSheet(ss, SHEET_NAMES.bookings, plan.bookings, HEADERS.bookings);
+      if (plan.removed.length) appendTombstoneRows_(ss, plan.removed.map(function (b) { return ['bookings', b.id, nowIso]; }));
+      writeIdSnapshot_(ss, collectIds_(ss));
+    }
+    var live = {};
+    plan.bookings.forEach(function (b) { live[b.id] = true; });
+    writeQueueSyncOwned_(ownedInfo.sheet, plan.owned, live);
+
+    var report = {
+      status: 'ok', at: nowIso, tabs: tabsRead,
+      added: plan.added.length, updated: plan.updated.length, removed: plan.removed.length,
+      addedList: plan.added.map(function (p) { return p.where + ' · ' + p.text; }),
+      removedList: plan.removed.map(function (b) { return b.carId + ' ' + b.start + ' ' + b.customer; }),
+      skipped: skipped
+    };
+    try { props.setProperty('QUEUE_SYNC_LAST', JSON.stringify(report).slice(0, 8500)); } catch (e) {}
+    return report;
+  } catch (err) {
+    return { status: 'error', error: err.message };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// Called from handleGet: sync at most every QUEUE_SYNC_EVERY_MIN minutes.
+function maybeSyncQueue_() {
+  try {
+    var cache = CacheService.getScriptCache();
+    if (cache.get('queueSyncAt')) return;
+    cache.put('queueSyncAt', '1', QUEUE_SYNC_EVERY_MIN * 60);
+    syncQueueFromSheet_(0);
+  } catch (e) {}
+}
+
+// Timer entry point (see the note below).
+function queueSyncTrigger() { syncQueueFromSheet_(30000); }
+
+// Optional: to sync every 10 minutes even when nobody has the app open, add a
+// timer by hand (Apps Script editor > Triggers ⏰ > Add trigger > function
+// queueSyncTrigger, time-driven, every 10 minutes). Not created from code on
+// purpose: ScriptApp would add a new permission and stop the web app until
+// someone re-authorizes it.
+
+// Editor helper: run now and print the report.
+function testQueueSync() {
+  Logger.log(JSON.stringify(syncQueueFromSheet_(30000), null, 2));
 }
 
 /* ─────────────────────────────────────────
