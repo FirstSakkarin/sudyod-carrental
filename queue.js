@@ -99,6 +99,8 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
   background: rgba(20, 22, 30, .6); border: 1px solid var(--glass-edge); backdrop-filter: blur(18px) saturate(180%); -webkit-backdrop-filter: blur(18px) saturate(180%); box-shadow: var(--specular); pointer-events: none; }
 .hrow, .row { display: flex; align-items: stretch; }
 .hrow { background: rgba(255, 255, 255, .06); border-bottom: 1px solid var(--rule-strong); position: sticky; top: 0; z-index: 4; }
+/* pinned under the app's top bar while the car rows scroll past (see pinHead) */
+.hrow.pinned { z-index: 6; background: rgb(30, 32, 41); box-shadow: 0 6px 14px rgba(0, 0, 0, .45); will-change: transform; }
 .row { border-bottom: 1px solid var(--rule); min-height: 52px; }
 .row:last-child { border-bottom: 0; }
 .no, .lab {
@@ -597,6 +599,21 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
     if (di >= 0) wrapEl().querySelectorAll('.dh')[di].classList.add('sel');
     dayPill();
     applyZoom();
+    pinHead();
+  }
+  // The table scrolls sideways inside .wrap, so CSS sticky can't hold the date row against
+  // the page's own scroll. Slide it down instead so it stays just under the app's top bar
+  // (it stays inside .wrap, so sideways scrolling keeps it lined up with the rows).
+  function pinHead() {
+    const head = wrapEl().querySelector('.hrow'), sheetEl = head && head.parentElement;
+    if (!head || !wrapEl().offsetParent) return;
+    const bar = document.querySelector('.topbar');
+    const top = bar && getComputedStyle(bar).display !== 'none' ? Math.max(0, bar.getBoundingClientRect().bottom) : 0;
+    const r = sheetEl.getBoundingClientRect();
+    const room = r.height - head.offsetHeight - 52; // let it go once the last row is passing
+    const y = Math.max(0, Math.min(top - r.top, room));
+    head.style.transform = y > 0 ? `translate3d(0,${y}px,0)` : '';
+    head.classList.toggle('pinned', y > 0);
   }
 
   // ---------- bottom sheet ----------
@@ -1181,7 +1198,9 @@ button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
   // Redraw in place (after a save or a tab/sort change) without losing the scroll position.
   let redrawAfterDrag = false;
   function renderKeep() { if (drag) { redrawAfterDrag = true; return; } const w = wrapEl(), sl = w.scrollLeft; render(); w.scrollLeft = sl; }
-  addEventListener('resize', () => { if (alive()) applyZoom(); });
+  addEventListener('resize', () => { if (alive()) { applyZoom(); pinHead(); } });
+  let headRaf = 0;
+  addEventListener('scroll', () => { if (!alive() || headRaf) return; headRaf = requestAnimationFrame(() => { headRaf = 0; pinHead(); }); }, { passive: true });
   return { first, renderKeep, closeSheet: () => closeSheet() };
   }
 
