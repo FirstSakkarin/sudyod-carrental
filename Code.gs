@@ -480,6 +480,18 @@ function currentTombstoneIds_(ss) {
   return out;
 }
 
+// Drop tombstones for ids that came back (the queue sync re-added a booking
+// it had taken out itself).
+function removeTombstoneRows_(ss, coll, ids) {
+  var sh = ss.getSheetByName(SHEET_NAMES.tombstones);
+  if (!sh || !ids.length) return;
+  var drop = {};
+  ids.forEach(function (id) { drop[String(id)] = true; });
+  var rows = sheetToArray(ss, SHEET_NAMES.tombstones, HEADERS.tombstones);
+  var keep = rows.filter(function (r) { return !(r.collection === coll && drop[String(r.id)]); });
+  if (keep.length !== rows.length) arrayToSheet(ss, SHEET_NAMES.tombstones, keep, HEADERS.tombstones);
+}
+
 function appendTombstoneRows_(ss, rows) {
   var sh = ss.getSheetByName(SHEET_NAMES.tombstones);
   if (!sh) { ensureSheets(ss); sh = ss.getSheetByName(SHEET_NAMES.tombstones); }
@@ -532,7 +544,7 @@ function reconcileDeletions_(ss) {
 var QUEUE_SHEET_ID_DEFAULT = '1fWxpWzoWOJcfFNvdX5uJY13Dxo5-aY3PdxuJAa-j3Pw';
 var QUEUE_BASE_YEAR = 2026;   // tabs without a year suffix ('พย') are 2569 = 2026; 'มค70' = 2570 = 2027
 var QUEUE_MONTHS_AHEAD = 3;   // read this month + 3 more tabs
-var QUEUE_SYNC_EVERY_MIN = 5;
+var QUEUE_SYNC_EVERY_MIN = 2;
 var QUEUE_SYNC_SHEET = '_QueueSync'; // hidden: id + updatedAt of rows this sync wrote
 var QUEUE_TAB_NAMES = ['มค','กพ','มีค','เมย','พค','มิย','กค','สค','กย','ตค','พย','ธค'];
 var QUEUE_NOTE_TAG = '(นำเข้าจากตารางคิว)';
@@ -692,18 +704,28 @@ function queueStatus_(b, nowYmdHm) {
   return 'completed';
 }
 
+// Same car, start within a day, and the rental times really overlap.
+// Back-to-back rentals (one customer returns 11:30, the next picks up 13:00
+// the same day) are two bookings, not one: comparing dates only used to merge
+// them and the sync then dropped the second one.
 function queueSameBooking_(a, b) {
   if (String(a.carId) !== String(b.carId)) return false;
   var as = queueDayMs_(a.start), bs = queueDayMs_(b.start);
-  var ae = queueDayMs_(a.end || a.start), be = queueDayMs_(b.end || b.start);
-  return Math.abs(as - bs) <= QUEUE_DAY && as <= be && bs <= ae;
+  if (Math.abs(as - bs) > QUEUE_DAY) return false;
+  var t = function (d, tm, dflt) { return String(d || '').slice(0, 10) + ' ' + (queueTime_(tm) || dflt); };
+  var aS = t(a.start, a.startTime, '00:00'), aE = t(a.end || a.start, a.endTime, '23:59');
+  var bS = t(b.start, b.startTime, '00:00'), bE = t(b.end || b.start, b.endTime, '23:59');
+  return aS < bE && bS < aE;
 }
 
 // Pure merge step (no Sheet access) so it can be tested on its own.
 // parsed: from parseQueueGrid_ (all tabs). owned: {id: updatedAt this sync wrote}.
+// syncRemoved: {id: when} rows this sync itself took out (their tombstone is
+// not a person's deletion, so the booking may come back if the Sheet has it).
 // Returns the new bookings array + what changed.
-function planQueueSync_(parsed, bookings, owned, tombIds, todayYmd, coveredUntilYmd, nowIso, nowYmdHm, idFn) {
-  var out = bookings.slice(), byId = {}, seen = {}, kept = [], added = [], updated = [], removed = [];
+function planQueueSync_(parsed, bookings, owned, tombIds, todayYmd, coveredUntilYmd, nowIso, nowYmdHm, idFn, syncRemoved) {
+  syncRemoved = syncRemoved || {};
+  var out = bookings.slice(), byId = {}, seen = {}, kept = [], added = [], updated = [], removed = [], revived = [];
   out.forEach(function (b) { byId[String(b.id)] = b; });
   var isOwnedUntouched = function (b) { return owned[b.id] && String(owned[b.id]) === String(b.updatedAt); };
   var manual = out.filter(function (b) { return !owned[b.id]; });
@@ -714,7 +736,7 @@ function planQueueSync_(parsed, bookings, owned, tombIds, todayYmd, coveredUntil
     // ...or written slightly differently in the two tabs: keep the first one
     if (kept.some(function (k) { return queueSameBooking_(k, p); })) return;
     seen[id] = true; kept.push(p);
-    if (tombIds[id]) return; // deleted in the app: stays deleted
+    if (tombIds[id] && !syncRemoved[id]) return; // deleted in the app: stays deleted
     var note = (p.channel ? p.channel + ' · ' : '') + p.text + ' ' + QUEUE_NOTE_TAG;
     var existing = byId[id];
     if (existing) {
@@ -735,6 +757,7 @@ function planQueueSync_(parsed, bookings, owned, tombIds, todayYmd, coveredUntil
       status: queueStatus_(p, nowYmdHm), note: note, updatedAt: nowIso
     };
     out.push(row); byId[id] = row; owned[id] = nowIso;
+    if (syncRemoved[id]) { if (tombIds[id]) revived.push(id); delete syncRemoved[id]; }
     added.push(p);
   });
 
@@ -744,10 +767,10 @@ function planQueueSync_(parsed, bookings, owned, tombIds, todayYmd, coveredUntil
     if (!isOwnedUntouched(b) || b.status !== 'upcoming') return true;
     var gone = !seen[b.id] && b.start >= todayYmd && b.start <= coveredUntilYmd;
     var dupe = manual.some(function (mb) { return mb.id !== b.id && queueSameBooking_(mb, b); });
-    if (gone || dupe) { removed.push(b); delete owned[b.id]; return false; }
+    if (gone || dupe) { removed.push(b); delete owned[b.id]; syncRemoved[b.id] = nowIso; return false; }
     return true;
   });
-  return { bookings: out, added: added, updated: updated, removed: removed, owned: owned };
+  return { bookings: out, added: added, updated: updated, removed: removed, owned: owned, syncRemoved: syncRemoved, revived: revived };
 }
 
 function queueTabName_(year, month) {
@@ -761,14 +784,23 @@ function readQueueSyncOwned_(ss) {
     sh.getRange(1, 1, 1, 2).setValues([['id', 'updatedAt']]);
     sh.hideSheet();
   }
-  var out = {}, last = sh.getLastRow();
-  if (last >= 2) sh.getRange(2, 1, last - 1, 2).getDisplayValues().forEach(function (r) { if (r[0]) out[r[0]] = r[1]; });
-  return { sheet: sh, owned: out };
+  // updatedAt "removed@<time>" = a row this sync took out itself.
+  var out = {}, removed = {}, last = sh.getLastRow();
+  if (last >= 2) sh.getRange(2, 1, last - 1, 2).getDisplayValues().forEach(function (r) {
+    if (!r[0]) return;
+    if (String(r[1]).indexOf('removed@') === 0) removed[r[0]] = String(r[1]).slice(8);
+    else out[r[0]] = r[1];
+  });
+  return { sheet: sh, owned: out, removed: removed };
 }
 
-function writeQueueSyncOwned_(sh, owned, liveIds) {
+function writeQueueSyncOwned_(sh, owned, liveIds, removed, nowIso) {
   var rows = [['id', 'updatedAt']];
   Object.keys(owned).forEach(function (id) { if (liveIds[id]) rows.push([id, owned[id]]); });
+  var keepAfter = new Date(Date.parse(nowIso) - 120 * QUEUE_DAY).toISOString();
+  Object.keys(removed || {}).forEach(function (id) {
+    if (!liveIds[id] && removed[id] >= keepAfter) rows.push([id, 'removed@' + removed[id]]);
+  });
   sh.clearContents();
   sh.getRange(1, 1, rows.length, 2).setNumberFormat('@').setValues(rows);
 }
@@ -814,20 +846,21 @@ function syncQueueFromSheet_(waitMs) {
       return Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, s, Utilities.Charset.UTF_8)
         .map(function (b) { return ('0' + (b & 0xff).toString(16)).slice(-2); }).join('').slice(0, 10);
     };
-    var plan = planQueueSync_(parsed, bookings, ownedInfo.owned, tomb, todayYmd, coveredUntil, nowIso, nowYmdHm, md5);
+    var plan = planQueueSync_(parsed, bookings, ownedInfo.owned, tomb, todayYmd, coveredUntil, nowIso, nowYmdHm, md5, ownedInfo.removed);
 
     if (plan.added.length || plan.updated.length || plan.removed.length) {
       arrayToSheet(ss, SHEET_NAMES.bookings, plan.bookings, HEADERS.bookings);
+      if (plan.revived.length) removeTombstoneRows_(ss, 'bookings', plan.revived);
       if (plan.removed.length) appendTombstoneRows_(ss, plan.removed.map(function (b) { return ['bookings', b.id, nowIso]; }));
       writeIdSnapshot_(ss, collectIds_(ss));
     }
     var live = {};
     plan.bookings.forEach(function (b) { live[b.id] = true; });
-    writeQueueSyncOwned_(ownedInfo.sheet, plan.owned, live);
+    writeQueueSyncOwned_(ownedInfo.sheet, plan.owned, live, plan.syncRemoved, nowIso);
 
     var report = {
       status: 'ok', at: nowIso, tabs: tabsRead,
-      added: plan.added.length, updated: plan.updated.length, removed: plan.removed.length,
+      added: plan.added.length, updated: plan.updated.length, removed: plan.removed.length, revived: plan.revived.length,
       addedList: plan.added.map(function (p) { return p.where + ' · ' + p.text; }),
       removedList: plan.removed.map(function (b) { return b.carId + ' ' + b.start + ' ' + b.customer; }),
       skipped: skipped
@@ -847,7 +880,10 @@ function maybeSyncQueue_() {
     var cache = CacheService.getScriptCache();
     if (cache.get('queueSyncAt')) return;
     cache.put('queueSyncAt', '1', QUEUE_SYNC_EVERY_MIN * 60);
-    syncQueueFromSheet_(0);
+    var r = syncQueueFromSheet_(0);
+    // A save was writing at that moment: try again on the next refresh
+    // instead of waiting the full interval.
+    if (r && r.status !== 'ok') cache.remove('queueSyncAt');
   } catch (e) {}
 }
 
